@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import SettingsModal from './SettingsModal';
 import CharacterEditor from './CharacterEditor';
 import SceneEditor from './SceneEditor';
+import UserPersonaEditor from './UserPersonaEditor';
 
 // API Configuration
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
@@ -45,7 +46,8 @@ const MainApp = () => {
   const [showSceneEditor, setShowSceneEditor] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [editingCharacter, setEditingCharacter] = useState(null);
-  
+  const [userPersona, setUserPersona] = useState(null);
+  const [showPersonaEditor, setShowPersonaEditor] = useState(false);
   const messagesEndRef = useRef(null);
 
   // ============================================================================
@@ -240,7 +242,52 @@ const MainApp = () => {
       return false;
     }
   };
+/**
+ * Load user's persona
+ */
+const loadUserPersona = async () => {
+  try {
+    const persona = await apiRequest('/api/user/persona');
+    console.log('📥 Loaded user persona:', persona);
+    setUserPersona(persona);
+  } catch (err) {
+    console.error('Failed to load user persona:', err);
+    // Set default if loading fails
+    setUserPersona({
+      hasPersona: false,
+      persona: {
+        name: 'User',
+        personality: 'A curious individual engaging in conversation',
+        interests: [],
+        communication_style: 'casual and friendly',
+        avatar: '👤',
+        color: 'from-blue-500 to-indigo-500'
+      }
+    });
+  }
+};
 
+/**
+ * Save user persona
+ */
+const saveUserPersona = async (personaData) => {
+  try {
+    console.log('📤 Saving user persona:', personaData);
+    const response = await apiRequest('/api/user/persona', {
+      method: 'POST',
+      body: JSON.stringify(personaData),
+    });
+    
+    console.log('✅ Persona saved:', response);
+    await loadUserPersona(); // Reload to get updated data
+    setError(null);
+    return true;
+  } catch (err) {
+    console.error('Failed to save user persona:', err);
+    setError('Failed to save persona: ' + err.message);
+    return false;
+  }
+};
   // ============================================================================
   // CHAT FUNCTIONS
   // ============================================================================
@@ -394,31 +441,44 @@ const MainApp = () => {
 
   // Initialize app on mount
   useEffect(() => {
-    const initializeApp = async () => {
-      console.log('🚀 Initializing app for user:', user?.email);
-      const isConnected = await checkApiStatus();
-      if (isConnected) {
-        await Promise.all([
-          loadCharacters(),
-          loadScenarios(),
-          loadUserSettings()
-        ]);
-      }
-    };
+  const initializeApp = async () => {
+    console.log('🚀 Initializing app for user:', user?.email);
+    const isConnected = await checkApiStatus();
+    if (isConnected) {
+      await Promise.all([
+        loadCharacters(),
+        loadScenarios(),
+        loadUserSettings(),
+        loadUserPersona() // ADD THIS LINE
+      ]);
+    }
+  };
 
     if (user) {
-      initializeApp();
-    }
+    initializeApp();
+  }
 
-    // Set welcome message
-    setMessages([
-      {
-        type: 'system',
-        content: `Welcome back, ${user?.user_metadata?.full_name || user?.email}! Ready to chat with your AI characters?`,
-        timestamp: new Date()
-      }
-    ]);
-  }, [user]);
+  // Update welcome message to include user persona name
+  const userName = userPersona?.persona?.name || user?.user_metadata?.full_name || user?.email;
+  setMessages([
+    {
+      type: 'system',
+      content: `Welcome back, ${userName}! Ready to chat with your AI characters?`,
+      timestamp: new Date()
+    }
+  ]);
+}, [user]); // Keep the dependency array as [user]
+
+useEffect(() => {
+  if (userPersona && messages.length > 0) {
+    const userName = userPersona.persona.name || user?.user_metadata?.full_name || user?.email;
+    setMessages(prev => prev.map((msg, index) => 
+      index === 0 && msg.type === 'system' 
+        ? { ...msg, content: `Welcome back, ${userName}! Ready to chat with your AI characters?` }
+        : msg
+    ));
+  }
+}, [userPersona]);
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -461,37 +521,54 @@ const MainApp = () => {
           {/* User Menu */}
           <div className="relative">
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/10 transition-colors"
-            >
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
-                {user?.user_metadata?.avatar_url ? (
-                  <img 
-                    src={user.user_metadata.avatar_url} 
-                    alt="Profile" 
-                    className="w-8 h-8 rounded-full"
-                  />
-                ) : (
-                  <User className="text-white" size={16} />
-                )}
-              </div>
-            </button>
-            
-            {showUserMenu && (
-              <div className="absolute right-0 top-12 bg-slate-800 border border-white/10 rounded-lg p-2 min-w-48 z-10">
-                <div className="px-3 py-2 border-b border-white/10 mb-2">
-                  <p className="text-sm font-medium text-white">
-                    {user?.user_metadata?.full_name || 'User'}
-                  </p>
-                  <p className="text-xs text-gray-400">{user?.email}</p>
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
-                >
-                  <LogOut size={16} />
-                  Sign Out
-                </button>
+  			  onClick={() => setShowUserMenu(!showUserMenu)}
+ 			   className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/10 transition-colors"
+			  >
+ 			   <div className={`w-8 h-8 bg-gradient-to-r ${
+			      userPersona?.hasPersona ? userPersona.persona.color : 'from-purple-500 to-blue-500'
+			    } rounded-full flex items-center justify-center`}>
+			      {userPersona?.hasPersona ? (
+			        <span className="text-white text-sm">{userPersona.persona.avatar}</span>
+ 			     ) : user?.user_metadata?.avatar_url ? (
+			        <img 
+			          src={user.user_metadata.avatar_url} 
+			          alt="Profile" 
+ 			         className="w-8 h-8 rounded-full"
+ 			       />
+ 			     ) : (
+  			      <User className="text-white" size={16} />
+			      )}
+			    </div>
+			  </button>
+  
+			  {showUserMenu && (
+			    <div className="absolute right-0 top-12 bg-slate-800 border border-white/10 rounded-lg p-2 min-w-48 z-10">
+			      <div className="px-3 py-2 border-b border-white/10 mb-2">
+  			      <p className="text-sm font-medium text-white">
+  			        {userPersona?.hasPersona ? userPersona.persona.name : user?.user_metadata?.full_name || 'User'}
+  			      </p>
+  			      <p className="text-xs text-gray-400">{user?.email}</p>
+   			     {userPersona?.hasPersona && (
+   				      <p className="text-xs text-blue-300 mt-1">Persona Active</p>
+   			     )}
+  			    </div>
+   			   <button
+   			     onClick={() => {
+  			      	setShowPersonaEditor(true);
+   			     	setShowUserMenu(false);
+  			      }}
+   			     className="w-full flex items-center gap-2 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
+  			    >
+    				<User size={16} />
+    			    {userPersona?.hasPersona ? 'Edit Persona' : 'Create Persona'}
+   			    </button>
+  			    <button
+   			     onClick={handleSignOut}
+    				className="w-full flex items-center gap-2 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
+   			   	>
+     			   <LogOut size={16} />
+     			   Sign Out
+    			  </button>
               </div>
             )}
           </div>
@@ -519,19 +596,38 @@ const MainApp = () => {
         {/* Settings Buttons */}
         <div className="mb-6 space-y-2">
           <button
-            onClick={() => setShowSettings(true)}
-            className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
-          >
-            <Settings size={18} />
-            <span>Settings & API Keys</span>
-          </button>
-          <button
-            onClick={() => setShowSceneEditor(true)}
-            className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
-          >
-            <MessageCircle size={18} />
-            <span>Manage Scenes</span>
-          </button>
+    		onClick={() => setShowPersonaEditor(true)}
+    		className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
+  		>
+   		 <User size={18} />
+		    <div className="flex-1 text-left">
+		      <div className="text-sm">Your Persona</div>
+ 		     <div className="text-xs text-gray-400">
+		        {userPersona?.hasPersona ? userPersona.persona.name : 'Set up your character'}
+		      </div>
+		    </div>
+		    {userPersona?.hasPersona && (
+ 		     <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${userPersona.persona.color} flex items-center justify-center text-xs`}>
+ 		       {userPersona.persona.avatar}
+ 		     </div>
+		    )}
+		  </button>
+  
+		  <button
+		    onClick={() => setShowSettings(true)}
+ 		   className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
+		  >
+		    <Settings size={18} />
+ 		   <span>Settings & API Keys</span>
+ 		 </button>
+ 		 
+ 		 <button
+   		 onClick={() => setShowSceneEditor(true)}
+  		  className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
+ 		 >
+   		 <MessageCircle size={18} />
+  		  <span>Manage Scenes</span>
+ 		 </button>
         </div>
 
         {/* Scenario Selection */}
@@ -813,6 +909,18 @@ const MainApp = () => {
           onClose={() => setShowSceneEditor(false)}
         />
       )}
+      {showPersonaEditor && (
+ 		 <UserPersonaEditor
+	    	userPersona={userPersona}
+		    onSave={async (personaData) => {
+		      const success = await saveUserPersona(personaData);
+		      if (success) {
+		        setShowPersonaEditor(false);
+ 		     }
+ 		   }}
+ 		   onClose={() => setShowPersonaEditor(false)}
+ 		 />
+		)}
 
       {/* Click outside to close user menu */}
       {showUserMenu && (

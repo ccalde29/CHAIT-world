@@ -302,7 +302,116 @@ class DatabaseService {
       throw error;
     }
   }
+// ============================================================================
+// USER PERSONA MANAGEMENT METHODS
+// Add these methods to your DatabaseService class in database.js
+// ============================================================================
 
+/**
+ * Get user's persona
+ */
+async getUserPersona(userId) {
+  try {
+    const { data, error } = await this.supabase
+      .from('user_personas')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      throw error;
+    }
+
+    // Return default persona if none exists
+    if (!data) {
+      return {
+        hasPersona: false,
+        persona: {
+          name: 'User',
+          personality: 'A curious individual engaging in conversation',
+          interests: [],
+          communication_style: 'casual and friendly',
+          avatar: '👤',
+          color: 'from-blue-500 to-indigo-500'
+        }
+      };
+    }
+
+    return {
+      hasPersona: true,
+      persona: {
+        id: data.id,
+        name: data.name,
+        personality: data.personality,
+        interests: data.interests || [],
+        communication_style: data.communication_style || '',
+        avatar: data.avatar,
+        color: data.color,
+        created_at: data.created_at
+      }
+    };
+
+  } catch (error) {
+    console.error('Database error getting user persona:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create or update user persona
+ */
+async createOrUpdateUserPersona(userId, personaData) {
+  try {
+    // First, deactivate any existing active persona
+    await this.supabase
+      .from('user_personas')
+      .update({ is_active: false })
+      .eq('user_id', userId);
+
+    // Create new active persona
+    const { data, error } = await this.supabase
+      .from('user_personas')
+      .insert({
+        user_id: userId,
+        name: personaData.name,
+        personality: personaData.personality,
+        interests: personaData.interests,
+        communication_style: personaData.communication_style,
+        avatar: personaData.avatar,
+        color: personaData.color,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+
+  } catch (error) {
+    console.error('Database error creating/updating user persona:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete user persona (deactivate)
+ */
+async deleteUserPersona(userId) {
+  try {
+    const { error } = await this.supabase
+      .from('user_personas')
+      .update({ is_active: false })
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    return { message: 'User persona deleted successfully' };
+
+  } catch (error) {
+    console.error('Database error deleting user persona:', error);
+    throw error;
+  }
+}
   // ============================================================================
   // USER SETTINGS MANAGEMENT
   // ============================================================================
