@@ -302,116 +302,7 @@ class DatabaseService {
       throw error;
     }
   }
-// ============================================================================
-// USER PERSONA MANAGEMENT METHODS
-// Add these methods to your DatabaseService class in database.js
-// ============================================================================
 
-/**
- * Get user's persona
- */
-async getUserPersona(userId) {
-  try {
-    const { data, error } = await this.supabase
-      .from('user_personas')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      throw error;
-    }
-
-    // Return default persona if none exists
-    if (!data) {
-      return {
-        hasPersona: false,
-        persona: {
-          name: 'User',
-          personality: 'A curious individual engaging in conversation',
-          interests: [],
-          communication_style: 'casual and friendly',
-          avatar: '👤',
-          color: 'from-blue-500 to-indigo-500'
-        }
-      };
-    }
-
-    return {
-      hasPersona: true,
-      persona: {
-        id: data.id,
-        name: data.name,
-        personality: data.personality,
-        interests: data.interests || [],
-        communication_style: data.communication_style || '',
-        avatar: data.avatar,
-        color: data.color,
-        created_at: data.created_at
-      }
-    };
-
-  } catch (error) {
-    console.error('Database error getting user persona:', error);
-    throw error;
-  }
-}
-
-/**
- * Create or update user persona
- */
-async createOrUpdateUserPersona(userId, personaData) {
-  try {
-    // First, deactivate any existing active persona
-    await this.supabase
-      .from('user_personas')
-      .update({ is_active: false })
-      .eq('user_id', userId);
-
-    // Create new active persona
-    const { data, error } = await this.supabase
-      .from('user_personas')
-      .insert({
-        user_id: userId,
-        name: personaData.name,
-        personality: personaData.personality,
-        interests: personaData.interests,
-        communication_style: personaData.communication_style,
-        avatar: personaData.avatar,
-        color: personaData.color,
-        is_active: true
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-
-  } catch (error) {
-    console.error('Database error creating/updating user persona:', error);
-    throw error;
-  }
-}
-
-/**
- * Delete user persona (deactivate)
- */
-async deleteUserPersona(userId) {
-  try {
-    const { error } = await this.supabase
-      .from('user_personas')
-      .update({ is_active: false })
-      .eq('user_id', userId);
-
-    if (error) throw error;
-    return { message: 'User persona deleted successfully' };
-
-  } catch (error) {
-    console.error('Database error deleting user persona:', error);
-    throw error;
-  }
-}
   // ============================================================================
   // USER SETTINGS MANAGEMENT
   // ============================================================================
@@ -598,6 +489,107 @@ async deleteUserPersona(userId) {
   }
 
   // ============================================================================
+  // USER PERSONA MANAGEMENT
+  // ============================================================================
+
+  async getUserPersona(userId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_personas')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        throw error;
+      }
+
+      // Return default persona if none exists
+      if (!data) {
+        return {
+          hasPersona: false,
+          persona: {
+            name: 'User',
+            personality: 'A curious individual engaging in conversation',
+            interests: [],
+            communication_style: 'casual and friendly',
+            avatar: '👤',
+            color: 'from-blue-500 to-indigo-500'
+          }
+        };
+      }
+
+      return {
+        hasPersona: true,
+        persona: {
+          id: data.id,
+          name: data.name,
+          personality: data.personality,
+          interests: data.interests || [],
+          communication_style: data.communication_style || '',
+          avatar: data.avatar,
+          color: data.color,
+          created_at: data.created_at
+        }
+      };
+
+    } catch (error) {
+      console.error('Database error getting user persona:', error);
+      throw error;
+    }
+  }
+
+  async createOrUpdateUserPersona(userId, personaData) {
+    try {
+      // First, deactivate any existing active persona
+      await this.supabase
+        .from('user_personas')
+        .update({ is_active: false })
+        .eq('user_id', userId);
+
+      // Create new active persona
+      const { data, error } = await this.supabase
+        .from('user_personas')
+        .insert({
+          user_id: userId,
+          name: personaData.name,
+          personality: personaData.personality,
+          interests: personaData.interests,
+          communication_style: personaData.communication_style,
+          avatar: personaData.avatar,
+          color: personaData.color,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+
+    } catch (error) {
+      console.error('Database error creating/updating user persona:', error);
+      throw error;
+    }
+  }
+
+  async deleteUserPersona(userId) {
+    try {
+      const { error } = await this.supabase
+        .from('user_personas')
+        .update({ is_active: false })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return { message: 'User persona deleted successfully' };
+
+    } catch (error) {
+      console.error('Database error deleting user persona:', error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
   // SCENARIO MANAGEMENT
   // ============================================================================
 
@@ -716,6 +708,339 @@ async deleteUserPersona(userId) {
       console.error('Database error deleting scenario:', error);
       throw error;
     }
+  }
+
+  // ============================================================================
+  // CHARACTER MEMORY MANAGEMENT
+  // ============================================================================
+
+  async getCharacterMemories(characterId, userId, limit = 10) {
+    try {
+      const { data, error } = await this.supabase
+        .from('character_memories')
+        .select('*')
+        .eq('character_id', characterId)
+        .eq('user_id', userId)
+        .order('importance_score', { ascending: false })
+        .order('last_accessed', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+
+    } catch (error) {
+      console.error('Database error getting character memories:', error);
+      throw error;
+    }
+  }
+
+  async addCharacterMemory(characterId, userId, memoryData) {
+    try {
+      const { data, error } = await this.supabase
+        .from('character_memories')
+        .insert({
+          character_id: characterId,
+          user_id: userId,
+          memory_type: memoryData.type,
+          target_entity: memoryData.target_entity || userId,
+          memory_content: memoryData.content,
+          importance_score: memoryData.importance_score || 0.5
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+
+    } catch (error) {
+      console.error('Database error adding character memory:', error);
+      throw error;
+    }
+  }
+
+  async updateMemoryAccess(memoryId) {
+    try {
+      const { error } = await this.supabase
+        .rpc('increment_access_count', { memory_id: memoryId });
+
+      if (error) throw error;
+      return true;
+
+    } catch (error) {
+      console.error('Database error updating memory access:', error);
+      return false;
+    }
+  }
+
+  async getCharacterRelationship(characterId, userId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('character_relationships')
+        .select('*')
+        .eq('character_id', characterId)
+        .eq('user_id', userId)
+        .eq('target_type', 'user')
+        .eq('target_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        throw error;
+      }
+
+      // Return default relationship if none exists
+      if (!data) {
+        return {
+          relationship_type: 'neutral',
+          trust_level: 0.5,
+          familiarity_level: 0.1,
+          emotional_bond: 0.0,
+          interaction_count: 0
+        };
+      }
+
+      return data;
+
+    } catch (error) {
+      console.error('Database error getting character relationship:', error);
+      throw error;
+    }
+  }
+
+  async updateCharacterRelationship(characterId, userId, relationshipData) {
+    try {
+      const { data, error } = await this.supabase
+        .from('character_relationships')
+        .upsert({
+          character_id: characterId,
+          user_id: userId,
+          target_type: 'user',
+          target_id: userId,
+          relationship_type: relationshipData.relationship_type,
+          trust_level: relationshipData.trust_level,
+          familiarity_level: relationshipData.familiarity_level,
+          emotional_bond: relationshipData.emotional_bond,
+          last_interaction: new Date().toISOString(),
+          interaction_count: relationshipData.interaction_count || 1
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+
+    } catch (error) {
+      console.error('Database error updating character relationship:', error);
+      throw error;
+    }
+  }
+
+  async getConversationContext(sessionId, characterId, userId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('conversation_contexts')
+        .select('*')
+        .eq('session_id', sessionId)
+        .eq('character_id', characterId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      return data || null;
+
+    } catch (error) {
+      console.error('Database error getting conversation context:', error);
+      throw error;
+    }
+  }
+
+  async updateConversationContext(sessionId, characterId, userId, contextData) {
+    try {
+      const { data, error } = await this.supabase
+        .from('conversation_contexts')
+        .upsert({
+          session_id: sessionId,
+          character_id: characterId,
+          user_id: userId,
+          context_summary: contextData.summary,
+          important_points: contextData.important_points || [],
+          last_messages: contextData.last_messages || [],
+          token_count: contextData.token_count || 0,
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+
+    } catch (error) {
+      console.error('Database error updating conversation context:', error);
+      throw error;
+    }
+  }
+
+  async createConversationSummary(sessionId, summaryText, messageCount) {
+    try {
+      const { data, error } = await this.supabase
+        .from('conversation_summaries')
+        .insert({
+          session_id: sessionId,
+          summary_text: summaryText,
+          original_message_count: messageCount
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+
+    } catch (error) {
+      console.error('Database error creating conversation summary:', error);
+      throw error;
+    }
+  }
+
+  async buildCharacterContext(characterId, userId, sessionId = null) {
+    try {
+      // Get user persona
+      const userPersona = await this.getUserPersona(userId);
+      
+      // Get character memories
+      const memories = await this.getCharacterMemories(characterId, userId, 5);
+      
+      // Get character relationship
+      const relationship = await this.getCharacterRelationship(characterId, userId);
+      
+      // Get conversation context if session provided
+      let conversationContext = null;
+      if (sessionId) {
+        conversationContext = await this.getConversationContext(sessionId, characterId, userId);
+      }
+
+      return {
+        userPersona: userPersona.persona,
+        memories,
+        relationship,
+        conversationContext
+      };
+
+    } catch (error) {
+      console.error('Database error building character context:', error);
+      throw error;
+    }
+  }
+
+  // ============================================================================
+  // HELPER FUNCTIONS FOR MEMORY PROCESSING
+  // ============================================================================
+
+  analyzeConversationForMemories(userMessage, characterResponse, userPersona) {
+    const memories = [];
+    
+    // Extract potential memories from conversation
+    const conversationText = `${userMessage} ${characterResponse}`.toLowerCase();
+    
+    // Personal information detection
+    const personalPatterns = [
+      /my name is (\w+)/,
+      /i'm (\w+)/,
+      /call me (\w+)/,
+      /i work (?:as|at) ([\w\s]+)/,
+      /i live in ([\w\s]+)/,
+      /i'm from ([\w\s]+)/,
+      /i like ([\w\s]+)/,
+      /i love ([\w\s]+)/,
+      /i hate ([\w\s]+)/,
+      /i don't like ([\w\s]+)/
+    ];
+
+    personalPatterns.forEach(pattern => {
+      const match = conversationText.match(pattern);
+      if (match) {
+        memories.push({
+          type: 'fact',
+          content: `User mentioned: ${match[0]}`,
+          importance_score: 0.8,
+          target_entity: 'user'
+        });
+      }
+    });
+
+    // Emotional context detection
+    const emotionalPatterns = [
+      /(?:i'm|i am|feeling) (?:sad|happy|excited|angry|frustrated|worried|nervous)/,
+      /(?:love|hate|enjoy|dislike) (?:this|that|it)/,
+      /(?:that's|this is) (?:amazing|terrible|wonderful|awful|great|bad)/
+    ];
+
+    emotionalPatterns.forEach(pattern => {
+      const match = conversationText.match(pattern);
+      if (match) {
+        memories.push({
+          type: 'event',
+          content: `Emotional moment: ${match[0]}`,
+          importance_score: 0.6,
+          target_entity: 'user'
+        });
+      }
+    });
+
+    return memories;
+  }
+
+  calculateRelationshipUpdate(currentRelationship, userMessage, characterResponse) {
+    let familiarityIncrease = 0.02; // Base familiarity increase per interaction
+    let emotionalChange = 0.0;
+    let trustChange = 0.0;
+
+    // Analyze user message sentiment
+    const userText = userMessage.toLowerCase();
+    const characterText = characterResponse.toLowerCase();
+
+    // Positive interactions
+    if (userText.match(/(?:thank you|thanks|appreciate|love|like|great|wonderful|amazing)/)) {
+      emotionalChange += 0.05;
+      trustChange += 0.02;
+    }
+
+    // Negative interactions
+    if (userText.match(/(?:hate|dislike|terrible|awful|stupid|wrong|bad)/)) {
+      emotionalChange -= 0.03;
+      trustChange -= 0.01;
+    }
+
+    // Sharing personal information increases trust
+    if (userText.match(/(?:my|i'm|i am|personal|private|secret)/)) {
+      trustChange += 0.03;
+      familiarityIncrease += 0.01;
+    }
+
+    // Long conversations increase familiarity more
+    if (userMessage.length > 100) {
+      familiarityIncrease += 0.01;
+    }
+
+    return {
+      relationship_type: this.determineRelationshipType(
+        currentRelationship.emotional_bond + emotionalChange,
+        currentRelationship.familiarity_level + familiarityIncrease
+      ),
+      trust_level: Math.max(0, Math.min(1, currentRelationship.trust_level + trustChange)),
+      familiarity_level: Math.max(0, Math.min(1, currentRelationship.familiarity_level + familiarityIncrease)),
+      emotional_bond: Math.max(-1, Math.min(1, currentRelationship.emotional_bond + emotionalChange)),
+      interaction_count: (currentRelationship.interaction_count || 0) + 1
+    };
+  }
+
+  determineRelationshipType(emotionalBond, familiarityLevel) {
+    if (emotionalBond > 0.6 && familiarityLevel > 0.7) return 'close_friend';
+    if (emotionalBond > 0.3 && familiarityLevel > 0.4) return 'friend';
+    if (emotionalBond > 0.1 && familiarityLevel > 0.2) return 'acquaintance';
+    if (emotionalBond < -0.3) return 'dislike';
+    return 'neutral';
   }
 
   // ============================================================================

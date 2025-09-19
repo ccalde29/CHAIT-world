@@ -4,12 +4,13 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Users, Settings, Plus, MessageCircle, Zap, Wifi, WifiOff, Edit, Trash2, LogOut, User } from 'lucide-react';
+import { Send, Users, Settings, Plus, MessageCircle, Zap, Wifi, WifiOff, Edit, Trash2, LogOut, User, Brain } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsModal from './SettingsModal';
 import CharacterEditor from './CharacterEditor';
 import SceneEditor from './SceneEditor';
 import UserPersonaEditor from './UserPersonaEditor';
+import CharacterMemoryViewer from './CharacterMemoryViewer';
 
 // API Configuration
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
@@ -28,7 +29,9 @@ const MainApp = () => {
   const [userInput, setUserInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
-  
+  const [showMemoryViewer, setShowMemoryViewer] = useState(false);
+  const [selectedCharacterForMemory, setSelectedCharacterForMemory] = useState(null);
+
   // Characters and scenarios
   const [characters, setCharacters] = useState([]);
   const [activeCharacters, setActiveCharacters] = useState([]);
@@ -288,6 +291,18 @@ const saveUserPersona = async (personaData) => {
     return false;
   }
 };
+
+// ADD MEMORY VIEWER FUNCTIONS
+const openMemoryViewer = (character) => {
+  setSelectedCharacterForMemory(character);
+  setShowMemoryViewer(true);
+};
+
+const closeMemoryViewer = () => {
+  setShowMemoryViewer(false);
+  setSelectedCharacterForMemory(null);
+};
+
   // ============================================================================
   // CHAT FUNCTIONS
   // ============================================================================
@@ -678,62 +693,79 @@ useEffect(() => {
           </div>
           
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {characters.map((character) => (
-              <div
-                key={character.id}
-                onClick={() => !isGenerating && toggleCharacter(character.id)}
-                className={`p-3 rounded-lg border transition-all ${
-                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                } ${
-                  activeCharacters.includes(character.id)
-                    ? `bg-gradient-to-r ${character.color} border-white/20`
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">
-                    {character.avatar}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="font-medium text-white text-sm">{character.name}</div>
-                      {character.is_default && (
-                        <span className="text-xs bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded">
-                          Default
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-300 line-clamp-2">{character.personality}</div>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingCharacter(character);
-                        setShowCharacterEditor(true);
-                      }}
-                      className="p-1 text-gray-400 hover:text-white transition-colors"
-                      title="Edit character"
-                    >
-                      <Edit size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (window.confirm(`Delete ${character.name}?`)) {
-                          deleteCharacter(character.id);
-                        }
-                      }}
-                      className="p-1 text-gray-400 hover:text-red-400 transition-colors"
-                      title="Delete character"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          	{characters.map((character) => (
+          		<div
+          			key={character.id}
+      				className={`p-3 rounded-lg border transition-all ${
+        				isGenerating ? 'opacity-50 cursor-not-allowed' : ''
+        			} ${
+     			 		activeCharacters.includes(character.id)
+				          ? `bg-gradient-to-r ${character.color} border-white/20`
+				          : 'bg-white/5 border-white/10 hover:bg-white/10'
+				      }`}
+				    >
+				      <div className="flex items-center gap-3">
+ 				       <div 
+				          onClick={() => !isGenerating && toggleCharacter(character.id)}
+				          className={`flex-1 flex items-center gap-3 ${!isGenerating ? 'cursor-pointer' : ''}`}
+				        >
+				          <span className="text-2xl">
+				            {character.avatar}
+          				</span>
+          				<div className="flex-1 min-w-0">
+            				<div className="flex items-center gap-2">
+              				<div className="font-medium text-white text-sm">{character.name}</div>
+              				{character.is_default && (
+                				<span className="text-xs bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded">
+                  				Default
+                				</span>
+              				)}
+            				</div>
+            				<div className="text-xs text-gray-300 line-clamp-2">{character.personality}</div>
+          				</div>
+        				</div>
+        
+        				<div className="flex flex-col gap-1">
+          				<div className="flex gap-1">
+            				<button
+              				onClick={(e) => {
+                				e.stopPropagation();
+                				openMemoryViewer(character);
+              				}}
+              				className="p-1 text-gray-400 hover:text-purple-400 transition-colors"
+              				title="View memories"
+           				 >
+              				<Brain size={12} />
+            				</button>
+            				<button
+              				onClick={(e) => {
+                				e.stopPropagation();
+                				setEditingCharacter(character);
+                				setShowCharacterEditor(true);
+              				}}
+              				className="p-1 text-gray-400 hover:text-white transition-colors"
+              				title="Edit character"
+            				>
+              				<Edit size={12} />
+            				</button>
+            				<button
+              				onClick={(e) => {
+                				e.stopPropagation();
+                				if (window.confirm(`Delete ${character.name}?`)) {
+                  				deleteCharacter(character.id);
+                				}
+              				}}
+              				className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+              				title="Delete character"
+            			  >
+              				<Trash2 size={12} />
+            				</button>
+          					</div>
+        				</div>
+      				</div>
+    			</div>
+  				))}
+			</div>
         </div>
       </div>
 
@@ -869,6 +901,13 @@ useEffect(() => {
           }}
         />
       )}
+      {showMemoryViewer && selectedCharacterForMemory && (
+      	<CharacterMemoryViewer
+      		character={selectedCharacterForMemory}
+		    onClose={closeMemoryViewer}
+		    apiRequest={apiRequest}
+		/>
+	  )}
 
       {showSceneEditor && (
         <SceneEditor
