@@ -291,22 +291,20 @@ const CharacterEditor = ({ character, onSave, onClose }) => {
   			  </div>
  			 )}
 
- 			 {/* Image Upload Component */}
-			  <ImageUpload
-  			  currentImage={formData.avatar_image_url}
-  			  currentEmoji={formData.avatar}
- 			   onImageChange={(imageData) => {
-    			  setFormData(prev => ({
-    			    ...prev,
-    			    avatar_image_url: imageData.url,
-    			    avatar_image_filename: imageData.filename,
-    			    uses_custom_image: imageData.useCustomImage
-   			   }));
-  			  }}
-  			  onEmojiChange={(emoji) => handleInputChange('avatar', emoji)}
-  			  userId={User?.id}
-  			  type="character"
-			  />
+            {/* Image Upload Component */}
+            <ImageUpload
+                currentImage={formData.avatar_image_url}
+                currentEmoji={formData.avatar}
+                onImageChange={(imageData) => {
+                    setFormData(prev => ({
+                        ...prev,
+                        avatar_image_url: imageData.url,
+                        avatar_image_filename: imageData.filename,
+                        uses_custom_image: imageData.useCustomImage
+                     }));
+                  }}
+                  type="character"
+               />
 			</div>
           {/* Color Selection */}
           <div>

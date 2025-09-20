@@ -1,7 +1,5 @@
-// ============================================================================
-// Database Service Layer
 // backend/services/database.js
-// ============================================================================
+// Complete structure with proper method placement
 
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
@@ -9,18 +7,28 @@ const crypto = require('crypto');
 class DatabaseService {
   constructor() {
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Service role for backend
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing Supabase environment variables');
     }
     
+    // CRITICAL: Use environment variable for encryption key
+    if (!process.env.ENCRYPTION_KEY) {
+      throw new Error('ENCRYPTION_KEY environment variable is required for secure API key storage');
+    }
+    
     this.supabase = createClient(supabaseUrl, supabaseServiceKey);
-    this.encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32);
+    
+    // Create a proper 32-byte key from the environment variable
+    this.encryptionKey = crypto
+      .createHash('sha256')
+      .update(process.env.ENCRYPTION_KEY)
+      .digest();
   }
 
   // ============================================================================
-  // ENCRYPTION UTILITIES
+  // SECURE ENCRYPTION UTILITIES
   // ============================================================================
 
   encryptApiKey(text) {
@@ -29,11 +37,7 @@ class DatabaseService {
     try {
       const algorithm = 'aes-256-gcm';
       const iv = crypto.randomBytes(16);
-      
-      // Create a proper 32-byte key from the encryption key
-      const key = crypto.createHash('sha256').update(this.encryptionKey.toString()).digest();
-      
-      const cipher = crypto.createCipherGCM(algorithm, key, iv);
+      const cipher = crypto.createCipheriv(algorithm, this.encryptionKey, iv);
       
       let encrypted = cipher.update(text, 'utf8', 'hex');
       encrypted += cipher.final('hex');
@@ -44,19 +48,12 @@ class DatabaseService {
         encrypted,
         iv: iv.toString('hex'),
         authTag: authTag.toString('hex'),
-        algorithm: 'aes-256-gcm'
+        algorithm: 'aes-256-gcm',
+        version: 1
       };
     } catch (error) {
       console.error('Encryption error:', error);
-      
-      // Fallback: simple base64 encoding (less secure but works)
-      console.warn('Falling back to base64 encoding');
-      return {
-        encrypted: Buffer.from(text).toString('base64'),
-        iv: null,
-        authTag: null,
-        algorithm: 'base64'
-      };
+      throw new Error('Failed to encrypt API key securely');
     }
   }
 
@@ -64,17 +61,16 @@ class DatabaseService {
     if (!encryptedData) return null;
     
     try {
-      // Handle base64 fallback
+      // Handle legacy base64 encoding (for migration period only)
       if (encryptedData.algorithm === 'base64') {
+        console.warn('WARNING: Found legacy base64 encoded API key. Please re-save your API keys.');
         return Buffer.from(encryptedData.encrypted, 'base64').toString('utf8');
       }
       
-      // Handle proper AES-GCM decryption
+      // Proper AES-GCM decryption
       if (encryptedData.algorithm === 'aes-256-gcm') {
-        const key = crypto.createHash('sha256').update(this.encryptionKey.toString()).digest();
         const iv = Buffer.from(encryptedData.iv, 'hex');
-        
-        const decipher = crypto.createDecipherGCM('aes-256-gcm', key, iv);
+        const decipher = crypto.createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
         decipher.setAuthTag(Buffer.from(encryptedData.authTag, 'hex'));
         
         let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
@@ -83,19 +79,138 @@ class DatabaseService {
         return decrypted;
       }
       
-      // Fallback for unknown algorithm
       throw new Error('Unknown encryption algorithm');
       
     } catch (error) {
       console.error('Decryption error:', error);
-      
-      // Try base64 fallback as last resort
-      try {
-        return Buffer.from(encryptedData.encrypted, 'base64').toString('utf8');
-      } catch (fallbackError) {
-        console.error('All decryption methods failed:', fallbackError);
-        return null;
+      throw new Error('Failed to decrypt API key. The encryption key may have changed.');
+    }
+  }
+  
+  async migrateApiKeys(userId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_settings')
+        .select('openai_key_encrypted, anthropic_key_encrypted')
+        .eq('user_id', userId)
+        .single();
+
+      if (error || !data) return;
+
+      let needsUpdate = false;
+      const updates = {};
+
+      // Check and migrate OpenAI key
+      if (data.openai_key_encrypted) {
+        const encData = JSON.parse(data.openai_key_encrypted);
+        if (encData.algorithm === 'base64') {
+          const decrypted = Buffer.from(encData.encrypted, 'base64').toString('utf8');
+          updates.openai_key_encrypted = JSON.stringify(this.encryptApiKey(decrypted));
+          needsUpdate = true;
+        }
       }
+
+      // Check and migrate Anthropic key
+      if (data.anthropic_key_encrypted) {
+        const encData = JSON.parse(data.anthropic_key_encrypted);
+        if (encData.algorithm === 'base64') {
+          const decrypted = Buffer.from(encData.encrypted, 'base64').toString('utf8');
+          updates.anthropic_key_encrypted = JSON.stringify(this.encryptApiKey(decrypted));
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        await this.supabase
+          .from('user_settings')
+          .update(updates)
+          .eq('user_id', userId);
+        
+        console.log('Successfully migrated API keys to secure encryption');
+      }
+
+    } catch (error) {
+      console.error('Error migrating API keys:', error);
+    }
+  }
+
+  // ============================================================================
+  // CHARACTER MANAGEMENT - This is where getCharacters starts
+  // ============================================================================
+
+  async getCharacters(userId) {
+    try {
+      // Get custom characters
+      const { data: customChars, error: customError } = await this.supabase
+        .from('characters')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (customError) throw customError;
+
+      // Get hidden default characters
+      const { data: hiddenDefaults, error: hiddenError } = await this.supabase
+        .from('hidden_default_characters')
+        .select('character_id')
+        .eq('user_id', userId);
+
+      if (hiddenError) throw hiddenError;
+
+      const hiddenDefaultIds = new Set(hiddenDefaults.map(h => h.character_id));
+
+      // Default characters (defined in application)
+      const defaultCharacters = [
+        {
+          id: 'maya',
+          name: 'Maya',
+          personality: 'Energetic art student who loves creativity, colors, and seeing the artistic side of everything. Optimistic and playful with a tendency to get excited about visual concepts.',
+          avatar: '🎨',
+          color: 'from-pink-500 to-purple-500',
+          response_style: 'playful',
+          is_default: true
+        },
+        {
+          id: 'alex',
+          name: 'Alex',
+          personality: 'Thoughtful philosophy major who asks deep questions about human nature, meaning, and existence. Contemplative and curious, often references philosophical concepts.',
+          avatar: '🤔',
+          color: 'from-blue-500 to-indigo-500',
+          response_style: 'contemplative',
+          is_default: true
+        },
+        {
+          id: 'zoe',
+          name: 'Zoe',
+          personality: 'Sarcastic tech enthusiast with quick wit and dry humor. Knowledgeable about technology and internet culture, slightly cynical but ultimately caring.',
+          avatar: '💻',
+          color: 'from-green-500 to-teal-500',
+          response_style: 'witty',
+          is_default: true
+        },
+        {
+          id: 'finn',
+          name: 'Finn',
+          personality: 'Laid-back musician who goes with the flow and relates everything back to music, lyrics, or cultural moments. Supportive and chill with a creative soul.',
+          avatar: '🎸',
+          color: 'from-orange-500 to-red-500',
+          response_style: 'chill',
+          is_default: true
+        }
+      ];
+
+      // Filter out hidden defaults and combine with custom characters
+      const visibleDefaults = defaultCharacters.filter(char => !hiddenDefaultIds.has(char.id));
+      const allCharacters = [...visibleDefaults, ...(customChars || [])];
+
+      return {
+        characters: allCharacters,
+        total: allCharacters.length
+      };
+
+    } catch (error) {
+      console.error('Database error getting characters:', error);
+      throw error;
     }
   }
 
@@ -212,7 +327,7 @@ class DatabaseService {
     async updateCharacter(userId, characterId, updates) {
       try {
         // Check if it's a default character being modified
-        const defaultCharacterIds = ['maya', 'alex', 'zoe', 'finn'];
+        const defaultCharacterIds = ['zoe', 'finn'];
         
         if (defaultCharacterIds.includes(characterId)) {
           // Create a new custom character based on the default
@@ -731,8 +846,134 @@ class DatabaseService {
       throw error;
     }
   }
-
   // ============================================================================
+  // IMAGE MANAGEMENT METHODS (Add after deleteScenario method)
+  // ============================================================================
+    /**
+     * Update character image
+     */
+    async updateCharacterImage(userId, characterId, imageData) {
+      try {
+        const { url, filename, useCustomImage } = imageData;
+        
+        // Check if it's a default character being modified
+        const defaultCharacterIds = ['maya', 'alex', 'zoe', 'finn'];
+        
+        if (defaultCharacterIds.includes(characterId)) {
+          // For default characters, we need to create a new custom character
+          // This should be handled by the updateCharacter method instead
+          throw new Error('Use updateCharacter method for default characters');
+        } else {
+          // Update existing custom character
+          const { data, error } = await this.supabase
+            .from('characters')
+            .update({
+              avatar_image_url: url,
+              avatar_image_filename: filename,
+              uses_custom_image: useCustomImage,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', characterId)
+            .eq('user_id', userId)
+            .select()
+            .single();
+
+          if (error) throw error;
+          return data;
+        }
+      } catch (error) {
+        console.error('Database error updating character image:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Update user persona image
+     */
+    async updateUserPersonaImage(userId, imageData) {
+      try {
+        const { url, filename, useCustomImage } = imageData;
+        
+        const { data, error } = await this.supabase
+          .from('user_personas')
+          .update({
+            avatar_image_url: url,
+            avatar_image_filename: filename,
+            uses_custom_image: useCustomImage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('is_active', true);
+
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        console.error('Database error updating user persona image:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Update scenario image
+     */
+    async updateScenarioImage(userId, scenarioId, imageData) {
+      try {
+        const { url, filename, useCustomImage } = imageData;
+        
+        const { data, error } = await this.supabase
+          .from('scenarios')
+          .update({
+            background_image_url: url,
+            background_image_filename: filename,
+            uses_custom_background: useCustomImage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', scenarioId)
+          .eq('user_id', userId)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        console.error('Database error updating scenario image:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Delete image from storage and database
+     */
+    async deleteImage(userId, filename, type) {
+      try {
+        // Delete from Supabase Storage
+        const { error: storageError } = await this.supabase.storage
+          .from('user-images')
+          .remove([`${userId}/${type}/${filename}`]);
+
+        if (storageError) {
+          console.error('Storage deletion error:', storageError);
+          // Don't throw here - continue with database cleanup
+        }
+
+        // Delete from database
+        const { error: dbError } = await this.supabase
+          .from('user_images')
+          .delete()
+          .eq('filename', `${userId}/${type}/${filename}`)
+          .eq('user_id', userId);
+
+        if (dbError) throw dbError;
+        
+        return { message: 'Image deleted successfully' };
+      } catch (error) {
+        console.error('Database error deleting image:', error);
+        throw error;
+      }
+    }
+
+    
+  //============================================================================
   // CHARACTER MEMORY MANAGEMENT
   // ============================================================================
 
@@ -793,6 +1034,34 @@ class DatabaseService {
       return false;
     }
   }
+    
+    async clearCharacterMemories(characterId, userId) {
+      try {
+        // Clear memories
+        const { error: memError } = await this.supabase
+          .from('character_memories')
+          .delete()
+          .eq('character_id', characterId)
+          .eq('user_id', userId);
+
+        if (memError) throw memError;
+
+        // Reset relationship
+        const { error: relError } = await this.supabase
+          .from('character_relationships')
+          .delete()
+          .eq('character_id', characterId)
+          .eq('user_id', userId);
+
+        if (relError && relError.code !== 'PGRST116') throw relError;
+
+        return { success: true };
+
+      } catch (error) {
+        console.error('Database error clearing memories:', error);
+        throw error;
+      }
+    }
 
   async getCharacterRelationship(characterId, userId) {
     try {

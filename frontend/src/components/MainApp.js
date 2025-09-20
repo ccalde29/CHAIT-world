@@ -31,6 +31,7 @@ const MainApp = () => {
   const [error, setError] = useState(null);
   const [showMemoryViewer, setShowMemoryViewer] = useState(false);
   const [selectedCharacterForMemory, setSelectedCharacterForMemory] = useState(null);
+  const [sessionId] = useState(`session_${user?.id}_${Date.now()}`);
 
   // Characters and scenarios
   const [characters, setCharacters] = useState([]);
@@ -356,7 +357,8 @@ const MainApp = () => {
           activeCharacters: activeCharacters,
           scenario: currentScenario,
           groupMode: groupDynamicsMode,
-          conversationHistory: conversationHistory
+          conversationHistory: conversationHistory,
+          sessionId: sessionId
         })
       });
 

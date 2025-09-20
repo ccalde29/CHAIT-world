@@ -116,40 +116,55 @@ const ImageUpload = ({
   };
 
   // Remove current image
-  const handleRemoveImage = async () => {
-    if (!currentImage) return;
+    const handleRemoveImage = async () => {
+      if (!currentImage) return;
 
-    try {
-      // Delete from storage if it's a custom uploaded image
-      if (currentImage.includes('user-images/')) {
-        const fileName = currentImage.split('/user-images/')[1];
-        await supabase.storage
-          .from('user-images')
-          .remove([fileName]);
+      try {
+        // Delete from storage if it's a custom uploaded image
+        if (currentImage.includes('user-images/')) {
+          // Extract the filename from the URL
+          const urlParts = currentImage.split('/user-images/');
+          if (urlParts.length > 1) {
+            const fileName = urlParts[1];
+            
+            const { error: storageError } = await supabase.storage
+              .from('user-images')
+              .remove([fileName]);
 
-        // Delete from database
-        await supabase
-          .from('user_images')
-          .delete()
-          .eq('url', currentImage)
-          .eq('user_id', user.id);
+            if (storageError) {
+              console.error('Storage deletion error:', storageError);
+              // Continue anyway - the database cleanup is more important
+            }
+
+            // Delete from database
+            const { error: dbError } = await supabase
+              .from('user_images')
+              .delete()
+              .eq('url', currentImage)
+              .eq('user_id', user.id);
+
+            if (dbError) {
+              console.error('Database deletion error:', dbError);
+              // Continue anyway - the main goal is to update the UI
+            }
+          }
+        }
+
+        // Update parent component
+        onImageChange({
+          url: null,
+          filename: null,
+          useCustomImage: false
+        });
+
+        setUseCustomImage(false);
+        setError(null);
+
+      } catch (error) {
+        console.error('Remove error:', error);
+        setError(`Failed to remove image: ${error.message}`);
       }
-
-      // Update parent component
-      onImageChange({
-        url: null,
-        filename: null,
-        useCustomImage: false
-      });
-
-      setUseCustomImage(false);
-      setError(null);
-
-    } catch (error) {
-      console.error('Remove error:', error);
-      setError(`Failed to remove image: ${error.message}`);
-    }
-  };
+    };
 
   // Handle switching to emoji/no background mode
   const handleSwitchToEmoji = () => {
