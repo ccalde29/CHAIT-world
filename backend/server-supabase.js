@@ -422,6 +422,115 @@ app.delete('/api/scenarios/:id', requireAuth, async (req, res) => {
   }
 });
 // ============================================================================
+// IMAGE UPLOAD API ROUTES
+// Add these routes to your server-supabase.js file
+// ============================================================================
+
+/**
+ * Update character image
+ * PUT /api/characters/:id/image
+ */
+app.put('/api/characters/:id/image', requireAuth, async (req, res) => {
+  try {
+    const { url, filename, useCustomImage } = req.body;
+    
+    const result = await db.updateCharacterImage(req.userId, req.params.id, {
+      url,
+      filename,
+      useCustomImage
+    });
+    
+    res.json({
+      ...result,
+      message: 'Character image updated successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error updating character image:', error);
+    res.status(500).json({ error: 'Failed to update character image' });
+  }
+});
+
+/**
+ * Update user persona image
+ * PUT /api/user/persona/image
+ */
+app.put('/api/user/persona/image', requireAuth, async (req, res) => {
+  try {
+    const { url, filename, useCustomImage } = req.body;
+    
+    const result = await db.updateUserPersonaImage(req.userId, {
+      url,
+      filename,
+      useCustomImage
+    });
+    
+    res.json({
+      ...result,
+      message: 'Persona image updated successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error updating persona image:', error);
+    res.status(500).json({ error: 'Failed to update persona image' });
+  }
+});
+
+/**
+ * Update scenario background image
+ * PUT /api/scenarios/:id/image
+ */
+app.put('/api/scenarios/:id/image', requireAuth, async (req, res) => {
+  try {
+    const { url, filename, useCustomImage } = req.body;
+    
+    // Check if it's a default scenario
+    const defaultScenarios = ['coffee-shop', 'study-group', 'party'];
+    if (defaultScenarios.includes(req.params.id)) {
+      return res.status(400).json({ 
+        error: 'Default scenarios cannot have custom backgrounds. Create a custom scenario instead.' 
+      });
+    }
+    
+    const result = await db.updateScenarioImage(req.userId, req.params.id, {
+      url,
+      filename,
+      useCustomImage
+    });
+    
+    res.json({
+      ...result,
+      message: 'Scene background updated successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error updating scenario image:', error);
+    res.status(500).json({ error: 'Failed to update scenario background' });
+  }
+});
+
+/**
+ * Delete uploaded image
+ * DELETE /api/images/:type/:filename
+ */
+app.delete('/api/images/:type/:filename', requireAuth, async (req, res) => {
+  try {
+    const { type, filename } = req.params;
+    
+    if (!['character', 'persona', 'scene'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid image type' });
+    }
+    
+    await db.deleteImage(req.userId, filename, type);
+    
+    res.json({ message: 'Image deleted successfully' });
+    
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    res.status(500).json({ error: 'Failed to delete image' });
+  }
+});
+// ============================================================================
 // USER PERSONA MANAGEMENT ROUTES
 // ============================================================================
 

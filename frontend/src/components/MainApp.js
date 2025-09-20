@@ -245,63 +245,64 @@ const MainApp = () => {
       return false;
     }
   };
-/**
- * Load user's persona
- */
-const loadUserPersona = async () => {
-  try {
-    const persona = await apiRequest('/api/user/persona');
-    console.log('📥 Loaded user persona:', persona);
-    setUserPersona(persona);
-  } catch (err) {
-    console.error('Failed to load user persona:', err);
-    // Set default if loading fails
-    setUserPersona({
-      hasPersona: false,
-      persona: {
-        name: 'User',
-        personality: 'A curious individual engaging in conversation',
-        interests: [],
-        communication_style: 'casual and friendly',
-        avatar: '👤',
-        color: 'from-blue-500 to-indigo-500'
-      }
-    });
-  }
-};
 
-/**
- * Save user persona
- */
-const saveUserPersona = async (personaData) => {
-  try {
-    console.log('📤 Saving user persona:', personaData);
-    const response = await apiRequest('/api/user/persona', {
-      method: 'POST',
-      body: JSON.stringify(personaData),
-    });
-    
-    console.log('✅ Persona saved:', response);
-    await loadUserPersona(); // Reload to get updated data
-    setError(null);
-    return true;
-  } catch (err) {
-    console.error('Failed to save user persona:', err);
-    setError('Failed to save persona: ' + err.message);
-    return false;
-  }
-};
+  /**
+   * Load user's persona
+   */
+  const loadUserPersona = async () => {
+    try {
+      const persona = await apiRequest('/api/user/persona');
+      console.log('📥 Loaded user persona:', persona);
+      setUserPersona(persona);
+    } catch (err) {
+      console.error('Failed to load user persona:', err);
+      // Set default if loading fails
+      setUserPersona({
+        hasPersona: false,
+        persona: {
+          name: 'User',
+          personality: 'A curious individual engaging in conversation',
+          interests: [],
+          communication_style: 'casual and friendly',
+          avatar: '👤',
+          color: 'from-blue-500 to-indigo-500'
+        }
+      });
+    }
+  };
 
-// ADD MEMORY VIEWER FUNCTIONS
-const openMemoryViewer = (character) => {
-  setSelectedCharacterForMemory(character);
-  setShowMemoryViewer(true);
-};
+  /**
+   * Save user persona
+   */
+  const saveUserPersona = async (personaData) => {
+    try {
+      console.log('📤 Saving user persona:', personaData);
+      const response = await apiRequest('/api/user/persona', {
+        method: 'POST',
+        body: JSON.stringify(personaData),
+      });
+      
+      console.log('✅ Persona saved:', response);
+      await loadUserPersona(); // Reload to get updated data
+      setError(null);
+      return true;
+    } catch (err) {
+      console.error('Failed to save user persona:', err);
+      setError('Failed to save persona: ' + err.message);
+      return false;
+    }
+  };
 
-const closeMemoryViewer = () => {
-  setShowMemoryViewer(false);
-  setSelectedCharacterForMemory(null);
-};
+  // Memory viewer functions
+  const openMemoryViewer = (character) => {
+    setSelectedCharacterForMemory(character);
+    setShowMemoryViewer(true);
+  };
+
+  const closeMemoryViewer = () => {
+    setShowMemoryViewer(false);
+    setSelectedCharacterForMemory(null);
+  };
 
   // ============================================================================
   // CHAT FUNCTIONS
@@ -456,44 +457,44 @@ const closeMemoryViewer = () => {
 
   // Initialize app on mount
   useEffect(() => {
-  const initializeApp = async () => {
-    console.log('🚀 Initializing app for user:', user?.email);
-    const isConnected = await checkApiStatus();
-    if (isConnected) {
-      await Promise.all([
-        loadCharacters(),
-        loadScenarios(),
-        loadUserSettings(),
-        loadUserPersona() // ADD THIS LINE
-      ]);
-    }
-  };
+    const initializeApp = async () => {
+      console.log('🚀 Initializing app for user:', user?.email);
+      const isConnected = await checkApiStatus();
+      if (isConnected) {
+        await Promise.all([
+          loadCharacters(),
+          loadScenarios(),
+          loadUserSettings(),
+          loadUserPersona()
+        ]);
+      }
+    };
 
     if (user) {
-    initializeApp();
-  }
-
-  // Update welcome message to include user persona name
-  const userName = userPersona?.persona?.name || user?.user_metadata?.full_name || user?.email;
-  setMessages([
-    {
-      type: 'system',
-      content: `Welcome back, ${userName}! Ready to chat with your AI characters?`,
-      timestamp: new Date()
+      initializeApp();
     }
-  ]);
-}, [user]); // Keep the dependency array as [user]
 
-useEffect(() => {
-  if (userPersona && messages.length > 0) {
-    const userName = userPersona.persona.name || user?.user_metadata?.full_name || user?.email;
-    setMessages(prev => prev.map((msg, index) => 
-      index === 0 && msg.type === 'system' 
-        ? { ...msg, content: `Welcome back, ${userName}! Ready to chat with your AI characters?` }
-        : msg
-    ));
-  }
-}, [userPersona]);
+    // Update welcome message to include user persona name
+    const userName = userPersona?.persona?.name || user?.user_metadata?.full_name || user?.email;
+    setMessages([
+      {
+        type: 'system',
+        content: `Welcome back, ${userName}! Ready to chat with your AI characters?`,
+        timestamp: new Date()
+      }
+    ]);
+  }, [user]);
+
+  useEffect(() => {
+    if (userPersona && messages.length > 0) {
+      const userName = userPersona.persona.name || user?.user_metadata?.full_name || user?.email;
+      setMessages(prev => prev.map((msg, index) => 
+        index === 0 && msg.type === 'system' 
+          ? { ...msg, content: `Welcome back, ${userName}! Ready to chat with your AI characters?` }
+          : msg
+      ));
+    }
+  }, [userPersona]);
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -536,54 +537,62 @@ useEffect(() => {
           {/* User Menu */}
           <div className="relative">
             <button
-  			  onClick={() => setShowUserMenu(!showUserMenu)}
- 			   className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/10 transition-colors"
-			  >
- 			   <div className={`w-8 h-8 bg-gradient-to-r ${
-			      userPersona?.hasPersona ? userPersona.persona.color : 'from-purple-500 to-blue-500'
-			    } rounded-full flex items-center justify-center`}>
-			      {userPersona?.hasPersona ? (
-			        <span className="text-white text-sm">{userPersona.persona.avatar}</span>
- 			     ) : user?.user_metadata?.avatar_url ? (
-			        <img 
-			          src={user.user_metadata.avatar_url} 
-			          alt="Profile" 
- 			         className="w-8 h-8 rounded-full"
- 			       />
- 			     ) : (
-  			      <User className="text-white" size={16} />
-			      )}
-			    </div>
-			  </button>
-  
-			  {showUserMenu && (
-			    <div className="absolute right-0 top-12 bg-slate-800 border border-white/10 rounded-lg p-2 min-w-48 z-10">
-			      <div className="px-3 py-2 border-b border-white/10 mb-2">
-  			      <p className="text-sm font-medium text-white">
-  			        {userPersona?.hasPersona ? userPersona.persona.name : user?.user_metadata?.full_name || 'User'}
-  			      </p>
-  			      <p className="text-xs text-gray-400">{user?.email}</p>
-   			     {userPersona?.hasPersona && (
-   				      <p className="text-xs text-blue-300 mt-1">Persona Active</p>
-   			     )}
-  			    </div>
-   			   <button
-   			     onClick={() => {
-  			      	setShowPersonaEditor(true);
-   			     	setShowUserMenu(false);
-  			      }}
-   			     className="w-full flex items-center gap-2 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
-  			    >
-    				<User size={16} />
-    			    {userPersona?.hasPersona ? 'Edit Persona' : 'Create Persona'}
-   			    </button>
-  			    <button
-   			     onClick={handleSignOut}
-    				className="w-full flex items-center gap-2 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
-   			   	>
-     			   <LogOut size={16} />
-     			   Sign Out
-    			  </button>
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/10 transition-colors"
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                userPersona?.hasPersona && userPersona.persona.uses_custom_image && userPersona.persona.avatar_image_url
+                  ? ''
+                  : `bg-gradient-to-r ${userPersona?.hasPersona ? userPersona.persona.color : 'from-purple-500 to-blue-500'}`
+              }`}>
+                {userPersona?.hasPersona && userPersona.persona.uses_custom_image && userPersona.persona.avatar_image_url ? (
+                  <img
+                    src={userPersona.persona.avatar_image_url}
+                    alt="Your avatar"
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                ) : userPersona?.hasPersona ? (
+                  <span className="text-white text-sm">{userPersona.persona.avatar}</span>
+                ) : user?.user_metadata?.avatar_url ? (
+                  <img
+                    src={user.user_metadata.avatar_url}
+                    alt="Profile"
+                    className="w-8 h-8 rounded-full"
+                  />
+                ) : (
+                  <User className="text-white" size={16} />
+                )}
+              </div>
+            </button>
+            
+            {showUserMenu && (
+              <div className="absolute right-0 top-12 bg-slate-800 border border-white/10 rounded-lg p-2 min-w-48 z-10">
+                <div className="px-3 py-2 border-b border-white/10 mb-2">
+                  <p className="text-sm font-medium text-white">
+                    {userPersona?.hasPersona ? userPersona.persona.name : user?.user_metadata?.full_name || 'User'}
+                  </p>
+                  <p className="text-xs text-gray-400">{user?.email}</p>
+                  {userPersona?.hasPersona && (
+                    <p className="text-xs text-blue-300 mt-1">Persona Active</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    setShowPersonaEditor(true);
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
+                >
+                  <User size={16} />
+                  {userPersona?.hasPersona ? 'Edit Persona' : 'Create Persona'}
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
               </div>
             )}
           </div>
@@ -611,38 +620,38 @@ useEffect(() => {
         {/* Settings Buttons */}
         <div className="mb-6 space-y-2">
           <button
-    		onClick={() => setShowPersonaEditor(true)}
-    		className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
-  		>
-   		 <User size={18} />
-		    <div className="flex-1 text-left">
-		      <div className="text-sm">Your Persona</div>
- 		     <div className="text-xs text-gray-400">
-		        {userPersona?.hasPersona ? userPersona.persona.name : 'Set up your character'}
-		      </div>
-		    </div>
-		    {userPersona?.hasPersona && (
- 		     <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${userPersona.persona.color} flex items-center justify-center text-xs`}>
- 		       {userPersona.persona.avatar}
- 		     </div>
-		    )}
-		  </button>
-  
-		  <button
-		    onClick={() => setShowSettings(true)}
- 		   className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
-		  >
-		    <Settings size={18} />
- 		   <span>Settings & API Keys</span>
- 		 </button>
- 		 
- 		 <button
-   		 onClick={() => setShowSceneEditor(true)}
-  		  className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
- 		 >
-   		 <MessageCircle size={18} />
-  		  <span>Manage Scenes</span>
- 		 </button>
+            onClick={() => setShowPersonaEditor(true)}
+            className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
+          >
+            <User size={18} />
+            <div className="flex-1 text-left">
+              <div className="text-sm">Your Persona</div>
+              <div className="text-xs text-gray-400">
+                {userPersona?.hasPersona ? userPersona.persona.name : 'Set up your character'}
+              </div>
+            </div>
+            {userPersona?.hasPersona && (
+              <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${userPersona.persona.color} flex items-center justify-center text-xs`}>
+                {userPersona.persona.avatar}
+              </div>
+            )}
+          </button>
+
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
+          >
+            <Settings size={18} />
+            <span>Settings & API Keys</span>
+          </button>
+          
+          <button
+            onClick={() => setShowSceneEditor(true)}
+            className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
+          >
+            <MessageCircle size={18} />
+            <span>Manage Scenes</span>
+          </button>
         </div>
 
         {/* Scenario Selection */}
@@ -693,183 +702,257 @@ useEffect(() => {
           </div>
           
           <div className="space-y-2 max-h-96 overflow-y-auto">
-          	{characters.map((character) => (
-          		<div
-          			key={character.id}
-      				className={`p-3 rounded-lg border transition-all ${
-        				isGenerating ? 'opacity-50 cursor-not-allowed' : ''
-        			} ${
-     			 		activeCharacters.includes(character.id)
-				          ? `bg-gradient-to-r ${character.color} border-white/20`
-				          : 'bg-white/5 border-white/10 hover:bg-white/10'
-				      }`}
-				    >
-				      <div className="flex items-center gap-3">
- 				       <div 
-				          onClick={() => !isGenerating && toggleCharacter(character.id)}
-				          className={`flex-1 flex items-center gap-3 ${!isGenerating ? 'cursor-pointer' : ''}`}
-				        >
-				          <span className="text-2xl">
-				            {character.avatar}
-          				</span>
-          				<div className="flex-1 min-w-0">
-            				<div className="flex items-center gap-2">
-              				<div className="font-medium text-white text-sm">{character.name}</div>
-              				{character.is_default && (
-                				<span className="text-xs bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded">
-                  				Default
-                				</span>
-              				)}
-            				</div>
-            				<div className="text-xs text-gray-300 line-clamp-2">{character.personality}</div>
-          				</div>
-        				</div>
-        
-        				<div className="flex flex-col gap-1">
-          				<div className="flex gap-1">
-            				<button
-              				onClick={(e) => {
-                				e.stopPropagation();
-                				openMemoryViewer(character);
-              				}}
-              				className="p-1 text-gray-400 hover:text-purple-400 transition-colors"
-              				title="View memories"
-           				 >
-              				<Brain size={12} />
-            				</button>
-            				<button
-              				onClick={(e) => {
-                				e.stopPropagation();
-                				setEditingCharacter(character);
-                				setShowCharacterEditor(true);
-              				}}
-              				className="p-1 text-gray-400 hover:text-white transition-colors"
-              				title="Edit character"
-            				>
-              				<Edit size={12} />
-            				</button>
-            				<button
-              				onClick={(e) => {
-                				e.stopPropagation();
-                				if (window.confirm(`Delete ${character.name}?`)) {
-                  				deleteCharacter(character.id);
-                				}
-              				}}
-              				className="p-1 text-gray-400 hover:text-red-400 transition-colors"
-              				title="Delete character"
-            			  >
-              				<Trash2 size={12} />
-            				</button>
-          					</div>
-        				</div>
-      				</div>
-    			</div>
-  				))}
-			</div>
+            {characters.map((character) => (
+              <div
+                key={character.id}
+                className={`p-3 rounded-lg border transition-all ${
+                  isGenerating ? 'opacity-50 cursor-not-allowed' : ''
+                } ${
+                  activeCharacters.includes(character.id)
+                    ? `bg-gradient-to-r ${character.color} border-white/20`
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    onClick={() => !isGenerating && toggleCharacter(character.id)}
+                    className={`flex-1 flex items-center gap-3 ${!isGenerating ? 'cursor-pointer' : ''}`}
+                  >
+                    {/* Avatar - Image or Emoji */}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      character.uses_custom_image && character.avatar_image_url 
+                        ? '' 
+                        : `bg-gradient-to-r ${character.color}`
+                    }`}>
+                      {character.uses_custom_image && character.avatar_image_url ? (
+                        <img
+                          src={character.avatar_image_url}
+                          alt={`${character.name} avatar`}
+                          className="w-10 h-10 rounded-full object-cover border border-white/20"
+                        />
+                      ) : (
+                        <span className="text-2xl">
+                          {character.avatar}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium text-white text-sm">{character.name}</div>
+                        {character.is_default && (
+                          <span className="text-xs bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded">
+                            Default
+                          </span>
+                        )}
+                        {character.uses_custom_image && (
+                          <span className="text-xs bg-purple-500/20 text-purple-300 px-1 py-0.5 rounded">
+                            Custom
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-300 line-clamp-2">{character.personality}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col gap-1">
+                    <div className="flex gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openMemoryViewer(character);
+                        }}
+                        className="p-1 text-gray-400 hover:text-purple-400 transition-colors"
+                        title="View memories"
+                      >
+                        <Brain size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingCharacter(character);
+                          setShowCharacterEditor(true);
+                        }}
+                        className="p-1 text-gray-400 hover:text-white transition-colors"
+                        title="Edit character"
+                      >
+                        <Edit size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete ${character.name}?`)) {
+                            deleteCharacter(character.id);
+                          }
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                        title="Delete character"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-black/20 backdrop-blur-sm border-b border-white/10 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white">
-                {findScenarioById(currentScenario)?.name || 'Chat Room'}
-              </h2>
-              <p className="text-sm text-gray-400">
-                {findScenarioById(currentScenario)?.description || 'Group conversation'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {activeCharacters.map(id => {
-                const character = findCharacterById(id);
-                return character ? (
-                  <div key={id} className="flex items-center gap-1 bg-white/10 rounded-full px-2 py-1">
-                    <span className="text-sm">{character.avatar}</span>
-                    <span className="text-xs text-white">{character.name}</span>
+      {/* Chat Area with Dynamic Background */}
+      <div className="flex-1 flex flex-col relative">
+        {/* Background Image */}
+        {findScenarioById(currentScenario)?.background_image_url && (
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url(${findScenarioById(currentScenario).background_image_url})`
+            }}
+          >
+            {/* Dark overlay for readability */}
+            <div className="absolute inset-0 bg-black/60"></div>
+          </div>
+        )}
+
+        {/* Chat Content */}
+        <div className="relative z-10 flex flex-col h-full">
+          {/* Header */}
+          <div className="bg-black/20 backdrop-blur-sm border-b border-white/10 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">
+                  {findScenarioById(currentScenario)?.name || 'Chat Room'}
+                </h2>
+                <p className="text-sm text-gray-200">
+                  {findScenarioById(currentScenario)?.description || 'Group conversation'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* User Persona Indicator */}
+                {userPersona?.hasPersona && (
+                  <div className="flex items-center gap-1 bg-white/10 rounded-full px-2 py-1 border border-blue-400/30 backdrop-blur-sm">
+                    {userPersona.persona.uses_custom_image && userPersona.persona.avatar_image_url ? (
+                      <img
+                        src={userPersona.persona.avatar_image_url}
+                        alt="Your avatar"
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm">{userPersona.persona.avatar}</span>
+                    )}
+                    <span className="text-xs text-blue-300">{userPersona.persona.name}</span>
                   </div>
-                ) : null;
-              })}
+                )}
+
+                {/* Active Characters */}
+                {activeCharacters.map(id => {
+                  const character = findCharacterById(id);
+                  return character ? (
+                    <div key={id} className="flex items-center gap-1 bg-white/10 rounded-full px-2 py-1 backdrop-blur-sm">
+                      {character.uses_custom_image && character.avatar_image_url ? (
+                        <img
+                          src={character.avatar_image_url}
+                          alt={`${character.name} avatar`}
+                          className="w-5 h-5 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-sm">{character.avatar}</span>
+                      )}
+                      <span className="text-xs text-white">{character.name}</span>
+                    </div>
+                  ) : null;
+                })}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((message, index) => (
-            <div key={index} className="animate-in slide-in-from-bottom-2 duration-300">
-              {message.type === 'system' ? (
-                <div className="text-center">
-                  <span className="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full text-sm">
-                    {message.content}
-                  </span>
-                </div>
-              ) : message.type === 'user' ? (
-                <div className="flex justify-end">
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl rounded-br-sm px-4 py-2 max-w-xs">
-                    {message.content}
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {messages.map((message, index) => (
+              <div key={index} className="animate-in slide-in-from-bottom-2 duration-300">
+                {message.type === 'system' ? (
+                  <div className="text-center">
+                    <span className="bg-purple-500/30 backdrop-blur-sm text-purple-100 px-3 py-1 rounded-full text-sm border border-purple-400/30">
+                      {message.content}
+                    </span>
                   </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-3">
-                  <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${
-                    findCharacterById(message.character)?.color || 'from-gray-500 to-gray-600'
-                  } flex items-center justify-center text-sm`}>
-                    {findCharacterById(message.character)?.avatar || '🤖'}
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-400 mb-1">
-                      {findCharacterById(message.character)?.name || 'Unknown'}
-                      {message.hasError && <span className="text-red-400 ml-2">⚠ Error</span>}
-                    </div>
-                    <div className={`backdrop-blur-sm text-white rounded-2xl rounded-tl-sm px-4 py-2 max-w-md ${
-                      message.hasError ? 'bg-red-500/20' : 'bg-white/10'
-                    }`}>
+                ) : message.type === 'user' ? (
+                  <div className="flex justify-end">
+                    <div className="bg-gradient-to-r from-blue-500/90 to-purple-600/90 backdrop-blur-sm text-white rounded-2xl rounded-br-sm px-4 py-2 max-w-xs border border-white/20">
                       {message.content}
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
-          
-          {isGenerating && (
-            <div className="flex items-center gap-2 text-gray-400">
-              <Zap size={16} className="animate-pulse" />
-              <span className="text-sm">AI characters are thinking...</span>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm border border-white/20 ${
+                      findCharacterById(message.character)?.uses_custom_image && 
+                      findCharacterById(message.character)?.avatar_image_url 
+                        ? '' 
+                        : `bg-gradient-to-r ${findCharacterById(message.character)?.color || 'from-gray-500 to-gray-600'}`
+                    }`}>
+                      {findCharacterById(message.character)?.uses_custom_image &&
+                       findCharacterById(message.character)?.avatar_image_url ? (
+                        <img
+                          src={findCharacterById(message.character).avatar_image_url}
+                          alt={`${findCharacterById(message.character).name} avatar`}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        findCharacterById(message.character)?.avatar || '🤖'
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-200 mb-1">
+                        {findCharacterById(message.character)?.name || 'Unknown'}
+                        {message.hasError && <span className="text-red-400 ml-2">⚠ Error</span>}
+                      </div>
+                      <div className={`backdrop-blur-sm text-white rounded-2xl rounded-tl-sm px-4 py-2 max-w-md border border-white/20 ${
+                        message.hasError ? 'bg-red-500/30' : 'bg-white/15'
+                      }`}>
+                        {message.content}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
 
-        {/* Input */}
-        <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-4">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder={
-                apiStatus !== 'connected' 
-                  ? "AI service offline..." 
-                  : activeCharacters.length === 0
-                  ? "Select characters first..."
-                  : `Chat with ${activeCharacters.length} AI character${activeCharacters.length === 1 ? '' : 's'}...`
-              }
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-400"
-              disabled={isGenerating || apiStatus !== 'connected' || activeCharacters.length === 0}
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!userInput.trim() || isGenerating || apiStatus !== 'connected' || activeCharacters.length === 0}
-              className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 transition-all"
-            >
-              <Send size={18} />
-            </button>
+            {isGenerating && (
+              <div className="flex items-center gap-2 text-gray-200">
+                <Zap size={16} className="animate-pulse" />
+                <span className="text-sm">AI characters are thinking...</span>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder={
+                  apiStatus !== 'connected'
+                    ? "AI service offline..."
+                    : activeCharacters.length === 0
+                    ? "Select characters first..."
+                    : `Chat with ${activeCharacters.length} AI character${activeCharacters.length === 1 ? '' : 's'}...`
+                }
+                className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-white placeholder-gray-300 focus:outline-none focus:border-purple-400"
+                disabled={isGenerating || apiStatus !== 'connected' || activeCharacters.length === 0}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!userInput.trim() || isGenerating || apiStatus !== 'connected' || activeCharacters.length === 0}
+                className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 transition-all backdrop-blur-sm"
+              >
+                <Send size={18} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -901,13 +984,14 @@ useEffect(() => {
           }}
         />
       )}
+
       {showMemoryViewer && selectedCharacterForMemory && (
-      	<CharacterMemoryViewer
-      		character={selectedCharacterForMemory}
-		    onClose={closeMemoryViewer}
-		    apiRequest={apiRequest}
-		/>
-	  )}
+        <CharacterMemoryViewer
+          character={selectedCharacterForMemory}
+          onClose={closeMemoryViewer}
+          apiRequest={apiRequest}
+        />
+      )}
 
       {showSceneEditor && (
         <SceneEditor
@@ -948,18 +1032,19 @@ useEffect(() => {
           onClose={() => setShowSceneEditor(false)}
         />
       )}
+
       {showPersonaEditor && (
- 		 <UserPersonaEditor
-	    	userPersona={userPersona}
-		    onSave={async (personaData) => {
-		      const success = await saveUserPersona(personaData);
-		      if (success) {
-		        setShowPersonaEditor(false);
- 		     }
- 		   }}
- 		   onClose={() => setShowPersonaEditor(false)}
- 		 />
-		)}
+        <UserPersonaEditor
+          userPersona={userPersona}
+          onSave={async (personaData) => {
+            const success = await saveUserPersona(personaData);
+            if (success) {
+              setShowPersonaEditor(false);
+            }
+          }}
+          onClose={() => setShowPersonaEditor(false)}
+        />
+      )}
 
       {/* Click outside to close user menu */}
       {showUserMenu && (

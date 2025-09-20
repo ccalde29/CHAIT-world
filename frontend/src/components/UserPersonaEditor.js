@@ -63,28 +63,10 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
       communication_style: "expressive and imaginative"
     },
     {
-      name: "The Practical Advisor",
-      personality: "Focuses on realistic solutions and enjoys helping others solve problems. Values efficiency, planning, and getting things done. Brings a grounded perspective to conversations.",
-      interests: ["productivity", "planning", "problem-solving", "organization"],
-      communication_style: "direct and helpful"
-    },
-    {
       name: "The Social Connector",
       personality: "Loves meeting new people and building relationships. Energized by social interactions and enjoys bringing others together. Values community, friendship, and shared experiences.",
       interests: ["socializing", "relationships", "community", "events"],
       communication_style: "warm and sociable"
-    },
-    {
-      name: "The Thoughtful Analyst",
-      personality: "Enjoys deep thinking and analyzing complex topics. Takes time to consider different angles before responding. Values logic, reasoning, and understanding underlying principles.",
-      interests: ["philosophy", "analysis", "research", "debate"],
-      communication_style: "reflective and analytical"
-    },
-    {
-      name: "The Empathetic Listener",
-      personality: "Naturally attuned to others' emotions and needs. Enjoys providing support and understanding. Values kindness, compassion, and creating safe spaces for authentic conversation.",
-      interests: ["psychology", "wellness", "relationships", "mindfulness"],
-      communication_style: "supportive and understanding"
     }
   ];
 

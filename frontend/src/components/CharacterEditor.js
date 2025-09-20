@@ -4,7 +4,7 @@
  * Modal component for creating new characters or editing existing custom characters.
  * Provides form validation, emoji picker, and color selection.
  */
-
+import ImageUpload from './ImageUpload';
 import React, { useState, useEffect } from 'react';
 import { X, User, Palette, Smile, Sparkles } from 'lucide-react';
 
@@ -13,12 +13,17 @@ const CharacterEditor = ({ character, onSave, onClose }) => {
   // STATE MANAGEMENT
   // ============================================================================
   
+ // UPDATE the formData state to include image fields (add this to your useState):
   const [formData, setFormData] = useState({
     name: '',
     personality: '',
     avatar: '🤖',
-    color: 'from-gray-500 to-slate-500'
+    color: 'from-gray-500 to-slate-500',
+    avatar_image_url: null,
+    avatar_image_filename: null,
+    uses_custom_image: false
   });
+
   
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -59,18 +64,6 @@ const CharacterEditor = ({ character, onSave, onClose }) => {
     {
       name: "The Tech Enthusiast",
       personality: "A knowledgeable techie with a sharp wit and dry sense of humor. Loves discussing technology, programming, and internet culture. Slightly sarcastic but ultimately caring."
-    },
-    {
-      name: "The Free Spirit",
-      personality: "A laid-back individual who goes with the flow and finds connections to music and culture in everything. Supportive, chill, and has a creative approach to life."
-    },
-    {
-      name: "The Adventurer",
-      personality: "Bold and energetic, always ready for the next adventure. Loves traveling, trying new things, and inspiring others to step out of their comfort zones."
-    },
-    {
-      name: "The Wise Mentor",
-      personality: "A patient and understanding guide who offers thoughtful advice and life lessons. Has a wealth of experience and enjoys helping others grow and learn."
     }
   ];
 
@@ -79,26 +72,31 @@ const CharacterEditor = ({ character, onSave, onClose }) => {
   // ============================================================================
   
   useEffect(() => {
-    if (character) {
-      // Editing existing character
-      setFormData({
-        name: character.name || '',
-        personality: character.personality || '',
-        avatar: character.avatar || '🤖',
-        color: character.color || 'from-gray-500 to-slate-500'
-      });
-    } else {
-      // Creating new character - reset form
-      setFormData({
-        name: '',
-        personality: '',
-        avatar: '🤖',
-        color: 'from-gray-500 to-slate-500'
-      });
-    }
-    setValidationErrors({});
-  }, [character]);
-
+  if (character) {
+    // Editing existing character
+    setFormData({
+      name: character.name || '',
+      personality: character.personality || '',
+      avatar: character.avatar || '🤖',
+      color: character.color || 'from-gray-500 to-slate-500',
+      avatar_image_url: character.avatar_image_url || null,
+      avatar_image_filename: character.avatar_image_filename || null,
+      uses_custom_image: character.uses_custom_image || false
+    });
+  } else {
+    // Creating new character - reset form
+    setFormData({
+      name: '',
+      personality: '',
+      avatar: '🤖',
+      color: 'from-gray-500 to-slate-500',
+      avatar_image_url: null,
+      avatar_image_filename: null,
+      uses_custom_image: false
+    });
+  }
+  setValidationErrors({});
+}, [character]);
   // ============================================================================
   // FORM HANDLING
   // ============================================================================
@@ -133,23 +131,28 @@ const CharacterEditor = ({ character, onSave, onClose }) => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSave = async () => {
-    if (!validateForm()) return;
+	const handleSave = async () => {
+	  if (!validateForm()) return;
+  
+	  setSaving(true);
+  
+	  try {
+    	const characterData = {
+      	name: formData.name.trim(),
+      	personality: formData.personality.trim(),
+      	avatar: formData.avatar,
+      	color: formData.color,
+      	avatar_image_url: formData.avatar_image_url,
+      	avatar_image_filename: formData.avatar_image_filename,
+      	uses_custom_image: formData.uses_custom_image
+    	};
     
-    setSaving(true);
-    
-    try {
-      await onSave({
-        name: formData.name.trim(),
-        personality: formData.personality.trim(),
-        avatar: formData.avatar,
-        color: formData.color
-      });
-    } catch (error) {
-      console.error('Failed to save character:', error);
-    } finally {
-      setSaving(false);
-    }
+    	await onSave(characterData);
+  	} catch (error) {
+   	 console.error('Failed to save character:', error);
+  	} finally {
+   	 setSaving(false);
+  	}
   };
 
   const applyTemplate = (template) => {
@@ -163,7 +166,7 @@ const CharacterEditor = ({ character, onSave, onClose }) => {
   const getFieldError = (field) => {
     return validationErrors[field];
   };
-
+ 
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -225,39 +228,86 @@ const CharacterEditor = ({ character, onSave, onClose }) => {
             <p className="text-xs text-gray-500 mt-1">{formData.name.length}/50 characters</p>
           </div>
 
-          {/* Avatar Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              <Smile size={16} className="inline mr-2" />
-              Avatar
-            </label>
-            <div className="flex items-center gap-2 mb-3">
-              <button
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm"
-              >
-                Current: {formData.avatar} - Click to change
-              </button>
-            </div>
-            
-            {showEmojiPicker && (
-              <div className="grid grid-cols-10 gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
-                {emojiOptions.map((emoji, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      handleInputChange('avatar', emoji);
-                      setShowEmojiPicker(false);
-                    }}
-                    className="w-8 h-8 text-xl hover:bg-white/10 rounded transition-colors"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Avatar Selection with Image Upload */}
+		 <div>
+		 	<label className="block text-sm font-medium text-gray-300 mb-2">
+			    <Smile size={16} className="inline mr-2" />
+ 			   Avatar
+			  </label>
+  
+			  {/* Show current avatar in preview */}
+ 			 <div className="mb-4">
+ 			   <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/10">
+ 			     {formData.uses_custom_image && formData.avatar_image_url ? (
+ 			       <img 
+  			        src={formData.avatar_image_url} 
+ 			         alt="Character avatar" 
+ 			         className="w-12 h-12 rounded-full object-cover"
+  			      />
+ 			     ) : (
+  			      <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${formData.color} flex items-center justify-center text-xl`}>
+   			       {formData.avatar}
+   			     </div>
+   			   )}
+ 			     <div>
+    			    <div className="text-sm font-medium text-white">
+  			        {formData.uses_custom_image ? 'Custom Image' : 'Emoji Avatar'}
+ 			       </div>
+   			     <div className="text-xs text-gray-400">
+    			      {formData.uses_custom_image ? 'Using uploaded image' : `Using emoji: ${formData.avatar}`}
+    			    </div>
+    			  </div>
+   			 </div>
+ 		  </div>
+ 		  
+			{/* Emoji Picker (when not using custom image) */}
+ 			 {!formData.uses_custom_image && (
+  			  <div className="mb-4">
+   			   <div className="flex items-center gap-2 mb-3">
+ 			       <button
+  			        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+   			       className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm"
+  			      >
+   			       Current: {formData.avatar} - Click to change
+ 			       </button>
+ 			     </div>
+ 	     
+  			    {showEmojiPicker && (
+    			    <div className="grid grid-cols-10 gap-2 p-3 bg-white/5 rounded-lg border border-white/10 mb-4">
+    			      {emojiOptions.map((emoji, index) => (
+     			       <button
+   			           key={index}
+     			         onClick={() => {
+        			        handleInputChange('avatar', emoji);
+       			         setShowEmojiPicker(false);
+        			      }}
+        			      className="w-8 h-8 text-xl hover:bg-white/10 rounded transition-colors"
+       			     >
+         			     {emoji}
+ 			           </button>
+     			     ))}
+   			     </div>
+   			   )}
+  			  </div>
+ 			 )}
 
+ 			 {/* Image Upload Component */}
+			  <ImageUpload
+  			  currentImage={formData.avatar_image_url}
+  			  currentEmoji={formData.avatar}
+ 			   onImageChange={(imageData) => {
+    			  setFormData(prev => ({
+    			    ...prev,
+    			    avatar_image_url: imageData.url,
+    			    avatar_image_filename: imageData.filename,
+    			    uses_custom_image: imageData.useCustomImage
+   			   }));
+  			  }}
+  			  onEmojiChange={(emoji) => handleInputChange('avatar', emoji)}
+  			  userId={User?.id}
+  			  type="character"
+			  />
+			</div>
           {/* Color Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">

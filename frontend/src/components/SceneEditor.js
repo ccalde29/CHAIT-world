@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, Plus, Edit, Trash2, Sparkles } from 'lucide-react';
+import { X, MapPin, Plus, Edit, Trash2, Sparkles, Image } from 'lucide-react';
+import ImageUpload from './ImageUpload';
 
 const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
   // ============================================================================
@@ -15,11 +16,15 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
   
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingScene, setEditingScene] = useState(null);
+ 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     context: '',
-    atmosphere: ''
+    atmosphere: '',
+    background_image_url: null,
+    background_image_filename: null,
+    uses_custom_background: false
   });
   const [validationErrors, setValidationErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -45,34 +50,10 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
       atmosphere: "energetic and nostalgic"
     },
     {
-      name: "Art Gallery Opening",
-      description: "An elegant gallery opening with wine and artistic discussions",
-      context: "The group is mingling at an art gallery opening, discussing the artwork and enjoying wine and hors d'oeuvres.",
-      atmosphere: "cultured and creative"
-    },
-    {
       name: "Beach Bonfire",
       description: "A nighttime gathering around a bonfire on the beach",
       context: "The group is sitting around a crackling bonfire on the beach under the stars, sharing stories and marshmallows.",
       atmosphere: "relaxed and intimate"
-    },
-    {
-      name: "Food Truck Festival",
-      description: "A vibrant outdoor festival with diverse food options",
-      context: "The group is exploring a food truck festival, trying different cuisines and people-watching in the lively crowd.",
-      atmosphere: "casual and diverse"
-    },
-    {
-      name: "Escape Room",
-      description: "A challenging puzzle room where teamwork is essential",
-      context: "The group is working together to solve puzzles and escape from a themed room within the time limit.",
-      atmosphere: "intense and collaborative"
-    },
-    {
-      name: "Hiking Trail",
-      description: "A scenic nature trail with beautiful views and fresh air",
-      context: "The group is hiking along a scenic trail, enjoying nature and having conversations while walking.",
-      atmosphere: "peaceful and invigorating"
     }
   ];
 
@@ -85,14 +66,29 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
       name: '',
       description: '',
       context: '',
-      atmosphere: ''
+      atmosphere: '',
+      background_image_url: null,
+      background_image_filename: null,
+      uses_custom_background: false
     });
     setValidationErrors({});
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
+    if (field.includes('.')) {
+      // Handle nested fields like 'background.url'
+      const [parent, child] = field.split('.');
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: value
+        }
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+  
     // Clear validation error for this field
     if (validationErrors[field]) {
       setValidationErrors(prev => ({ ...prev, [field]: null }));
@@ -163,18 +159,22 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
       name: scene.name || '',
       description: scene.description || '',
       context: scene.context || '',
-      atmosphere: scene.atmosphere || ''
+      atmosphere: scene.atmosphere || '',
+      background_image_url: scene.background_image_url || null,
+      background_image_filename: scene.background_image_filename || null,
+      uses_custom_background: scene.uses_custom_background || false
     });
     setShowCreateForm(true);
   };
 
   const applyTemplate = (template) => {
-    setFormData({
+    setFormData(prev => ({
+      ...prev,
       name: template.name,
       description: template.description,
       context: template.context,
       atmosphere: template.atmosphere
-    });
+    }));
     setValidationErrors({});
   };
 
@@ -226,45 +226,67 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
                 </button>
               </div>
 
-              {/* Existing Scenes */}
+              {/* Existing Scenes with Background Preview */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {scenarios.map((scene) => (
                   <div
                     key={scene.id}
-                    className="bg-white/5 border border-white/10 rounded-lg p-4 hover:bg-white/10 transition-colors"
+                    className="bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 transition-colors"
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-lg font-medium text-white">{scene.name}</h3>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => startEdit(scene)}
-                          className="p-1 text-gray-400 hover:text-white transition-colors"
-                          title="Edit scene"
-                        >
-                          <Edit size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Delete "${scene.name}" scene?`)) {
-                              onDelete(scene.id);
-                            }
-                          }}
-                          className="p-1 text-gray-400 hover:text-red-400 transition-colors"
-                          title="Delete scene"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                    {/* Background Image Preview */}
+                    {scene.background_image_url && scene.uses_custom_background ? (
+                      <div className="h-24 relative">
+                        <img 
+                          src={scene.background_image_url} 
+                          alt={`${scene.name} background`}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40"></div>
                       </div>
-                    </div>
-                    <p className="text-sm text-gray-300 mb-2">{scene.description}</p>
-                    <div className="text-xs text-gray-400">
-                      <span className="font-medium">Context:</span> {scene.context}
-                    </div>
-                    {scene.atmosphere && (
-                      <div className="text-xs text-purple-300 mt-1">
-                        <span className="font-medium">Atmosphere:</span> {scene.atmosphere}
-                      </div>
+                    ) : (
+                      <div className="h-24 bg-gradient-to-r from-purple-500/20 to-blue-500/20"></div>
                     )}
+            
+                    {/* Scene Content */}
+                    <div className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="text-lg font-medium text-white">{scene.name}</h3>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => startEdit(scene)}
+                            className="p-1 text-gray-400 hover:text-white transition-colors"
+                            title="Edit scene"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Delete "${scene.name}" scene?`)) {
+                                onDelete(scene.id);
+                              }
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                            title="Delete scene"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-300 mb-2">{scene.description}</p>
+                      <div className="text-xs text-gray-400">
+                        <span className="font-medium">Context:</span> {scene.context}
+                      </div>
+                      {scene.atmosphere && (
+                        <div className="text-xs text-purple-300 mt-1">
+                          <span className="font-medium">Atmosphere:</span> {scene.atmosphere}
+                        </div>
+                      )}
+                      {scene.uses_custom_background && (
+                        <div className="text-xs text-blue-300 mt-1">
+                          <span className="font-medium">📸 Custom Background</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -288,18 +310,42 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
                 </button>
               </div>
 
-              {/* Scene Preview */}
-              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-purple-300 mb-2">Preview</h4>
-                <div className="text-lg font-medium text-white mb-1">
-                  {formData.name || 'Scene Name'}
-                </div>
-                <div className="text-sm text-gray-300 mb-2">
-                  {formData.description || 'Scene description will appear here...'}
-                </div>
-                <div className="text-xs text-gray-400">
-                  {formData.context || 'Scene context for AI characters...'}
-                </div>
+              {/* Scene Preview with Background */}
+              <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
+                <h4 className="text-sm font-medium text-purple-300 mb-2 p-4 pb-0">Preview</h4>
+        
+                {/* Background Preview */}
+                {formData.background_image_url && formData.uses_custom_background ? (
+                  <div className="relative h-32 mb-4">
+                    <img 
+                      src={formData.background_image_url} 
+                      alt="Scene background" 
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <div className="text-lg font-medium">
+                          {formData.name || 'Scene Name'}
+                        </div>
+                        <div className="text-sm opacity-75">
+                          {formData.description || 'Scene description will appear here...'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4">
+                    <div className="text-lg font-medium text-white mb-1">
+                      {formData.name || 'Scene Name'}
+                    </div>
+                    <div className="text-sm text-gray-300 mb-2">
+                      {formData.description || 'Scene description will appear here...'}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {formData.context || 'Scene context for AI characters...'}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Scene Name */}
@@ -361,6 +407,44 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
                       <div className="text-xs text-gray-400">{template.description}</div>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Background Image Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <Image size={16} className="inline mr-2" />
+                  Scene Background (Optional)
+                </label>
+        
+                <ImageUpload
+                  currentImage={formData.background_image_url}
+                  currentEmoji={null} // Not used for scenes
+                  onImageChange={(imageData) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      background_image_url: imageData.url,
+                      background_image_filename: imageData.filename,
+                      uses_custom_background: imageData.useCustomImage
+                    }));
+                  }}
+                  type="scene"
+                  aspectRatio="wide"
+                />
+        
+                <div className="mt-2 text-xs text-gray-500">
+                  <div className="flex items-start gap-2">
+                    <span>💡</span>
+                    <div>
+                      <p><strong>Background Image Tips:</strong></p>
+                      <ul className="mt-1 space-y-1 ml-2">
+                        <li>• Use high-quality landscape images (1920x1080 or higher)</li>
+                        <li>• Avoid busy images that would distract from conversation</li>
+                        <li>• Consider the mood and atmosphere of your scene</li>
+                        <li>• Images will be overlaid with semi-transparent chat interface</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
 
