@@ -178,87 +178,109 @@ class DatabaseService {
       throw error;
     }
   }
-
-  async createCharacter(userId, characterData) {
-    try {
-      const { data, error } = await this.supabase
-        .from('characters')
-        .insert({
-          user_id: userId,
-          name: characterData.name,
-          personality: characterData.personality,
-          avatar: characterData.avatar || '🤖',
-          color: characterData.color || 'from-gray-500 to-slate-500',
-          response_style: 'custom'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-
-    } catch (error) {
-      console.error('Database error creating character:', error);
-      throw error;
-    }
-  }
-
-  async updateCharacter(userId, characterId, updates) {
-    try {
-      // Check if it's a default character being modified
-      const defaultCharacterIds = ['maya', 'alex', 'zoe', 'finn'];
-      
-      if (defaultCharacterIds.includes(characterId)) {
-        // Create a new custom character based on the default
-        const newCharacter = {
-          user_id: userId,
-          name: updates.name,
-          personality: updates.personality,
-          avatar: updates.avatar,
-          color: updates.color,
-          response_style: 'custom',
-          is_modified_default: true,
-          original_id: characterId
-        };
-
+    async createCharacter(userId, characterData) {
+      try {
         const { data, error } = await this.supabase
           .from('characters')
-          .insert(newCharacter)
+          .insert({
+            user_id: userId,
+            name: characterData.name,
+            personality: characterData.personality,
+            avatar: characterData.avatar || '🤖',
+            color: characterData.color || 'from-gray-500 to-slate-500',
+            response_style: 'custom',
+            // Add support for custom images
+            avatar_image_url: characterData.avatar_image_url || null,
+            avatar_image_filename: characterData.avatar_image_filename || null,
+            uses_custom_image: characterData.uses_custom_image || false
+          })
           .select()
           .single();
 
         if (error) throw error;
-
-        // Hide the original default character
-        await this.hideDefaultCharacter(userId, characterId);
-
         return data;
-      } else {
-        // Update existing custom character
-        const { data, error } = await this.supabase
-          .from('characters')
-          .update({
+
+      } catch (error) {
+        console.error('Database error creating character:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Update an existing character with image support
+     */
+    async updateCharacter(userId, characterId, updates) {
+      try {
+        // Check if it's a default character being modified
+        const defaultCharacterIds = ['maya', 'alex', 'zoe', 'finn'];
+        
+        if (defaultCharacterIds.includes(characterId)) {
+          // Create a new custom character based on the default
+          const newCharacter = {
+            user_id: userId,
+            name: updates.name,
+            personality: updates.personality,
+            avatar: updates.avatar,
+            color: updates.color,
+            response_style: 'custom',
+            is_modified_default: true,
+            original_id: characterId,
+            // Add image support
+            avatar_image_url: updates.avatar_image_url || null,
+            avatar_image_filename: updates.avatar_image_filename || null,
+            uses_custom_image: updates.uses_custom_image || false
+          };
+
+          const { data, error } = await this.supabase
+            .from('characters')
+            .insert(newCharacter)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          // Hide the original default character
+          await this.hideDefaultCharacter(userId, characterId);
+
+          return data;
+        } else {
+          // Update existing custom character
+          const updateData = {
             name: updates.name,
             personality: updates.personality,
             avatar: updates.avatar,
             color: updates.color,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', characterId)
-          .eq('user_id', userId)
-          .select()
-          .single();
+          };
 
-        if (error) throw error;
-        return data;
+          // Add image fields if they exist in the updates
+          if ('avatar_image_url' in updates) {
+            updateData.avatar_image_url = updates.avatar_image_url;
+          }
+          if ('avatar_image_filename' in updates) {
+            updateData.avatar_image_filename = updates.avatar_image_filename;
+          }
+          if ('uses_custom_image' in updates) {
+            updateData.uses_custom_image = updates.uses_custom_image;
+          }
+
+          const { data, error } = await this.supabase
+            .from('characters')
+            .update(updateData)
+            .eq('id', characterId)
+            .eq('user_id', userId)
+            .select()
+            .single();
+
+          if (error) throw error;
+          return data;
+        }
+
+      } catch (error) {
+        console.error('Database error updating character:', error);
+        throw error;
       }
-
-    } catch (error) {
-      console.error('Database error updating character:', error);
-      throw error;
     }
-  }
-
   async deleteCharacter(userId, characterId) {
     try {
       const defaultCharacterIds = ['maya', 'alex', 'zoe', 'finn'];
