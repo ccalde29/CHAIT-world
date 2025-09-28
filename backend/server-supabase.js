@@ -93,7 +93,7 @@ async function callAIProvider(messages, characterPrompt, provider, userId, ollam
         if (!apiKeys.anthropic) {
           throw new Error('Anthropic API key not configured');
         }
-        return await callAnthropic(messages, characterPrompt, apiKeys.anthropic);
+        return await callAnthropicWithMemory(messages, characterPrompt, apiKeys.anthropic);
         
       case 'ollama':
         return await callOllama(

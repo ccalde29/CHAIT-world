@@ -4,9 +4,9 @@
  * Modal component for creating new characters or editing existing custom characters.
  * Provides form validation, emoji picker, and color selection.
  */
-import ImageUpload from './ImageUpload';
 import React, { useState, useEffect } from 'react';
 import { X, User, Palette, Smile, Sparkles } from 'lucide-react';
+import ImageUpload from './ImageUpload';
 
 const CharacterEditor = ({ character, onSave, onClose }) => {
   // ============================================================================
