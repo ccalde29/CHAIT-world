@@ -54,6 +54,7 @@ const MainApp = () => {
   const [userPersona, setUserPersona] = useState(null);
   const messagesEndRef = useRef(null);
   const userMenuRef = useRef(null);
+  const [historyUpdateTrigger, setHistoryUpdateTrigger] = useState(0);
 
   // ============================================================================
   // API FUNCTIONS
@@ -192,6 +193,7 @@ const MainApp = () => {
       }
     ]);
     setError(null);
+    setHistoryUpdateTrigger(prev => prev + 1);
   };
 
   const loadChatSession = async (session) => {
@@ -473,6 +475,7 @@ const MainApp = () => {
         onSessionSelect={loadChatSession}
         onNewChat={startNewChat}
         characters={characters}
+        onHistoryUpdate={historyUpdateTrigger}
       />
 
       {/* Main Content */}
