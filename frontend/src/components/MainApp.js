@@ -1,6 +1,6 @@
 /**
  * Main Application Component (after authentication)
- * Complete file with Supabase integration and proper settings handling
+ * Fixed version with working user menu dropdown
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -53,6 +53,7 @@ const MainApp = () => {
   const [selectedCharacterForMemory, setSelectedCharacterForMemory] = useState(null);
   const [userPersona, setUserPersona] = useState(null);
   const messagesEndRef = useRef(null);
+  const userMenuRef = useRef(null);
 
   // ============================================================================
   // API FUNCTIONS
@@ -443,6 +444,22 @@ const MainApp = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showUserMenu]);
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -469,10 +486,13 @@ const MainApp = () => {
               <h2 className="text-lg font-bold text-white">Characters</h2>
             </div>
             
-            {/* User Avatar */}
-            <div className="relative">
+            {/* User Avatar - FIXED VERSION */}
+            <div className="relative" ref={userMenuRef}>
               <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowUserMenu(!showUserMenu);
+                }}
                 className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/10 transition-colors"
               >
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -494,8 +514,9 @@ const MainApp = () => {
                 </div>
               </button>
               
+              {/* User Menu Dropdown - FIXED */}
               {showUserMenu && (
-                <div className="absolute right-0 top-12 bg-slate-800 border border-white/10 rounded-lg p-2 min-w-48 z-10">
+                <div className="absolute right-0 top-12 bg-slate-800 border border-white/10 rounded-lg shadow-xl p-2 min-w-48 z-[100]">
                   <div className="px-3 py-2 border-b border-white/10 mb-2">
                     <p className="text-sm font-medium text-white">
                       {userPersona?.hasPersona ? userPersona.persona.name : user?.user_metadata?.full_name || 'User'}
@@ -503,7 +524,8 @@ const MainApp = () => {
                     <p className="text-xs text-gray-400">{user?.email}</p>
                   </div>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setShowPersonaEditor(true);
                       setShowUserMenu(false);
                     }}
@@ -513,7 +535,8 @@ const MainApp = () => {
                     {userPersona?.hasPersona ? 'Edit Persona' : 'Create Persona'}
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setShowSettings(true);
                       setShowUserMenu(false);
                     }}
@@ -523,7 +546,10 @@ const MainApp = () => {
                     Settings
                   </button>
                   <button
-                    onClick={handleSignOut}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSignOut();
+                    }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-left text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors"
                   >
                     <LogOut size={16} />
@@ -918,14 +944,6 @@ const MainApp = () => {
             }
           }}
           onClose={() => setShowPersonaEditor(false)}
-        />
-      )}
-
-      {/* Click outside to close user menu */}
-      {showUserMenu && (
-        <div 
-          className="fixed inset-0 z-50" 
-          onClick={() => setShowUserMenu(false)}
         />
       )}
     </div>
