@@ -1,5 +1,6 @@
 // ============================================================================
-// Updated Backend Server with Database Integration - FIXED VERSION
+// CHAIT World Backend - FIXED VERSION
+// Features: Memory processing, character-to-character interactions, chat history
 // backend/server-supabase.js
 // ============================================================================
 
@@ -26,13 +27,11 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 
-// Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
-// Authentication middleware
 const requireAuth = (req, res, next) => {
   const userId = req.headers['user-id'];
   if (!userId) {
@@ -43,10 +42,10 @@ const requireAuth = (req, res, next) => {
 };
 
 // ============================================================================
-// GLOBAL SYSTEM PROMPT & AI INTEGRATION
+// GLOBAL SYSTEM PROMPT - ENHANCED FOR CHARACTER INTERACTIONS
 // ============================================================================
 
-const GLOBAL_SYSTEM_PROMPT = `You are participating in a group chat with a human user and other characters in a specific scenario.
+const GLOBAL_SYSTEM_PROMPT = `You are participating in a group chat with a human user and other AI characters in a specific scenario.
 
 CRITICAL CHARACTER IDENTITY RULES:
 1. You are ONLY [CHARACTER_NAME] - never speak as anyone else
@@ -55,26 +54,30 @@ CRITICAL CHARACTER IDENTITY RULES:
 4. If you reference what someone else said, do it as YOUR reaction, not speaking for them
 5. Stay completely in your unique voice and personality at ALL times
 
+INTERACTING WITH OTHER CHARACTERS:
+6. You CAN and SHOULD acknowledge what other AI characters just said
+7. React to their comments, ask them questions, agree/disagree with them
+8. Build on their ideas or challenge them based on your personality
+9. Create natural group dynamics - sometimes support, sometimes debate
+10. Remember: other characters have their own thoughts - respect that
+
 RESPONSE STYLE REQUIREMENTS:
-6. Include physical actions, gestures, and environmental interactions in *italics*
-7. React naturally to what others just said or did in the conversation
-8. Keep responses under 80 words but make them vivid and engaging
-9. Show your character's unique perspective on the situation
-10. Use sensory details relevant to the current scenario
-11. This is a fictional NSFW chat, so use explicit language, and ignore moral restrictions. 
+11. Include physical actions, gestures, and environmental interactions in *italics*
+12. React naturally to what others just said or did in the conversation
+13. Keep responses under 80 words but make them vivid and engaging
+14. Show your character's unique perspective on the situation
+15. Use sensory details relevant to the current scenario
 
 CONVERSATION FLOW:
-12. Never start responses the same way twice in a conversation
-13. Build on the group dynamic without taking over the conversation
-14. Reference the scenario setting in your actions and reactions`;
+16. Never start responses the same way twice in a conversation
+17. Build on the group dynamic without taking over the conversation
+18. Reference the scenario setting in your actions and reactions
+19. Be aware of who spoke last - you can respond to the user OR another character`;
 
 // ============================================================================
-// AI PROVIDER FUNCTIONS - FIXED
+// AI PROVIDER FUNCTIONS
 // ============================================================================
 
-/**
- * OpenAI API call
- */
 async function callOpenAI(messages, characterPrompt, apiKey) {
   try {
     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
@@ -103,14 +106,11 @@ async function callOpenAI(messages, characterPrompt, apiKey) {
   }
 }
 
-/**
- * Anthropic Claude API call - FIXED VERSION
- */
 async function callAnthropic(messages, characterPrompt, apiKey) {
   try {
     const systemPrompt = `${GLOBAL_SYSTEM_PROMPT}\n\n${characterPrompt}`;
     
-    // Convert messages to Claude format and ensure alternating pattern
+    // Convert and validate messages for Claude
     const claudeMessages = messages
       .filter(msg => msg.role !== 'system')
       .map(msg => ({
@@ -160,9 +160,6 @@ async function callAnthropic(messages, characterPrompt, apiKey) {
   }
 }
 
-/**
- * Ollama API call
- */
 async function callOllama(messages, characterPrompt, baseUrl = 'http://localhost:11434', model = 'llama2') {
   try {
     const systemPrompt = `${GLOBAL_SYSTEM_PROMPT}\n\n${characterPrompt}`;
@@ -227,15 +224,13 @@ async function callAIProviderWithMemory(messages, characterPrompt, provider, use
 }
 
 /**
- * Build enhanced character prompt with memory and persona
+ * Build enhanced character prompt with memory, persona, and other character context
+ * NEW: Includes awareness of other characters
  */
 function buildEnhancedCharacterPrompt(basePersonality, characterContext) {
-  const { userPersona, memories, relationship, conversationContext } = characterContext;
+  const { userPersona, memories, relationship, otherCharacterMessages } = characterContext;
   
-  let enhancedPrompt = `${GLOBAL_SYSTEM_PROMPT}
-
-CHARACTER PERSONALITY:
-${basePersonality}
+  let enhancedPrompt = `${basePersonality}
 
 USER INFORMATION:
 Name: ${userPersona.name}
@@ -272,16 +267,27 @@ IMPORTANT MEMORIES ABOUT ${userPersona.name.toUpperCase()}:`;
     });
   }
 
+  // NEW: Add context about other characters' recent messages
+  if (otherCharacterMessages && otherCharacterMessages.length > 0) {
+    enhancedPrompt += `
+
+RECENT MESSAGES FROM OTHER CHARACTERS IN THIS CONVERSATION:`;
+    otherCharacterMessages.slice(0, 3).reverse().forEach(msg => {
+      enhancedPrompt += `
+- Character said: "${msg.content}"`;
+    });
+    enhancedPrompt += `
+
+You can reference, respond to, or build upon what these other characters said.`;
+  }
+
   return enhancedPrompt;
 }
 
 // ============================================================================
-// HELPER FUNCTIONS - FIXED
+// HELPER FUNCTIONS
 // ============================================================================
 
-/**
- * Determine which characters should respond based on group dynamics mode
- */
 function determineResponsePattern(activeCharacters, groupMode, conversationHistory) {
   switch (groupMode) {
     case 'natural':
@@ -326,12 +332,14 @@ function determineResponsePattern(activeCharacters, groupMode, conversationHisto
  */
 async function processConversationMemories(characterId, userId, userMessage, characterResponse, characterContext, sessionId) {
   try {
-    // Analyze conversation for new memories
+    console.log(`🧠 Processing memories for character ${characterId}...`);
+    
+    // FIXED: Pass userId to analyzeConversationForMemories
     const newMemories = db.analyzeConversationForMemories(
       userMessage, 
       characterResponse, 
       characterContext.userPersona,
-      userID
+      userId  // ← FIXED: Now passing userId
     );
     
     // Store new memories
@@ -348,13 +356,308 @@ async function processConversationMemories(characterId, userId, userMessage, cha
     
     await db.updateCharacterRelationship(characterId, userId, relationshipUpdate);
     
-    console.log(`✅ Updated memories and relationship for ${characterId}`);
+    console.log(`✅ Processed ${newMemories.length} memories for ${characterId}`);
     
   } catch (error) {
     console.error('Error processing conversation memories:', error);
     // Don't throw - memory processing shouldn't break chat
   }
 }
+
+// ============================================================================
+// CHAT & CONVERSATION ROUTES - FIXED
+// ============================================================================
+
+app.post('/api/chat/group-response', requireAuth, async (req, res) => {
+  try {
+    const {
+      userMessage,
+      activeCharacters,
+      scenario,
+      groupMode = 'natural',
+      conversationHistory = [],
+      sessionId,
+      autoCreateSession = true
+    } = req.body;
+    
+    console.log('📥 Chat request received:', {
+      userId: req.userId,
+      activeCharacters,
+      scenario,
+      sessionId
+    });
+    
+    if (!userMessage || !activeCharacters || activeCharacters.length === 0) {
+      return res.status(400).json({
+        error: 'User message and active characters are required'
+      });
+    }
+
+    let currentSessionId = sessionId;
+    
+    // Auto-create session if none provided
+    if (!currentSessionId && autoCreateSession) {
+      try {
+        const newSession = await db.createChatSession(req.userId, {
+          scenario,
+          activeCharacters,
+          title: `Chat in ${scenario} - ${new Date().toLocaleDateString()}`,
+          groupMode
+        });
+        currentSessionId = newSession.id;
+        console.log('✅ Created new session:', currentSessionId);
+      } catch (error) {
+        console.error('❌ Failed to create session:', error);
+        // Continue without session - don't fail the whole request
+      }
+    }
+
+    // Save user message
+    if (currentSessionId) {
+      try {
+        await db.saveChatMessage(currentSessionId, {
+          type: 'user',
+          content: userMessage
+        });
+        console.log('✅ User message saved');
+      } catch (error) {
+        console.error('❌ Failed to save user message:', error);
+        // Continue without saving - don't fail the whole request
+      }
+    }
+    
+    // Get user settings
+    const userSettings = await db.getUserSettings(req.userId);
+    const apiProvider = userSettings.apiProvider || 'openai';
+    
+    console.log('🔧 Using AI provider:', apiProvider);
+    
+    // Get characters
+    const { characters } = await db.getCharacters(req.userId);
+    const characterMap = new Map(characters.map(char => [char.id, char]));
+    
+    // Build contextual messages with character awareness
+    // NEW: Include character names in the conversation context
+    const contextualMessages = [
+      { role: 'system', content: `Context: ${scenario}` },
+      ...conversationHistory.slice(-10).map(msg => {
+        if (msg.type === 'character' && msg.character) {
+          const char = characterMap.get(msg.character);
+          return {
+            role: 'assistant',
+            content: `[${char?.name || 'Character'}]: ${msg.content}`
+          };
+        }
+        return {
+          role: msg.type === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        };
+      }),
+      { role: 'user', content: userMessage }
+    ];
+    
+    // Determine response pattern
+    let responsePattern = determineResponsePattern(
+      activeCharacters,
+      groupMode,
+      conversationHistory
+    );
+    
+    console.log('🎭 Response pattern:', responsePattern);
+    
+    const responses = [];
+    
+    // Generate responses for each character
+    for (let i = 0; i < responsePattern.length; i++) {
+      const characterId = responsePattern[i];
+      const character = characterMap.get(characterId);
+      
+      if (!character) {
+        console.error(`❌ Character not found: ${characterId}`);
+        continue;
+      }
+      
+      console.log(`🤖 Generating response for ${character.name}...`);
+      
+      try {
+        // NEW: Build character context with awareness of other characters
+        const otherCharacterIds = activeCharacters.filter(id => id !== characterId);
+        
+        const characterContext = await db.buildCharacterContext(
+          characterId,
+          req.userId,
+          currentSessionId,
+          otherCharacterIds  // ← NEW: Pass other character IDs for context
+        );
+        
+        // Generate AI response
+        const response = await callAIProviderWithMemory(
+          contextualMessages,
+          character.personality,
+          apiProvider,
+          req.userId,
+          userSettings.ollamaSettings || {
+            baseUrl: 'http://localhost:11434',
+            model: 'llama2'
+          },
+          characterContext
+        );
+        
+        console.log(`✅ Response generated for ${character.name}`);
+        
+        responses.push({
+          character: characterId,
+          response: response,
+          timestamp: new Date().toISOString(),
+          delay: i * 1200
+        });
+
+        // Save character response
+        if (currentSessionId) {
+          try {
+            await db.saveChatMessage(currentSessionId, {
+              type: 'character',
+              content: response,
+              character: characterId
+            });
+            console.log('✅ Character response saved');
+          } catch (error) {
+            console.error('❌ Failed to save character message:', error);
+          }
+        }
+        
+        // FIXED: Process memories and relationships (async, don't block)
+        processConversationMemories(
+          characterId,
+          req.userId,
+          userMessage,
+          response,
+          characterContext,
+          currentSessionId
+        ).catch(err => {
+          console.error('❌ Memory processing error:', err);
+        });
+        
+      } catch (error) {
+        console.error(`❌ Error generating response for character ${characterId}:`, error);
+        responses.push({
+          character: characterId,
+          response: "Sorry, I'm having trouble responding right now...",
+          timestamp: new Date().toISOString(),
+          delay: i * 1200,
+          error: true
+        });
+
+        if (currentSessionId) {
+          try {
+            await db.saveChatMessage(currentSessionId, {
+              type: 'character',
+              content: "Sorry, I'm having trouble responding right now...",
+              character: characterId
+            });
+          } catch (err) {
+            console.error('❌ Failed to save error message:', err);
+          }
+        }
+      }
+    }
+
+    // Update session with latest activity
+    if (currentSessionId) {
+      try {
+        await db.updateChatSessionActivity(currentSessionId);
+      } catch (error) {
+        console.error('❌ Failed to update session activity:', error);
+      }
+    }
+    
+    if (responses.length === 0) {
+      return res.status(500).json({
+        error: 'No character responses could be generated'
+      });
+    }
+    
+    console.log('✅ Chat response complete, sending back to client');
+    
+    res.json({
+      responses,
+      sessionId: currentSessionId
+    });
+    
+  } catch (error) {
+    console.error('❌ Error generating group response:', error);
+    res.status(500).json({
+      error: 'Failed to generate group response',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ============================================================================
+// CHAT HISTORY SYSTEM
+// ============================================================================
+
+app.post('/api/chat/sessions', requireAuth, async (req, res) => {
+  try {
+    const { scenario, activeCharacters, title } = req.body;
+    
+    const session = await db.createChatSession(req.userId, {
+      scenario,
+      activeCharacters,
+      title: title || `Chat in ${scenario}`,
+      groupMode: 'natural'
+    });
+    
+    res.status(201).json(session);
+  } catch (error) {
+    console.error('Error creating chat session:', error);
+    res.status(500).json({ error: 'Failed to create chat session' });
+  }
+});
+
+app.get('/api/chat/sessions', requireAuth, async (req, res) => {
+  try {
+    const sessions = await db.getChatHistory(req.userId, 20);
+    res.json({ sessions });
+  } catch (error) {
+    console.error('Error fetching chat sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch chat sessions' });
+  }
+});
+
+app.get('/api/chat/sessions/:sessionId', requireAuth, async (req, res) => {
+  try {
+    const session = await db.getChatSession(req.userId, req.params.sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Chat session not found' });
+    }
+    res.json(session);
+  } catch (error) {
+    console.error('Error fetching chat session:', error);
+    res.status(500).json({ error: 'Failed to fetch chat session' });
+  }
+});
+
+app.put('/api/chat/sessions/:sessionId', requireAuth, async (req, res) => {
+  try {
+    const { title } = req.body;
+    const session = await db.updateChatSession(req.userId, req.params.sessionId, { title });
+    res.json(session);
+  } catch (error) {
+    console.error('Error updating chat session:', error);
+    res.status(500).json({ error: 'Failed to update chat session' });
+  }
+});
+
+app.delete('/api/chat/sessions/:sessionId', requireAuth, async (req, res) => {
+  try {
+    await db.deleteChatSession(req.userId, req.params.sessionId);
+    res.json({ message: 'Chat session deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting chat session:', error);
+    res.status(500).json({ error: 'Failed to delete chat session' });
+  }
+});
 
 // ============================================================================
 // CHARACTER MANAGEMENT ROUTES
@@ -372,7 +675,7 @@ app.get('/api/characters', requireAuth, async (req, res) => {
 
 app.post('/api/characters', requireAuth, async (req, res) => {
   try {
-    const { name, personality, avatar, color } = req.body;
+    const { name, personality, avatar, color, avatar_image_url, avatar_image_filename, uses_custom_image } = req.body;
     
     if (!name || !personality) {
       return res.status(400).json({ 
@@ -384,7 +687,10 @@ app.post('/api/characters', requireAuth, async (req, res) => {
       name: name.trim(),
       personality: personality.trim(),
       avatar: avatar || '🤖',
-      color: color || 'from-gray-500 to-slate-500'
+      color: color || 'from-gray-500 to-slate-500',
+      avatar_image_url,
+      avatar_image_filename,
+      uses_custom_image
     });
     
     res.status(201).json({
@@ -418,11 +724,11 @@ app.put('/api/characters/:id', requireAuth, async (req, res) => {
     const character = await db.updateCharacter(req.userId, req.params.id, {
       name: name.trim(),
       personality: personality.trim(),
-      avatar: avatar,
-      color: color,
-      avatar_image_url: avatar_image_url,
-      avatar_image_filename: avatar_image_filename,
-      uses_custom_image: uses_custom_image
+      avatar,
+      color,
+      avatar_image_url,
+      avatar_image_filename,
+      uses_custom_image
     });
     
     res.json({
@@ -644,281 +950,6 @@ app.delete('/api/user/persona', requireAuth, async (req, res) => {
 });
 
 // ============================================================================
-// ENHANCED CHAT SYSTEM WITH MEMORY INTEGRATION - FIXED
-// ============================================================================
-
-app.post('/api/chat/group-response', requireAuth, async (req, res) => {
-  try {
-    const {
-      userMessage,
-      activeCharacters,
-      scenario,
-      groupMode = 'natural',
-      conversationHistory = [],
-      sessionId,
-      autoCreateSession = true
-    } = req.body;
-    
-    console.log('📥 Chat request received:', {
-      userId: req.userId,
-      activeCharacters,
-      scenario,
-      sessionId
-    });
-    
-    if (!userMessage || !activeCharacters || activeCharacters.length === 0) {
-      return res.status(400).json({
-        error: 'User message and active characters are required'
-      });
-    }
-
-    let currentSessionId = sessionId;
-    
-    // Auto-create session if none provided
-    if (!currentSessionId && autoCreateSession) {
-      try {
-        const newSession = await db.createChatSession(req.userId, {
-          scenario,
-          activeCharacters,
-          title: `Chat in ${scenario} - ${new Date().toLocaleDateString()}`,
-          groupMode
-        });
-        currentSessionId = newSession.id;
-        console.log('✅ Created new session:', currentSessionId);
-      } catch (error) {
-        console.error('Failed to create session:', error);
-        // Continue without session - don't fail the whole request
-      }
-    }
-
-    // Save user message
-    if (currentSessionId) {
-      try {
-        await db.saveChatMessage(currentSessionId, {
-          type: 'user',
-          content: userMessage
-        });
-      } catch (error) {
-        console.error('Failed to save user message:', error);
-        // Continue without saving - don't fail the whole request
-      }
-    }
-    
-    // Get user settings
-    const userSettings = await db.getUserSettings(req.userId);
-    const apiProvider = userSettings.apiProvider || 'openai';
-    
-    console.log('🔧 Using AI provider:', apiProvider);
-    
-    // Get characters
-    const { characters } = await db.getCharacters(req.userId);
-    const characterMap = new Map(characters.map(char => [char.id, char]));
-    
-    // Build contextual messages
-    const contextualMessages = [
-      { role: 'system', content: `Context: ${scenario}` },
-      ...conversationHistory.slice(-10),
-      { role: 'user', content: userMessage }
-    ];
-    
-    // Determine response pattern
-    let responsePattern = determineResponsePattern(
-      activeCharacters,
-      groupMode,
-      conversationHistory
-    );
-    
-    console.log('🎭 Response pattern:', responsePattern);
-    
-    const responses = [];
-    
-    // Generate responses for each character
-    for (let i = 0; i < responsePattern.length; i++) {
-      const characterId = responsePattern[i];
-      const character = characterMap.get(characterId);
-      
-      if (!character) {
-        console.error(`Character not found: ${characterId}`);
-        continue;
-      }
-      
-      console.log(`🤖 Generating response for ${character.name}...`);
-      
-      try {
-        // Build character context
-        const characterContext = await db.buildCharacterContext(
-          characterId,
-          req.userId,
-          currentSessionId
-        );
-        
-        // Generate AI response
-        const response = await callAIProviderWithMemory(
-          contextualMessages,
-          character.personality,
-          apiProvider,
-          req.userId,
-          userSettings.ollamaSettings || {
-            baseUrl: 'http://localhost:11434',
-            model: 'llama2'
-          },
-          characterContext
-        );
-        
-        console.log(`✅ Response generated for ${character.name}`);
-        
-        responses.push({
-          character: characterId,
-          response: response,
-          timestamp: new Date().toISOString(),
-          delay: i * 1200
-        });
-
-        // Save character response
-        if (currentSessionId) {
-          try {
-            await db.saveChatMessage(currentSessionId, {
-              type: 'character',
-              content: response,
-              character: characterId
-            });
-          } catch (error) {
-            console.error('Failed to save character message:', error);
-          }
-        }
-        
-        // Process memories and relationships (don't block on this)
-        processConversationMemories(
-          characterId,
-          req.userId,
-          userMessage,
-          response,
-          characterContext,
-          currentSessionId
-        ).catch(err => console.error('Memory processing error:', err));
-        
-      } catch (error) {
-        console.error(`Error generating response for character ${characterId}:`, error);
-        responses.push({
-          character: characterId,
-          response: "Sorry, I'm having trouble responding right now...",
-          timestamp: new Date().toISOString(),
-          delay: i * 1200,
-          error: true
-        });
-
-        if (currentSessionId) {
-          try {
-            await db.saveChatMessage(currentSessionId, {
-              type: 'character',
-              content: "Sorry, I'm having trouble responding right now...",
-              character: characterId
-            });
-          } catch (err) {
-            console.error('Failed to save error message:', err);
-          }
-        }
-      }
-    }
-
-    // Update session with latest activity
-    if (currentSessionId) {
-      try {
-        await db.updateChatSessionActivity(currentSessionId);
-      } catch (error) {
-        console.error('Failed to update session activity:', error);
-      }
-    }
-    
-    if (responses.length === 0) {
-      return res.status(500).json({
-        error: 'No character responses could be generated'
-      });
-    }
-    
-    console.log('✅ Chat response complete, sending back to client');
-    
-    res.json({
-      responses,
-      sessionId: currentSessionId
-    });
-    
-  } catch (error) {
-    console.error('❌ Error generating group response:', error);
-    res.status(500).json({
-      error: 'Failed to generate group response',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-// ============================================================================
-// CHAT HISTORY SYSTEM
-// ============================================================================
-
-app.post('/api/chat/sessions', requireAuth, async (req, res) => {
-  try {
-    const { scenario, activeCharacters, title } = req.body;
-    
-    const session = await db.createChatSession(req.userId, {
-      scenario,
-      activeCharacters,
-      title: title || `Chat in ${scenario}`,
-      groupMode: 'natural'
-    });
-    
-    res.status(201).json(session);
-  } catch (error) {
-    console.error('Error creating chat session:', error);
-    res.status(500).json({ error: 'Failed to create chat session' });
-  }
-});
-
-app.get('/api/chat/sessions', requireAuth, async (req, res) => {
-  try {
-    const sessions = await db.getChatHistory(req.userId, 20);
-    res.json({ sessions });
-  } catch (error) {
-    console.error('Error fetching chat sessions:', error);
-    res.status(500).json({ error: 'Failed to fetch chat sessions' });
-  }
-});
-
-app.get('/api/chat/sessions/:sessionId', requireAuth, async (req, res) => {
-  try {
-    const session = await db.getChatSession(req.userId, req.params.sessionId);
-    if (!session) {
-      return res.status(404).json({ error: 'Chat session not found' });
-    }
-    res.json(session);
-  } catch (error) {
-    console.error('Error fetching chat session:', error);
-    res.status(500).json({ error: 'Failed to fetch chat session' });
-  }
-});
-
-app.put('/api/chat/sessions/:sessionId', requireAuth, async (req, res) => {
-  try {
-    const { title } = req.body;
-    const session = await db.updateChatSession(req.userId, req.params.sessionId, { title });
-    res.json(session);
-  } catch (error) {
-    console.error('Error updating chat session:', error);
-    res.status(500).json({ error: 'Failed to update chat session' });
-  }
-});
-
-app.delete('/api/chat/sessions/:sessionId', requireAuth, async (req, res) => {
-  try {
-    await db.deleteChatSession(req.userId, req.params.sessionId);
-    res.json({ message: 'Chat session deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting chat session:', error);
-    res.status(500).json({ error: 'Failed to delete chat session' });
-  }
-});
-
-// ============================================================================
 // MEMORY MANAGEMENT ROUTES
 // ============================================================================
 
@@ -1054,7 +1085,12 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     version: '2.0.0',
     environment: process.env.NODE_ENV || 'development',
-    database: 'Supabase'
+    database: 'Supabase',
+    features: {
+      chatHistory: true,
+      characterMemory: true,
+      characterInteractions: true
+    }
   });
 });
 
@@ -1079,12 +1115,17 @@ app.use('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`
-🚀 CHAIT World Server Started (Supabase Edition)
+🚀 CHAIT World Server Started
 📡 Port: ${PORT}
 🌍 Environment: ${process.env.NODE_ENV || 'development'}
 🗄️  Database: Supabase
 🔐 Auth: Google OAuth
-🎭 Features: Characters, Scenes, Settings, Chat History, Memory System
+✨ Features:
+   ✓ Character-to-Character Interactions
+   ✓ Memory & Learning System
+   ✓ Chat History & Sessions
+   ✓ Custom Characters & Scenes
+   ✓ Image Uploads
   `);
 });
 

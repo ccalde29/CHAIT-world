@@ -1,0 +1,262 @@
+2025-09-30T04:16:52.306Z - GET /api/chat/sessions
+2025-09-30T04:16:52.348Z - GET /api/characters
+2025-09-30T04:16:52.350Z - GET /api/user/persona
+2025-09-30T04:16:52.351Z - GET /api/user/settings
+2025-09-30T04:16:52.352Z - GET /api/scenarios
+2025-09-30T04:16:52.770Z - GET /api/chat/sessions
+2025-09-30T04:16:52.776Z - GET /api/scenarios
+2025-09-30T04:16:52.778Z - GET /api/user/settings
+2025-09-30T04:16:52.780Z - GET /api/user/persona
+2025-09-30T04:16:52.842Z - GET /api/characters
+2025-09-30T04:16:52.845Z - GET /api/scenarios
+2025-09-30T04:16:52.854Z - GET /api/user/persona
+2025-09-30T04:16:52.857Z - GET /api/user/settings
+2025-09-30T04:16:52.921Z - GET /api/scenarios
+2025-09-30T04:16:52.924Z - GET /api/user/persona
+2025-09-30T04:16:52.929Z - GET /api/user/settings
+2025-09-30T04:16:52.978Z - GET /api/characters
+2025-09-30T04:16:52.987Z - GET /api/user/persona
+2025-09-30T04:16:52.990Z - GET /api/scenarios
+2025-09-30T04:16:53.006Z - GET /api/user/settings
+2025-09-30T04:16:53.118Z - GET /api/characters
+2025-09-30T04:16:53.272Z - GET /api/characters
+2025-09-30T04:17:20.305Z - POST /api/chat/group-response
+📥 Chat request received: {
+  userId: 'cbae9dce-c179-4aeb-9a3b-7c729f2719e8',
+  activeCharacters: [
+    '1b0c98ae-4511-46c3-baa2-9fc54bfae5d4',
+    'a3ce74c9-6f83-4d16-830e-b6bcfc9705bc'
+  ],
+  scenario: '293584b4-9c80-47d7-b34b-23eaae7cf0ea',
+  sessionId: null
+}
+📝 Creating chat session for user: cbae9dce-c179-4aeb-9a3b-7c729f2719e8
+✅ Chat session created: f3eac64f-8092-4c23-9fd9-66720ed47a05
+✅ Created new session: f3eac64f-8092-4c23-9fd9-66720ed47a05
+💬 Saving message to session: f3eac64f-8092-4c23-9fd9-66720ed47a05
+❌ Error saving message: {
+  code: '23502',
+  details: 'Failing row contains (1, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, Hello my loves, how are you guys, null, 2025-09-30 04:17:20.564674+00, user, null, 2025-09-30 04:17:20.47+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+Database error saving chat message: {
+  code: '23502',
+  details: 'Failing row contains (1, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, Hello my loves, how are you guys, null, 2025-09-30 04:17:20.564674+00, user, null, 2025-09-30 04:17:20.47+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+✅ User message saved
+🔧 Using AI provider: openai
+🎭 Response pattern: [ '1b0c98ae-4511-46c3-baa2-9fc54bfae5d4' ]
+🤖 Generating response for Ada Mcneal...
+🔍 Building context for character: 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4
+✅ Context built successfully
+WARNING: Found legacy base64 encoded API key
+✅ Response generated for Ada Mcneal
+💬 Saving message to session: f3eac64f-8092-4c23-9fd9-66720ed47a05
+❌ Error saving message: {
+  code: '23502',
+  details: "Failing row contains (2, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, *As the user's words pop up, I raise an eyebrow, intrigued.* Hel..., null, 2025-09-30 04:17:21.910284+00, character, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, 2025-09-30 04:17:21.82+00).",
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+Database error saving chat message: {
+  code: '23502',
+  details: "Failing row contains (2, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, *As the user's words pop up, I raise an eyebrow, intrigued.* Hel..., null, 2025-09-30 04:17:21.910284+00, character, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, 2025-09-30 04:17:21.82+00).",
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+✅ Character response saved
+🧠 Processing memories for character 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4...
+🔍 Analyzing conversation for memories...
+📊 Total memories found: 0
+💞 Calculating relationship update...
+✅ Relationship updated: neutral (trust: 0.55, familiarity: 0.16)
+💞 Updating relationship for character: 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4
+✅ Chat response complete, sending back to client
+❌ Error updating relationship: {
+  code: '23502',
+  details: 'Failing row contains (127, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, cbae9dce-c179-4aeb-9a3b-7c729f2719e8, null, null, neutral, 0.55, 0.16, 0.07, 2025-09-30 04:17:21.894+00, 2, 2025-09-30 04:17:21.990952+00).',
+  hint: null,
+  message: 'null value in column "target_type" of relation "character_relationships" violates not-null constraint'
+}
+Database error updating character relationship: {
+  code: '23502',
+  details: 'Failing row contains (127, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, cbae9dce-c179-4aeb-9a3b-7c729f2719e8, null, null, neutral, 0.55, 0.16, 0.07, 2025-09-30 04:17:21.894+00, 2, 2025-09-30 04:17:21.990952+00).',
+  hint: null,
+  message: 'null value in column "target_type" of relation "character_relationships" violates not-null constraint'
+}
+✅ Processed 0 memories for 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4
+2025-09-30T04:17:22.480Z - GET /api/chat/sessions
+2025-09-30T04:17:46.347Z - POST /api/chat/group-response
+📥 Chat request received: {
+  userId: 'cbae9dce-c179-4aeb-9a3b-7c729f2719e8',
+  activeCharacters: [
+    '1b0c98ae-4511-46c3-baa2-9fc54bfae5d4',
+    'a3ce74c9-6f83-4d16-830e-b6bcfc9705bc'
+  ],
+  scenario: '293584b4-9c80-47d7-b34b-23eaae7cf0ea',
+  sessionId: 'f3eac64f-8092-4c23-9fd9-66720ed47a05'
+}
+💬 Saving message to session: f3eac64f-8092-4c23-9fd9-66720ed47a05
+❌ Error saving message: {
+  code: '23502',
+  details: 'Failing row contains (3, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, and you Dia?, null, 2025-09-30 04:17:46.499227+00, user, null, 2025-09-30 04:17:46.347+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+Database error saving chat message: {
+  code: '23502',
+  details: 'Failing row contains (3, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, and you Dia?, null, 2025-09-30 04:17:46.499227+00, user, null, 2025-09-30 04:17:46.347+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+✅ User message saved
+🔧 Using AI provider: openai
+🎭 Response pattern: [
+  '1b0c98ae-4511-46c3-baa2-9fc54bfae5d4',
+  'a3ce74c9-6f83-4d16-830e-b6bcfc9705bc'
+]
+🤖 Generating response for Ada Mcneal...
+🔍 Building context for character: 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4
+✅ Context built successfully
+WARNING: Found legacy base64 encoded API key
+✅ Response generated for Ada Mcneal
+💬 Saving message to session: f3eac64f-8092-4c23-9fd9-66720ed47a05
+❌ Error saving message: {
+  code: '23502',
+  details: 'Failing row contains (4, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, *Glancing over at Dia, I see her quietly observing.* Dia, darlin..., null, 2025-09-30 04:17:48.341845+00, character, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, 2025-09-30 04:17:48.238+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+Database error saving chat message: {
+  code: '23502',
+  details: 'Failing row contains (4, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, *Glancing over at Dia, I see her quietly observing.* Dia, darlin..., null, 2025-09-30 04:17:48.341845+00, character, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, 2025-09-30 04:17:48.238+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+✅ Character response saved
+🧠 Processing memories for character 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4...
+🔍 Analyzing conversation for memories...
+📊 Total memories found: 0
+💞 Calculating relationship update...
+✅ Relationship updated: neutral (trust: 0.50, familiarity: 0.14)
+💞 Updating relationship for character: 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4
+🤖 Generating response for Dia the Homoculous...
+🔍 Building context for character: a3ce74c9-6f83-4d16-830e-b6bcfc9705bc
+❌ Error updating relationship: {
+  code: '23502',
+  details: 'Failing row contains (128, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, cbae9dce-c179-4aeb-9a3b-7c729f2719e8, null, null, neutral, 0.5, 0.14, 0.02, 2025-09-30 04:17:48.319+00, 2, 2025-09-30 04:17:48.453617+00).',
+  hint: null,
+  message: 'null value in column "target_type" of relation "character_relationships" violates not-null constraint'
+}
+Database error updating character relationship: {
+  code: '23502',
+  details: 'Failing row contains (128, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, cbae9dce-c179-4aeb-9a3b-7c729f2719e8, null, null, neutral, 0.5, 0.14, 0.02, 2025-09-30 04:17:48.319+00, 2, 2025-09-30 04:17:48.453617+00).',
+  hint: null,
+  message: 'null value in column "target_type" of relation "character_relationships" violates not-null constraint'
+}
+✅ Processed 0 memories for 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4
+✅ Context built successfully
+WARNING: Found legacy base64 encoded API key
+✅ Response generated for Dia the Homoculous
+💬 Saving message to session: f3eac64f-8092-4c23-9fd9-66720ed47a05
+❌ Error saving message: {
+  code: '23502',
+  details: "Failing row contains (5, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, *With a sly smile, I lean in.* Oh, darling Max, I've seen centur..., null, 2025-09-30 04:17:49.289455+00, character, a3ce74c9-6f83-4d16-830e-b6bcfc9705bc, 2025-09-30 04:17:49.192+00).",
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+Database error saving chat message: {
+  code: '23502',
+  details: "Failing row contains (5, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, *With a sly smile, I lean in.* Oh, darling Max, I've seen centur..., null, 2025-09-30 04:17:49.289455+00, character, a3ce74c9-6f83-4d16-830e-b6bcfc9705bc, 2025-09-30 04:17:49.192+00).",
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+✅ Character response saved
+🧠 Processing memories for character a3ce74c9-6f83-4d16-830e-b6bcfc9705bc...
+🔍 Analyzing conversation for memories...
+📊 Total memories found: 0
+💞 Calculating relationship update...
+✅ Relationship updated: neutral (trust: 0.50, familiarity: 0.14)
+💞 Updating relationship for character: a3ce74c9-6f83-4d16-830e-b6bcfc9705bc
+✅ Chat response complete, sending back to client
+❌ Error updating relationship: {
+  code: '23502',
+  details: 'Failing row contains (129, a3ce74c9-6f83-4d16-830e-b6bcfc9705bc, cbae9dce-c179-4aeb-9a3b-7c729f2719e8, null, null, neutral, 0.5, 0.14, 0.02, 2025-09-30 04:17:49.261+00, 2, 2025-09-30 04:17:49.357176+00).',
+  hint: null,
+  message: 'null value in column "target_type" of relation "character_relationships" violates not-null constraint'
+}
+Database error updating character relationship: {
+  code: '23502',
+  details: 'Failing row contains (129, a3ce74c9-6f83-4d16-830e-b6bcfc9705bc, cbae9dce-c179-4aeb-9a3b-7c729f2719e8, null, null, neutral, 0.5, 0.14, 0.02, 2025-09-30 04:17:49.261+00, 2, 2025-09-30 04:17:49.357176+00).',
+  hint: null,
+  message: 'null value in column "target_type" of relation "character_relationships" violates not-null constraint'
+}
+✅ Processed 0 memories for a3ce74c9-6f83-4d16-830e-b6bcfc9705bc
+2025-09-30T04:22:46.455Z - POST /api/chat/group-response
+📥 Chat request received: {
+  userId: 'cbae9dce-c179-4aeb-9a3b-7c729f2719e8',
+  activeCharacters: [
+    '1b0c98ae-4511-46c3-baa2-9fc54bfae5d4',
+    'a3ce74c9-6f83-4d16-830e-b6bcfc9705bc'
+  ],
+  scenario: '293584b4-9c80-47d7-b34b-23eaae7cf0ea',
+  sessionId: 'f3eac64f-8092-4c23-9fd9-66720ed47a05'
+}
+💬 Saving message to session: f3eac64f-8092-4c23-9fd9-66720ed47a05
+❌ Error saving message: {
+  code: '23502',
+  details: 'Failing row contains (6, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, Well i do know a story about a necromancer, he was an asshole th..., null, 2025-09-30 04:22:46.998008+00, user, null, 2025-09-30 04:22:46.455+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+Database error saving chat message: {
+  code: '23502',
+  details: 'Failing row contains (6, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, Well i do know a story about a necromancer, he was an asshole th..., null, 2025-09-30 04:22:46.998008+00, user, null, 2025-09-30 04:22:46.455+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+✅ User message saved
+🔧 Using AI provider: openai
+🎭 Response pattern: [ '1b0c98ae-4511-46c3-baa2-9fc54bfae5d4' ]
+🤖 Generating response for Ada Mcneal...
+🔍 Building context for character: 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4
+✅ Context built successfully
+WARNING: Found legacy base64 encoded API key
+✅ Response generated for Ada Mcneal
+💬 Saving message to session: f3eac64f-8092-4c23-9fd9-66720ed47a05
+❌ Error saving message: {
+  code: '23502',
+  details: 'Failing row contains (7, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, *Intrigued, I raise an eyebrow and tilt my head.* Oh, a story ab..., null, 2025-09-30 04:22:48.884066+00, character, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, 2025-09-30 04:22:48.786+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+Database error saving chat message: {
+  code: '23502',
+  details: 'Failing row contains (7, f3eac64f-8092-4c23-9fd9-66720ed47a05, null, null, *Intrigued, I raise an eyebrow and tilt my head.* Oh, a story ab..., null, 2025-09-30 04:22:48.884066+00, character, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, 2025-09-30 04:22:48.786+00).',
+  hint: null,
+  message: 'null value in column "sender_type" of relation "messages" violates not-null constraint'
+}
+✅ Character response saved
+🧠 Processing memories for character 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4...
+🔍 Analyzing conversation for memories...
+📊 Total memories found: 0
+💞 Calculating relationship update...
+✅ Relationship updated: neutral (trust: 0.50, familiarity: 0.15)
+💞 Updating relationship for character: 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4
+❌ Error updating relationship: {
+  code: '23502',
+  details: 'Failing row contains (130, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, cbae9dce-c179-4aeb-9a3b-7c729f2719e8, null, null, neutral, 0.5, 0.15, 0.02, 2025-09-30 04:22:48.875+00, 2, 2025-09-30 04:22:48.973756+00).',
+  hint: null,
+  message: 'null value in column "target_type" of relation "character_relationships" violates not-null constraint'
+}
+Database error updating character relationship: {
+  code: '23502',
+  details: 'Failing row contains (130, 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4, cbae9dce-c179-4aeb-9a3b-7c729f2719e8, null, null, neutral, 0.5, 0.15, 0.02, 2025-09-30 04:22:48.875+00, 2, 2025-09-30 04:22:48.973756+00).',
+  hint: null,
+  message: 'null value in column "target_type" of relation "character_relationships" violates not-null constraint'
+}
+✅ Processed 0 memories for 1b0c98ae-4511-46c3-baa2-9fc54bfae5d4
+✅ Chat response complete, sending back to client
