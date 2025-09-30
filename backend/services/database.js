@@ -373,7 +373,7 @@ class DatabaseService {
     async updateCharacter(userId, characterId, updates) {
         try {
             // Check if it's a default character being modified
-            const defaultCharacterIds = ['zoe', 'finn'];
+            const defaultCharacterIds = ['maya', 'alex', 'zoe', 'finn'];
             
             if (defaultCharacterIds.includes(characterId)) {
                 // Create a new custom character based on the default
@@ -1577,7 +1577,7 @@ class DatabaseService {
     // HELPER FUNCTIONS FOR MEMORY PROCESSING
     // ============================================================================
     
-    analyzeConversationForMemories(userMessage, characterResponse, userPersona) {
+    analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId) {
         const memories = [];
         const conversationText = `${userMessage} ${characterResponse}`.toLowerCase();
         

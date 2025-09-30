@@ -330,7 +330,8 @@ async function processConversationMemories(characterId, userId, userMessage, cha
     const newMemories = db.analyzeConversationForMemories(
       userMessage, 
       characterResponse, 
-      characterContext.userPersona
+      characterContext.userPersona,
+      userID
     );
     
     // Store new memories

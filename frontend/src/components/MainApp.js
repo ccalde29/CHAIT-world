@@ -1,6 +1,6 @@
 /**
  * Main Application Component (after authentication)
- * Fixed version with working user menu dropdown
+ * Fixed version with timeout cleanup and proper API URL handling
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -13,10 +13,14 @@ import UserPersonaEditor from './UserPersonaEditor';
 import CharacterMemoryViewer from './CharacterMemoryViewer';
 import ChatHistorySidebar from './ChatHistorySidebar';
 
-// API Configuration
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? process.env.REACT_APP_API_URL || 'https://your-app.herokuapp.com'
+// API Configuration - FIXED: Remove bad default, throw error if not set in production
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? process.env.REACT_APP_API_URL
   : 'http://localhost:3001';
+
+if (process.env.NODE_ENV === 'production' && !API_BASE_URL) {
+  throw new Error('REACT_APP_API_URL environment variable must be set in production');
+}
 
 const MainApp = () => {
   const { user, signOut } = useAuth();
@@ -31,6 +35,9 @@ const MainApp = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [currentSessionId, setCurrentSessionId] = useState(null);
+  
+  // FIXED: Add state to track active timeouts for cleanup
+  const [responseTimeouts, setResponseTimeouts] = useState([]);
 
   // Characters and scenarios
   const [characters, setCharacters] = useState([]);
@@ -136,10 +143,12 @@ const MainApp = () => {
         setCurrentSessionId(response.sessionId);
       }
 
-      // Add character responses with timing
+      // FIXED: Store timeout IDs and add character responses with timing
       if (response.responses && response.responses.length > 0) {
+        const newTimeoutIds = [];
+        
         response.responses.forEach((charResponse, index) => {
-          setTimeout(() => {
+          const timeoutId = setTimeout(() => {
             const characterMessage = {
               type: 'character',
               character: charResponse.character,
@@ -152,9 +161,15 @@ const MainApp = () => {
             
             if (index === response.responses.length - 1) {
               setIsGenerating(false);
+              // Clear timeout IDs after all responses are done
+              setResponseTimeouts([]);
             }
           }, charResponse.delay || (index * 1200));
+          
+          newTimeoutIds.push(timeoutId);
         });
+        
+        setResponseTimeouts(newTimeoutIds);
       } else {
         setIsGenerating(false);
         setError('No character responses generated');
@@ -176,7 +191,7 @@ const MainApp = () => {
   const toggleCharacter = (characterId) => {
     if (isGenerating) return;
     
-    setActiveCharacters(prev => 
+    setActiveCharacters(prev =>
       prev.includes(characterId)
         ? prev.filter(id => id !== characterId)
         : [...prev, characterId]
@@ -184,6 +199,10 @@ const MainApp = () => {
   };
 
   const startNewChat = () => {
+    // FIXED: Clear any pending timeouts when starting new chat
+    responseTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    setResponseTimeouts([]);
+    
     setCurrentSessionId(null);
     setMessages([
       {
@@ -198,6 +217,10 @@ const MainApp = () => {
 
   const loadChatSession = async (session) => {
     try {
+      // FIXED: Clear any pending timeouts when loading a chat
+      responseTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      setResponseTimeouts([]);
+      
       console.log('📥 Loading chat session:', session.id);
       const response = await apiRequest(`/api/chat/sessions/${session.id}`);
       
@@ -403,6 +426,10 @@ const MainApp = () => {
 
   const handleSignOut = async () => {
     try {
+      // FIXED: Clear timeouts before signing out
+      responseTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      setResponseTimeouts([]);
+      
       await signOut();
     } catch (error) {
       console.error('Error signing out:', error);
@@ -462,6 +489,14 @@ const MainApp = () => {
     }
   }, [showUserMenu]);
 
+  // FIXED: Cleanup effect for timeouts
+  useEffect(() => {
+    // Cleanup function that runs when component unmounts or responseTimeouts changes
+    return () => {
+      responseTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    };
+  }, [responseTimeouts]);
+
   // ============================================================================
   // RENDER
   // ============================================================================
@@ -489,7 +524,7 @@ const MainApp = () => {
               <h2 className="text-lg font-bold text-white">Characters</h2>
             </div>
             
-            {/* User Avatar - FIXED VERSION */}
+            {/* User Avatar */}
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={(e) => {
@@ -517,7 +552,7 @@ const MainApp = () => {
                 </div>
               </button>
               
-              {/* User Menu Dropdown - FIXED */}
+              {/* User Menu Dropdown */}
               {showUserMenu && (
                 <div className="absolute right-0 top-12 bg-slate-800 border border-white/10 rounded-lg shadow-xl p-2 min-w-48 z-[100]">
                   <div className="px-3 py-2 border-b border-white/10 mb-2">
@@ -567,7 +602,7 @@ const MainApp = () => {
           {error && (
             <div className="mb-4 text-xs text-red-300 bg-red-500/20 p-3 rounded-lg border border-red-500/20">
               {error}
-              <button 
+              <button
                 onClick={() => setError(null)}
                 className="ml-2 text-red-200 hover:text-white"
               >
@@ -598,7 +633,7 @@ const MainApp = () => {
           {/* Scenario Selection */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-300 mb-3">Current Scene</h3>
-            <select 
+            <select
               value={currentScenario}
               onChange={(e) => setCurrentScenario(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-400"
@@ -615,7 +650,7 @@ const MainApp = () => {
           {/* Group Dynamics Mode */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-300 mb-3">Chat Style</h3>
-            <select 
+            <select
               value={groupDynamicsMode}
               onChange={(e) => setGroupDynamicsMode(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-400"
@@ -792,165 +827,165 @@ const MainApp = () => {
                   ) : (
                     <div className="flex items-start gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm border border-white/20 ${
-                        findCharacterById(message.character)?.uses_custom_image && 
-                        findCharacterById(message.character)?.avatar_image_url 
-                          ? '' 
-                          : `bg-gradient-to-r ${findCharacterById(message.character)?.color || 'from-gray-500 to-gray-600'}`
-                      }`}>
-                        {findCharacterById(message.character)?.uses_custom_image &&
-                         findCharacterById(message.character)?.avatar_image_url ? (
-                          <img
-                            src={findCharacterById(message.character).avatar_image_url}
-                            alt={`${findCharacterById(message.character).name} avatar`}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          findCharacterById(message.character)?.avatar || '🤖'
-                        )}
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-200 mb-1">
-                          {findCharacterById(message.character)?.name || 'Unknown'}
-                          {message.hasError && <span className="text-red-400 ml-2">⚠ Error</span>}
-                        </div>
-                        <div className={`backdrop-blur-sm text-white rounded-2xl rounded-tl-sm px-4 py-2 max-w-md border border-white/20 ${
-                          message.hasError ? 'bg-red-500/30' : 'bg-white/15'
+                          findCharacterById(message.character)?.uses_custom_image && 
+                          findCharacterById(message.character)?.avatar_image_url 
+                            ? '' 
+                            : `bg-gradient-to-r ${findCharacterById(message.character)?.color || 'from-gray-500 to-gray-600'}`
                         }`}>
-                          {message.content}
+                          {findCharacterById(message.character)?.uses_custom_image &&
+                           findCharacterById(message.character)?.avatar_image_url ? (
+                            <img
+                              src={findCharacterById(message.character).avatar_image_url}
+                              alt={`${findCharacterById(message.character).name} avatar`}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            findCharacterById(message.character)?.avatar || '🤖'
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-200 mb-1">
+                            {findCharacterById(message.character)?.name || 'Unknown'}
+                            {message.hasError && <span className="text-red-400 ml-2">⚠ Error</span>}
+                          </div>
+                          <div className={`backdrop-blur-sm text-white rounded-2xl rounded-tl-sm px-4 py-2 max-w-md border border-white/20 ${
+                            message.hasError ? 'bg-red-500/30' : 'bg-white/15'
+                          }`}>
+                            {message.content}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                ))}
+
+                {isGenerating && (
+                  <div className="flex items-center gap-2 text-gray-200">
+                    <Zap size={16} className="animate-pulse" />
+                    <span className="text-sm">AI characters are thinking...</span>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder={
+                      activeCharacters.length === 0
+                        ? "Select characters first..."
+                        : `Chat with ${activeCharacters.length} AI character${activeCharacters.length === 1 ? '' : 's'}...`
+                    }
+                    className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-white placeholder-gray-300 focus:outline-none focus:border-purple-400"
+                    disabled={isGenerating || activeCharacters.length === 0}
+                  />
+                  <button
+                    onClick={handleSendMessage}
+                    disabled={!userInput.trim() || isGenerating || activeCharacters.length === 0}
+                    className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 transition-all backdrop-blur-sm"
+                  >
+                    <Send size={18} />
+                  </button>
                 </div>
-              ))}
-
-              {isGenerating && (
-                <div className="flex items-center gap-2 text-gray-200">
-                  <Zap size={16} className="animate-pulse" />
-                  <span className="text-sm">AI characters are thinking...</span>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input */}
-            <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-4">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder={
-                    activeCharacters.length === 0
-                      ? "Select characters first..."
-                      : `Chat with ${activeCharacters.length} AI character${activeCharacters.length === 1 ? '' : 's'}...`
-                  }
-                  className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-white placeholder-gray-300 focus:outline-none focus:border-purple-400"
-                  disabled={isGenerating || activeCharacters.length === 0}
-                />
-                <button
-                  onClick={handleSendMessage}
-                  disabled={!userInput.trim() || isGenerating || activeCharacters.length === 0}
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 transition-all backdrop-blur-sm"
-                >
-                  <Send size={18} />
-                </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Modals */}
-      {showSettings && (
-        <SettingsModal
-          userSettings={userSettings}
-          onSave={saveUserSettings}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
+        {/* Modals */}
+        {showSettings && (
+          <SettingsModal
+            userSettings={userSettings}
+            onSave={saveUserSettings}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
 
-      {showCharacterEditor && (
-        <CharacterEditor
-          character={editingCharacter}
-          onSave={async (characterData) => {
-            if (editingCharacter) {
-              await updateCharacter(editingCharacter.id, characterData);
-            } else {
-              await createCharacter(characterData);
-            }
-            setShowCharacterEditor(false);
-            setEditingCharacter(null);
-          }}
-          onClose={() => {
-            setShowCharacterEditor(false);
-            setEditingCharacter(null);
-          }}
-        />
-      )}
-
-      {showMemoryViewer && selectedCharacterForMemory && (
-        <CharacterMemoryViewer
-          character={selectedCharacterForMemory}
-          onClose={closeMemoryViewer}
-          apiRequest={apiRequest}
-        />
-      )}
-
-      {showSceneEditor && (
-        <SceneEditor
-          scenarios={scenarios}
-          onSave={async (sceneData) => {
-            try {
-              if (sceneData.id) {
-                await apiRequest(`/api/scenarios/${sceneData.id}`, {
-                  method: 'PUT',
-                  body: JSON.stringify(sceneData),
-                });
+        {showCharacterEditor && (
+          <CharacterEditor
+            character={editingCharacter}
+            onSave={async (characterData) => {
+              if (editingCharacter) {
+                await updateCharacter(editingCharacter.id, characterData);
               } else {
-                await apiRequest('/api/scenarios', {
-                  method: 'POST',
-                  body: JSON.stringify(sceneData),
-                });
+                await createCharacter(characterData);
               }
-              await loadScenarios();
-              setError(null);
-            } catch (err) {
-              setError('Failed to save scene: ' + err.message);
-            }
-            setShowSceneEditor(false);
-          }}
-          onDelete={async (sceneId) => {
-            try {
-              await apiRequest(`/api/scenarios/${sceneId}`, {
-                method: 'DELETE',
-              });
-              await loadScenarios();
-              setError(null);
-            } catch (err) {
-              setError('Failed to delete scene: ' + err.message);
-            }
-          }}
-          onClose={() => setShowSceneEditor(false)}
-        />
-      )}
+              setShowCharacterEditor(false);
+              setEditingCharacter(null);
+            }}
+            onClose={() => {
+              setShowCharacterEditor(false);
+              setEditingCharacter(null);
+            }}
+          />
+        )}
 
-      {showPersonaEditor && (
-        <UserPersonaEditor
-          userPersona={userPersona}
-          onSave={async (personaData) => {
-            const success = await saveUserPersona(personaData);
-            if (success) {
-              setShowPersonaEditor(false);
-            }
-          }}
-          onClose={() => setShowPersonaEditor(false)}
-        />
-      )}
-    </div>
-  );
-};
+        {showMemoryViewer && selectedCharacterForMemory && (
+          <CharacterMemoryViewer
+            character={selectedCharacterForMemory}
+            onClose={closeMemoryViewer}
+            apiRequest={apiRequest}
+          />
+        )}
 
-export default MainApp;
+        {showSceneEditor && (
+          <SceneEditor
+            scenarios={scenarios}
+            onSave={async (sceneData) => {
+              try {
+                if (sceneData.id) {
+                  await apiRequest(`/api/scenarios/${sceneData.id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(sceneData),
+                  });
+                } else {
+                  await apiRequest('/api/scenarios', {
+                    method: 'POST',
+                    body: JSON.stringify(sceneData),
+                  });
+                }
+                await loadScenarios();
+                setError(null);
+              } catch (err) {
+                setError('Failed to save scene: ' + err.message);
+              }
+              setShowSceneEditor(false);
+            }}
+            onDelete={async (sceneId) => {
+              try {
+                await apiRequest(`/api/scenarios/${sceneId}`, {
+                  method: 'DELETE',
+                });
+                await loadScenarios();
+                setError(null);
+              } catch (err) {
+                setError('Failed to delete scene: ' + err.message);
+              }
+            }}
+            onClose={() => setShowSceneEditor(false)}
+          />
+        )}
+
+        {showPersonaEditor && (
+          <UserPersonaEditor
+            userPersona={userPersona}
+            onSave={async (personaData) => {
+              const success = await saveUserPersona(personaData);
+              if (success) {
+                setShowPersonaEditor(false);
+              }
+            }}
+            onClose={() => setShowPersonaEditor(false)}
+          />
+        )}
+      </div>
+    );
+  };
+
+  export default MainApp;

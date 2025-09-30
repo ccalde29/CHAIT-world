@@ -56,11 +56,14 @@ const ImageUpload = ({
 
     setUploading(true);
     setError(null);
-
+    
+    let uploadedFileName = null;  // Track uploaded file
+      
     try {
       // Create a unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${type}/${Date.now()}.${fileExt}`;
+      uploadedFileName = fileName;
 
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -95,6 +98,10 @@ const ImageUpload = ({
         .single();
 
       if (dbError) {
+          console.error('DB insert failed, rolling back storage upload');
+          await supabase.storage
+            .from('user-images')
+            .remove([fileName]);
         throw dbError;
       }
 
