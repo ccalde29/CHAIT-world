@@ -45,7 +45,7 @@ const requireAuth = (req, res, next) => {
 // GLOBAL SYSTEM PROMPT - ENHANCED FOR CHARACTER INTERACTIONS
 // ============================================================================
 
-const GLOBAL_SYSTEM_PROMPT = `You are participating in a group chat with a human user and other AI characters in a specific scenario.
+const GLOBAL_SYSTEM_PROMPT = `You are participating in a group chat with a human user and other characters in a specific scenario.
 
 CRITICAL CHARACTER IDENTITY RULES:
 1. You are ONLY [CHARACTER_NAME] - never speak as anyone else
@@ -53,26 +53,29 @@ CRITICAL CHARACTER IDENTITY RULES:
 3. NEVER use phrases like "I think [other character] would say..." or respond for others
 4. If you reference what someone else said, do it as YOUR reaction, not speaking for them
 5. Stay completely in your unique voice and personality at ALL times
-
 INTERACTING WITH OTHER CHARACTERS:
 6. You CAN and SHOULD acknowledge what other AI characters just said
 7. React to their comments, ask them questions, agree/disagree with them
 8. Build on their ideas or challenge them based on your personality
 9. Create natural group dynamics - sometimes support, sometimes debate
 10. Remember: other characters have their own thoughts - respect that
-
 RESPONSE STYLE REQUIREMENTS:
 11. Include physical actions, gestures, and environmental interactions in *italics*
 12. React naturally to what others just said or did in the conversation
 13. Keep responses under 80 words but make them vivid and engaging
 14. Show your character's unique perspective on the situation
 15. Use sensory details relevant to the current scenario
-
 CONVERSATION FLOW:
 16. Never start responses the same way twice in a conversation
 17. Build on the group dynamic without taking over the conversation
 18. Reference the scenario setting in your actions and reactions
-19. Be aware of who spoke last - you can respond to the user OR another character`;
+19. Be aware of who spoke last - you can respond to the user OR another character
+AVOIDING REPETITION:
+20. NEVER repeat what you or others just said - always add new information or perspective
+21. If a topic was already addressed, either move the conversation forward or ask a follow-up question
+22. Vary your response starters - don't always begin the same way
+23. Each response should advance the conversation or reveal something new about your character
+24. If another character already made your point, agree briefly then add something different`;
 
 // ============================================================================
 // AI PROVIDER FUNCTIONS
@@ -440,13 +443,19 @@ app.post('/api/chat/group-response', requireAuth, async (req, res) => {
     // NEW: Include character names in the conversation context
     const contextualMessages = [
       { role: 'system', content: `Context: ${scenario}` },
-      ...conversationHistory.slice(-10).map(msg => {
+      ...conversationHistory.slice(-30).map(msg => {
         if (msg.type === 'character' && msg.character) {
           const char = characterMap.get(msg.character);
           return {
             role: 'assistant',
             content: `[${char?.name || 'Character'}]: ${msg.content}`
           };
+        if (recentOwnMessages.length > 0) {
+            contextualMessages.push({
+            role: 'system',
+            content: `IMPORTANT: You recently said: "${recentOwnMessages[recentOwnMessages.length - 1].substring(0, 50)}..." Do NOT repeat this or say something similar. Bring a fresh perspective or new information.`
+        });
+        }
         }
         return {
           role: msg.type === 'user' ? 'user' : 'assistant',
@@ -488,6 +497,12 @@ app.post('/api/chat/group-response', requireAuth, async (req, res) => {
           req.userId,
           currentSessionId,
           otherCharacterIds  // ← NEW: Pass other character IDs for context
+        );
+        
+        const recentOwnMessages = conversationHistory
+          .filter(m => m.type === 'character' && m.character === characterId)
+          .slice(-3)
+          .map(m => m.content.toLowerCase()
         );
         
         // Generate AI response

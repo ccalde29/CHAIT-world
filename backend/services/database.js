@@ -146,13 +146,20 @@ class DatabaseService {
             }
             
             // Update session message count and last activity
+            const { data: session } = await this.supabase
+              .from('chat_sessions')
+              .select('message_count')
+              .eq('id', sessionId)
+              .single();
+
+            // Then increment it
             await this.supabase
-            .from('chat_sessions')
-            .update({
-                message_count: this.supabase.raw('message_count + 1'),
+              .from('chat_sessions')
+              .update({
+                message_count: (session?.message_count || 0) + 1,
                 updated_at: new Date().toISOString()
-            })
-            .eq('id', sessionId);
+              })
+              .eq('id', sessionId);
             
             console.log('✅ Message saved successfully');
             return data;
@@ -1154,10 +1161,19 @@ class DatabaseService {
             { pattern: /i live in ([\w\s]+)/i, type: 'location', importance: 0.7 },
             { pattern: /i'm from ([\w\s]+)/i, type: 'origin', importance: 0.7 },
             { pattern: /my favorite ([\w\s]+) is ([\w\s]+)/i, type: 'preference', importance: 0.6 },
-            { pattern: /i (love|hate|enjoy|dislike) ([\w\s]+)/i, type: 'preference', importance: 0.6 },
             { pattern: /i (?:feel|am feeling) (sad|happy|excited|angry|frustrated|worried)/i, type: 'emotion', importance: 0.7 },
             { pattern: /i want to ([\w\s]+)/i, type: 'goal', importance: 0.7 },
-            { pattern: /my goal is to ([\w\s]+)/i, type: 'goal', importance: 0.8 }
+            { pattern: /my goal is to ([\w\s]+)/i, type: 'goal', importance: 0.8 },
+            // Topic/interest patterns
+            { pattern: /\b(love|enjoy|like|prefer)\s+(?:to\s+)?(\w+(?:\s+\w+){0,3})/i, type: 'preference', importance: 0.6 },
+            { pattern: /\b(hate|dislike|can't stand)\s+(\w+(?:\s+\w+){0,3})/i, type: 'preference', importance: 0.6 },
+            { pattern: /story about (.+?)(?:\.|,|$)/i, type: 'topic', importance: 0.5 },
+            { pattern: /talking about (.+?)(?:\.|,|$)/i, type: 'topic', importance: 0.5 },
+            { pattern: /interested in (.+?)(?:\.|,|$)/i, type: 'interest', importance: 0.7 },
+            { pattern: /hobby is (.+?)(?:\.|,|$)/i, type: 'interest', importance: 0.7 },
+            // Conversational context
+            { pattern: /(?:i'm|i am)\s+(studying|learning|working on)\s+(.+?)(?:\.|,|$)/i, type: 'activity', importance: 0.6 },
+            { pattern: /(?:my|our)\s+(\w+)\s+is\s+(.+?)(?:\.|,|$)/i, type: 'personal_fact', importance: 0.6 }
         ];
         
         patterns.forEach(({ pattern, type, importance }) => {
@@ -1173,6 +1189,15 @@ class DatabaseService {
                 });
                 
                 console.log('✅ Found memory:', memoryContent);
+            }
+            // If no patterns matched but message is substantial, create a general memory
+            if (memories.length === 0 && userMessage.length > 75) {
+              memories.push({
+                type: 'conversation',
+                content: `Discussed: ${userMessage.substring(0, 100)}`,
+                importance_score: 0.2,
+                target_entity: userId
+              });
             }
         });
         
