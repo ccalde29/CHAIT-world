@@ -283,7 +283,7 @@ const ChatHistorySidebar = ({
                 {chatSessions.map((session) => (
                   <div
                     key={session.id}
-                    className={`relative rounded-lg border transition-all ${
+                    className={`group relative rounded-lg border transition-all ${
                       session.id === currentSessionId
                         ? 'bg-purple-500/20 border-purple-400/30'
                         : 'bg-white/5 border-white/10 hover:bg-white/10'
@@ -335,7 +335,6 @@ const ChatHistorySidebar = ({
                             <h3 className="text-white text-sm font-medium line-clamp-2 flex-1 pr-2">
                               {session.title}
                             </h3>
-                            
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={(e) => startEditing(session, e)}
