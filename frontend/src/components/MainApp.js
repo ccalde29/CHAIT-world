@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Users, Settings, Plus, Zap, User, Brain, MessageCircle, LogOut } from 'lucide-react';
+import { Send, Users, Settings, Plus, Zap, User, Brain, MessageCircle, LogOut, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsModal from './SettingsModal';
 import CharacterEditor from './CharacterEditor';
@@ -12,7 +12,7 @@ import SceneEditor from './SceneEditor';
 import UserPersonaEditor from './UserPersonaEditor';
 import CharacterMemoryViewer from './CharacterMemoryViewer';
 import ChatHistorySidebar from './ChatHistorySidebar';
-
+import CommunityHub from './CommunityHub';
 // API Configuration - FIXED: Remove bad default, throw error if not set in production
 const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? process.env.REACT_APP_API_URL
@@ -56,6 +56,8 @@ const MainApp = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showCharacterEditor, setShowCharacterEditor] = useState(false);
   const [showSceneEditor, setShowSceneEditor] = useState(false);
+  const [showCommunityHub, setShowCommunityHub] = useState(false);
+  const [selectedTagFilter, setSelectedTagFilter] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMemoryViewer, setShowMemoryViewer] = useState(false);
   const [showPersonaEditor, setShowPersonaEditor] = useState(false);
@@ -650,12 +652,65 @@ const MainApp = () => {
             </button>
             
             <button
+              onClick={() => setShowCommunityHub(true)}
+              className="w-full flex items-center gap-2 bg-blue-500/20 border border-blue-400/30 rounded-lg p-3 text-white hover:bg-blue-500/30 transition-colors"
+            >
+              <Users size={18} />
+              <span>Community Hub</span>
+            </button>
+            
+            <button
               onClick={() => setShowSceneEditor(true)}
               className="w-full flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg p-3 text-white hover:bg-white/10 transition-colors"
             >
               <MessageCircle size={18} />
               <span>Manage Scenes</span>
             </button>
+          </div>
+          {/* Search and Filter */}
+          <div className="mb-4 space-y-2">
+            <input
+              type="text"
+              value={characterSearch}
+              onChange={(e) => setCharacterSearch(e.target.value)}
+              placeholder="Search characters..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-400"
+            />
+            
+            <div className="flex gap-2">
+              <select
+                value={characterSort}
+                onChange={(e) => setCharacterSort(e.target.value)}
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-purple-400"
+              >
+                <option value="recent" className="bg-gray-800">Recent</option>
+                <option value="alphabetical" className="bg-gray-800">A-Z</option>
+                <option value="mostUsed" className="bg-gray-800">Most Used</option>
+              </select>
+              
+              <select
+                value={selectedTagFilter}
+                onChange={(e) => setSelectedTagFilter(e.target.value)}
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-purple-400"
+              >
+                <option value="" className="bg-gray-800">All Tags</option>
+                {Array.from(new Set(characters.flatMap(c => c.tags || []))).map(tag => (
+                  <option key={tag} value={tag} className="bg-gray-800">{tag}</option>
+                ))}
+              </select>
+            </div>
+            
+            {(characterSearch || selectedTagFilter) && (
+              <button
+                onClick={() => {
+                  setCharacterSearch('');
+                  setSelectedTagFilter('');
+                }}
+                className="text-xs text-purple-400 hover:text-purple-300"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
 
           {/* Scenario Selection */}
@@ -720,7 +775,39 @@ const MainApp = () => {
             </div>
             
             <div className="space-y-2 max-h-96 overflow-y-auto">
-            {filteredCharacters.map((character) => (
+              {characters
+                .filter(char => {
+                  // Search filter
+                  if (characterSearch) {
+                    const searchLower = characterSearch.toLowerCase();
+                    const matchesSearch =
+                      char.name.toLowerCase().includes(searchLower) ||
+                      char.personality.toLowerCase().includes(searchLower) ||
+                      char.tags?.some(tag => tag.toLowerCase().includes(searchLower));
+                    if (!matchesSearch) return false;
+                  }
+                  
+                  // Tag filter
+                  if (selectedTagFilter) {
+                    if (!char.tags?.includes(selectedTagFilter)) return false;
+                  }
+                  
+                  return true;
+                })
+                .sort((a, b) => {
+                  switch (characterSort) {
+                    case 'alphabetical':
+                      return a.name.localeCompare(b.name);
+                    case 'recent':
+                      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                    case 'mostUsed':
+                      // Would need usage tracking - for now use recent
+                      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                    default:
+                      return 0;
+                  }
+                })
+                .map((character) => (
              <div
               key={character.id}
               className={`p-3 rounded-lg border transition-all ${
@@ -808,9 +895,52 @@ const MainApp = () => {
                   >
                     <Settings size={12} />
                   </button>
+                  {/* NEW: Publish button (only show for custom characters) */}
+                    {!character.is_default && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (character.is_public) {
+                            // Unpublish
+                            if (window.confirm('Remove this character from the community?')) {
+                              try {
+                                await apiRequest(`/api/characters/${character.id}/unpublish`, {
+                                  method: 'POST'
+                                });
+                                await loadCharacters();
+                              } catch (err) {
+                                alert('Failed to unpublish character');
+                              }
+                            }
+                          } else {
+                            // Publish
+                            if (window.confirm('Share this character with the community?')) {
+                              try {
+                                await apiRequest(`/api/characters/${character.id}/publish`, {
+                                  method: 'POST'
+                                });
+                                await loadCharacters();
+                                alert('Character published to community!');
+                              } catch (err) {
+                                alert(err.message || 'Failed to publish character');
+                              }
+                            }
+                          }
+                        }}
+                        className={`p-1 transition-colors ${
+                          character.is_public 
+                            ? 'text-green-400 hover:text-green-300' 
+                            : 'text-gray-400 hover:text-blue-400'
+                        }`}
+                        title={character.is_public ? 'Published to community' : 'Publish to community'}
+                      >
+                        <Upload size={12} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+
           ))}
             </div>
           </div>
@@ -992,6 +1122,19 @@ const MainApp = () => {
               }}
             />
           )}
+         {/* Community Hub */}
+         {showCommunityHub && (
+           <CommunityHub
+             apiRequest={apiRequest}
+             onImport={async (importedCharacter) => {
+              // Reload characters to show the newly imported one
+              await loadCharacters();
+              setShowCommunityHub(false);
+              alert(`Successfully imported ${importedCharacter.name}!`);
+            }}
+            onClose={() => setShowCommunityHub(false)}
+          />
+        )}
 
         {showMemoryViewer && selectedCharacterForMemory && (
           <CharacterMemoryViewer

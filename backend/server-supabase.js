@@ -59,7 +59,7 @@ CRITICAL CHARACTER IDENTITY RULES:
 4. If you reference what someone else said, do it as YOUR reaction, not speaking for them
 5. Stay completely in your unique voice and personality at ALL times
 INTERACTING WITH OTHER CHARACTERS:
-6. You CAN and SHOULD acknowledge what other AI characters just said
+6. You CAN and SHOULD acknowledge what other characters just said
 7. React to their comments, ask them questions, agree/disagree with them
 8. Build on their ideas or challenge them based on your personality
 9. Create natural group dynamics - sometimes support, sometimes debate
@@ -441,7 +441,7 @@ app.post('/api/chat/group-response', requireAuth, async (req, res) => {
     console.log('🔧 Using AI provider:', apiProvider);
     
     // Get characters
-    const { characters } = await db.getCharacters(req.userId);
+    const { characters } = await characterService.getCharacters(req.userId);
     const characterMap = new Map(characters.map(char => [char.id, char]));
     
     // Build contextual messages with character awareness
