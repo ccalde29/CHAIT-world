@@ -1,330 +1,437 @@
-# 🤖 CHAIT World
+# CHAIT World 🌍
 
-**Create AI characters and have immersive group conversations**
+> **C**onversational **H**uman-**AI** **T**echnology World
 
-CHAIT World is a dynamic web application that lets you create AI chatbots with distinct personalities and have group conversations with them in various scenarios. Characters learn from your interactions, build relationships with you over time, and interact with each other naturally.
+A powerful multi-character AI chat application that enables rich, dynamic conversations with multiple AI personalities simultaneously. Create custom characters, build immersive scenes, and watch as your characters interact with each other and remember your conversations over time.
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Node](https://img.shields.io/badge/node-18%2B-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
 
 ---
 
 ## ✨ Features
 
-### Core Features
-- 🎭 **Multi-Character AI Conversations** - Chat with multiple AI personalities simultaneously
-- 🧠 **Character Memory System** - Characters remember your conversations and learn about you
-- 💞 **Relationship Tracking** - Characters build relationships with you based on your interactions
-- 🗣️ **Character-to-Character Interactions** - AI characters acknowledge and respond to each other
-- 📜 **Chat History** - All conversations are saved and can be resumed later
+### 🎭 **Advanced Character System**
+- **Custom Character Creation** - Design characters with detailed personalities, appearances, backgrounds, and behavioral traits
+- **Character Relationships** - Define how characters relate to each other for authentic group dynamics
+- **Chat Examples** - Provide example dialogues to train character responses (few-shot learning)
+- **Dynamic Personalities** - Characters with customizable temperament, creativity levels, and response styles
+- **Age-Safe** - Built-in 18+ validation for all characters
+- **Tag Organization** - Organize characters with custom tags for easy filtering
 
-### Customization
-- 🎨 **Custom Character Creation** - Design characters with unique personalities, avatars, and colors
-- 🌍 **Custom Scenarios** - Create immersive locations with custom backgrounds
-- 👤 **User Persona** - Define your own personality to influence how characters interact with you
-- 🖼️ **Image Uploads** - Custom avatars for characters and backgrounds for scenes
+### 💬 **Multi-Character Conversations**
+- **Group Chat Mode** - Multiple characters respond in the same conversation
+- **Character Awareness** - Characters reference and respond to each other's messages
+- **Natural Turn-Taking** - Smart conversation flow between multiple AI personalities
+- **Scene Management** - Create custom scenes with specific characters and contexts
+- **Conversation Memory** - Characters remember facts about you and past interactions
 
-### Technical
-- 🔐 **Secure Authentication** - Google OAuth with encrypted API key storage
-- ⚡ **Multiple AI Providers** - OpenAI, Anthropic Claude, and local Ollama models
-- 💾 **Persistent Data** - PostgreSQL database via Supabase
-- 🎯 **Smart Response Patterns** - Natural flow, round-robin, or all-respond modes
+### 🧠 **Intelligent Memory System**
+- **Persistent Memory** - Characters remember facts, preferences, and experiences across sessions
+- **Relationship Tracking** - Evolving relationships with familiarity and trust levels
+- **Contextual Awareness** - Characters use past conversations to inform current responses
+- **Memory per Character** - Each character has their own unique memories and perspective
+
+### 🌐 **Community Hub**
+- **Character Marketplace** - Browse and import characters shared by the community
+- **Publishing System** - Share your custom characters with others
+- **Search & Filter** - Find characters by tags, popularity, or recency
+- **Import with One Click** - Instantly add community characters to your collection
+- **Content Moderation** - Age validation and profanity filtering for public characters
+
+### ⚙️ **Powerful Customization**
+- **AI Model Settings** - Adjust temperature, response length, and context window per character
+- **Memory Toggle** - Enable/disable memory for specific characters
+- **Custom Avatars** - Use emojis or upload custom character images
+- **Color Themes** - Personalized color schemes for each character
+- **User Personas** - Define your own personality for more tailored interactions
+
+### 🔐 **Privacy & Control**
+- **Private Characters** - Keep characters private or share publicly
+- **Local Data** - Your conversations stored securely in your database
+- **API Key Control** - Use your own OpenAI/Anthropic API keys
+- **Data Export** - Export characters and conversations (coming soon)
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+
-- Supabase account (free tier works)
-- Google Cloud Console account (for OAuth)
-- API key from OpenAI, Anthropic, or local Ollama setup
+
+- **Node.js** v18.0.0 or higher
+- **npm** or **yarn**
+- **Supabase Account** (free tier works)
+- **OpenAI API Key** or **Anthropic API Key**
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/chait-world.git
-   cd chait-world
+   git clone https://github.com/ccalde29/CHAIT-world.git
+   cd CHAIT-world
    ```
 
-2. **Install dependencies**
+2. **Install backend dependencies**
    ```bash
-   # Backend
    cd backend
    npm install
-   
-   # Frontend
+   ```
+
+3. **Install frontend dependencies**
+   ```bash
    cd ../frontend
    npm install
    ```
 
-3. **Set up Supabase**
-   - Create a new Supabase project at https://supabase.com
-   - Go to Project Settings → Database → Connection String
-   - Copy your project URL and keys
+4. **Set up Supabase**
+   - Create a new project at [supabase.com](https://supabase.com)
+   - Go to Settings → API to get your project URL and anon key
+   - Run the database migration script (found in `backend/migrations/`)
 
-4. **Run database migrations**
-   
-   In Supabase SQL Editor, run:
-   ```sql
-   -- See docs/database-setup.sql for full schema
-   -- Tables: characters, user_settings, user_personas, scenarios,
-   --         chat_sessions, messages, character_memories, character_relationships
-   ```
+5. **Configure environment variables**
 
-5. **Configure Google OAuth**
-   - Go to Supabase Dashboard → Authentication → Providers
-   - Enable Google provider
-   - Add your Google Client ID and Secret
-   - Add authorized redirect URIs
-
-6. **Set up Storage Bucket**
-   - Go to Supabase Dashboard → Storage
-   - Create a public bucket named `user-images`
-   - Set up storage policies for authenticated users
-
-7. **Configure environment variables**
-
-   **Backend `.env`:**
-   ```bash
-   SUPABASE_URL=your_supabase_project_url
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-   ENCRYPTION_KEY=your_32_byte_random_key
-   ALLOWED_ORIGINS=http://localhost:3000
+   **Backend** (`backend/.env`):
+   ```env
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_KEY=your_supabase_anon_key
    PORT=3001
    ```
 
-   **Frontend `.env`:**
-   ```bash
-   REACT_APP_SUPABASE_URL=your_supabase_project_url
-   REACT_APP_SUPABASE_ANON_KEY=your_anon_key
+   **Frontend** (`frontend/.env`):
+   ```env
    REACT_APP_API_URL=http://localhost:3001
+   REACT_APP_SUPABASE_URL=your_supabase_url
+   REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
-   **Generate encryption key:**
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-   ```
+6. **Run the database migration**
+   - Open your Supabase project
+   - Go to SQL Editor
+   - Copy and run the migration script from `backend/migrations/initial_schema.sql`
 
-8. **Start development servers**
+7. **Start the application**
+
+   **Terminal 1 - Backend:**
    ```bash
-   # Backend (Terminal 1)
    cd backend
    npm run dev
-   
-   # Frontend (Terminal 2)
+   ```
+
+   **Terminal 2 - Frontend:**
+   ```bash
    cd frontend
    npm start
    ```
 
-9. **Open your browser**
-   Navigate to `http://localhost:3000`
+8. **Open your browser**
+   - Navigate to `http://localhost:3000`
+   - Enter your OpenAI or Anthropic API key in settings
+   - Start chatting!
 
 ---
 
-## 🎮 How It Works
+## 📚 Usage Guide
 
-### Character Memory System
-Characters automatically extract and store memories from conversations:
-- **Identity**: Names, ages, locations
-- **Preferences**: Likes, dislikes, interests
-- **Topics**: Subjects discussed
-- **Emotions**: Feelings expressed
-- **Activities**: Hobbies, work, goals
+### Creating Your First Character
 
-Memories are weighted by importance and influence how characters respond to you.
+1. Click the **"Create Character"** button in the left sidebar
+2. Fill in the character details:
+   - **Name** - Give your character a name
+   - **Age** - Must be 18 or older
+   - **Personality** - Describe their traits, quirks, and speaking style
+   - **Appearance** - Physical description (optional)
+   - **Background** - Backstory and context (optional)
+   - **Avatar** - Choose an emoji or upload an image
+   - **Tags** - Add tags for organization
+3. Optionally add **chat examples** to train response style
+4. Adjust **model settings** (temperature, context window, memory)
+5. Click **"Create Character"**
 
-### Relationship Growth
-Characters track their relationship with you through:
-- **Trust Level**: Grows when you share personal information
-- **Familiarity**: Increases with each interaction
-- **Emotional Bond**: Based on positive/negative interactions
-- **Relationship Type**: Progresses from stranger → acquaintance → friend → close friend
+### Starting a Conversation
 
-### Character Interactions
-Characters are aware of what other AI characters say and can:
-- Reference each other's comments
-- Agree or disagree with each other
-- Build on each other's ideas
-- Create natural group dynamics
+1. **Select characters** - Click on character cards to activate them (purple = active)
+2. **Choose a scene** - Select a scene or use the default
+3. **Type your message** - Characters will respond based on their personalities
+4. **Multi-character mode** - Multiple active characters will take turns responding
+
+### Publishing Characters
+
+1. Create a custom character
+2. Click the **upload icon** on the character card
+3. Confirm you want to share it publicly
+4. Your character will appear in the Community Hub for others to import
+
+### Importing Community Characters
+
+1. Click **"Community Hub"** in the sidebar
+2. Browse or search for characters
+3. Click on a character to see details
+4. Click **"Import"** to add it to your collection
 
 ---
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  React Frontend │───▶│ Express Backend │───▶│ Supabase DB     │
-│                 │    │                 │    │                 │
-│ • Auth UI       │    │ • API Routes    │    │ • PostgreSQL    │
-│ • Chat Interface│    │ • AI Integration│    │ • Storage       │
-│ • Character Mgmt│    │ • Memory System │    │ • Auth          │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │   AI Providers  │
-                       │                 │
-                       │ • OpenAI GPT    │
-                       │ • Anthropic     │
-                       │ • Ollama Local  │
-                       └─────────────────┘
-```
-
 ### Tech Stack
-- **Frontend**: React 18, Tailwind CSS, Lucide Icons
-- **Backend**: Node.js, Express.js
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth (Google OAuth)
-- **AI Models**: OpenAI GPT-3.5/4, Anthropic Claude, Ollama
-- **Storage**: Supabase Storage
 
----
+**Frontend:**
+- React 18
+- Tailwind CSS
+- Lucide Icons
+- Supabase Client
 
-## 📖 User Guide
+**Backend:**
+- Node.js / Express
+- Supabase (PostgreSQL)
+- OpenAI API
+- Anthropic API
 
-### Creating Characters
-1. Click "Create Character" in the sidebar
-2. Choose a name, avatar, and color theme
-3. Write a detailed personality description
-4. Optionally upload a custom avatar image
-5. Save and activate the character
+**Database:**
+- PostgreSQL (via Supabase)
+- Row Level Security (RLS)
+- Real-time subscriptions
 
-**Tips for good characters:**
-- Be specific about communication style
-- Include interests and background
-- Define how they react to different situations
-- Make them distinct from each other
-
-### Starting Conversations
-1. Select 2-5 characters from the sidebar
-2. Choose a scene (coffee shop, study session, party, or custom)
-3. Select chat style (Natural Flow, Round Robin, All Respond)
-4. Type your message and send
-
-### Building Relationships
-- Share personal information to build trust
-- Have longer conversations to increase familiarity
-- Express emotions to develop emotional bonds
-- Return regularly to deepen relationships
-
-### Managing Chat History
-- View all past conversations in the left sidebar
-- Click a chat to resume it
-- Hover over chats to rename or delete them
-- Start a new chat with the "New" button
-
----
-
-## 🔧 Configuration
-
-### AI Provider Setup
-
-**OpenAI**
-1. Get API key from https://platform.openai.com/api-keys
-2. Add to Settings in the app
-3. Uses GPT-3.5-turbo by default
-
-**Anthropic Claude**
-1. Get API key from https://console.anthropic.com/
-2. Add to Settings
-3. Uses Claude-3-Haiku
-
-**Ollama (Local)**
-1. Install: https://ollama.ai/
-2. Pull a model: `ollama pull llama2`
-3. Configure base URL in settings (default: http://localhost:11434)
-
-### User Persona
-Define your own personality to influence conversations:
-1. Click your avatar → "Create Persona"
-2. Add your name, personality, interests
-3. Choose communication style
-4. Characters will respond based on your persona
-
----
-
-## 🐛 Troubleshooting
-
-### Chat history is empty
-- Check backend logs for database errors
-- Verify Supabase connection
-- Ensure `chat_sessions` table exists
-
-### Characters not learning
-- Share explicit information ("My name is...", "I work as...")
-- Check Memory Viewer to see stored memories
-- Verify `character_memories` table is accessible
-
-### API errors
-- Verify API keys are correctly entered in Settings
-- Check API provider balance/quota
-- For Ollama, ensure service is running
-
-### Images not uploading
-- Verify `user-images` bucket exists in Supabase Storage
-- Check bucket is set to public
-- Ensure storage policies allow authenticated uploads
-
----
-
-## 📁 Project Structure
+### Project Structure
 
 ```
-chait-world/
-├── backend/
-│   ├── services/
-│   │   └── database.js          # Database operations
-│   ├── server-supabase.js        # Main server file
-│   └── package.json
+CHAIT-world/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── MainApp.js        # Main application
-│   │   │   ├── ChatHistorySidebar.js
-│   │   │   ├── CharacterEditor.js
-│   │   │   ├── SceneEditor.js
-│   │   │   ├── UserPersonaEditor.js
-│   │   │   ├── CharacterMemoryViewer.js
-│   │   │   ├── SettingsModal.js
-│   │   │   ├── LoginScreen.js
-│   │   │   └── ImageUpload.js
-│   │   ├── contexts/
-│   │   │   └── AuthContext.js    # Authentication
-│   │   └── lib/
-│   │       └── supabase.js       # Supabase client
+│   │   │   ├── MainApp.js           # Main application
+│   │   │   ├── CharacterEditor.js   # Character creation/editing
+│   │   │   ├── CommunityHub.js      # Character marketplace
+│   │   │   ├── MemoryViewer.js      # Memory inspection
+│   │   │   ├── SceneEditor.js       # Scene management
+│   │   │   ├── Settings.js          # User settings
+│   │   │   └── ImageUpload.js       # Avatar upload
+│   │   ├── App.js
+│   │   └── index.js
 │   └── package.json
-└── docs/
-    └── database-setup.sql         # Database schema
+│
+├── backend/
+│   ├── server-supabase.js           # Main server
+│   ├── services/
+│   │   ├── database.js              # Core DB operations
+│   │   ├── characterService.js      # Character CRUD
+│   │   ├── communityService.js      # Community features
+│   │   └── aiService.js             # AI provider calls
+│   ├── utils/
+│   │   └── profanityFilter.js       # Content moderation
+│   ├── migrations/
+│   │   └── initial_schema.sql       # Database setup
+│   └── package.json
+│
+└── README.md
 ```
 
 ---
 
-## 🚀 Deployment
+## 🗃️ Database Schema
 
-### Backend (Heroku)
-```bash
-heroku create your-app-name-api
-heroku config:set SUPABASE_URL=your_url
-heroku config:set SUPABASE_SERVICE_ROLE_KEY=your_key
-heroku config:set ENCRYPTION_KEY=your_encryption_key
-git subtree push --prefix backend heroku main
+### Core Tables
+
+- **`characters`** - Character definitions with personality, settings, and metadata
+- **`user_personas`** - User personality profiles for personalized interactions
+- **`character_memories`** - Facts and experiences characters remember
+- **`character_relationships`** - Tracked relationships between users and characters
+- **`chat_sessions`** - Conversation sessions with metadata
+- **`messages`** - Individual messages in conversations
+- **`scenes`** - Custom conversation scenes and contexts
+
+### Community Tables
+
+- **`character_imports`** - Track character import history
+- **`character_favorites`** - User favorites for community characters
+- **`character_reports`** - Content moderation reports
+- **`character_comments`** - Reviews and feedback (optional)
+
+### Views
+
+- **`community_characters`** - Public characters with stats for marketplace
+
+---
+
+## 🔑 API Endpoints
+
+### Characters
+
+- `GET /api/characters` - Get all user characters
+- `POST /api/characters` - Create new character
+- `PUT /api/characters/:id` - Update character
+- `DELETE /api/characters/:id` - Delete character
+
+### Community
+
+- `GET /api/community/characters` - Browse public characters
+- `POST /api/community/characters/:id/import` - Import character
+- `POST /api/characters/:id/publish` - Publish to community
+- `POST /api/characters/:id/unpublish` - Remove from community
+- `GET /api/community/tags` - Get popular tags
+
+### Chat
+
+- `POST /api/chat/group-response` - Get responses from multiple characters
+- `GET /api/chat/sessions/:userId` - Get user's chat sessions
+- `GET /api/chat/messages/:sessionId` - Get messages from session
+
+### Memories
+
+- `GET /api/memories/:characterId/:userId` - Get character memories
+- `POST /api/memories` - Create new memory
+- `DELETE /api/memories/:id` - Delete memory
+
+### User
+
+- `GET /api/user-persona/:userId` - Get user persona
+- `PUT /api/user-persona/:userId` - Update user persona
+- `GET /api/user-settings/:userId` - Get user settings
+- `PUT /api/user-settings/:userId` - Update settings
+
+---
+
+## ⚙️ Configuration
+
+### AI Provider Settings
+
+**OpenAI:**
+```javascript
+{
+  apiProvider: 'openai',
+  openaiApiKey: 'sk-...',
+  model: 'gpt-4-turbo-preview'
+}
 ```
 
-### Frontend (Vercel)
+**Anthropic:**
+```javascript
+{
+  apiProvider: 'anthropic',
+  anthropicApiKey: 'sk-ant-...',
+  model: 'claude-3-opus-20240229'
+}
+```
+
+**Ollama (Local):**
+```javascript
+{
+  apiProvider: 'ollama',
+  ollamaSettings: {
+    baseUrl: 'http://localhost:11434',
+    model: 'llama2'
+  }
+}
+```
+
+### Character Model Settings
+
+```javascript
+{
+  temperature: 0.7,        // 0.0-2.0, controls creativity
+  max_tokens: 150,         // 50-1000, response length
+  context_window: 8000,    // 1000-32000, conversation memory
+  memory_enabled: true     // Enable/disable character memory
+}
+```
+
+---
+
+## 🛠️ Development
+
+### Running Tests
+
 ```bash
+# Backend tests
+cd backend
+npm test
+
+# Frontend tests
 cd frontend
-vercel --prod
-# Set environment variables in Vercel dashboard
+npm test
 ```
 
-### Environment Variables for Production
-- Set `REACT_APP_API_URL` to your backend URL
-- Set `ALLOWED_ORIGINS` to include your frontend URL
-- Ensure all Supabase credentials are set
-- Generate a new `ENCRYPTION_KEY` for production
+### Building for Production
+
+```bash
+# Build frontend
+cd frontend
+npm run build
+
+# Start backend in production mode
+cd backend
+NODE_ENV=production node server-supabase.js
+```
+
+### Database Migrations
+
+To update the database schema:
+
+1. Create a new SQL file in `backend/migrations/`
+2. Run it in Supabase SQL Editor
+3. Update the schema documentation
+
+---
+
+## 🗺️ Roadmap
+
+### ✅ Completed (v1.0)
+
+- ✅ Multi-character conversations
+- ✅ Character memory system
+- ✅ Custom character creation
+- ✅ Community marketplace
+- ✅ Character relationships
+- ✅ Scene management
+- ✅ Search and filtering
+- ✅ Tag organization
+- ✅ Model settings per character
+
+### 🚧 In Progress (v1.1)
+
+- 🔄 Memory viewer/editor UI
+- 🔄 Conversation save/load
+- 🔄 Export conversations
+- 🔄 Character ratings & reviews
+
+### 📋 Planned (v1.2+)
+
+**Core Features:**
+- Conversation branching ("what if" scenarios)
+- Advanced memory management (importance scoring, clustering)
+- Enhanced multi-character dynamics (interruptions, side conversations)
+
+**UI/UX:**
+- Dark/light theme toggle
+- Customizable layouts
+- Keyboard shortcuts
+- Mobile-responsive design
+
+**AI Integration:**
+- Multiple AI provider support (easy provider switching)
+- Ollama integration improvements
+- Streaming response improvements
+
+**Character Features:**
+- Dynamic personality evolution
+- Mood system
+- Character goals and knowledge domains
+- Time-aware behavior
+
+**Creative:**
+- Story mode (AI narrator)
+- Character dreams (generated from memories)
+- Autonomous messages (characters message you first)
+
+**Collaboration:**
+- Shared workspaces (multi-user sessions)
+- Collaborative scene building
+- Discord bot integration
+
+**Platform:**
+- Mobile apps (iOS/Android)
+- Desktop app (Electron)
+- Self-hosted option
 
 ---
 
@@ -333,39 +440,33 @@ vercel --prod
 Contributions are welcome! Please follow these steps:
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Commit: `git commit -m 'Add amazing feature'`
-5. Push: `git push origin feature/amazing-feature`
-6. Open a Pull Request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Guidelines
+
+- Follow existing code style and conventions
+- Write meaningful commit messages
+- Add tests for new features
+- Update documentation as needed
+- Ensure all tests pass before submitting PR
 
 ---
 
-## 📝 Roadmap
+## 🐛 Known Issues
 
-### Completed ✅
-- Multi-character conversations
-- Character memory system
-- Relationship tracking
-- Character-to-character interactions
-- Chat history with persistence
-- Custom characters and scenes
-- Image uploads
-- User personas
+- Character relationships don't resolve names in system prompts yet
+- Mobile layout needs optimization
+- Large conversations (1000+ messages) may slow down
+- Image uploads limited to 5MB
 
-### Planned Features
-- Database schema updates (add new columns)
-- Character form expansion (add all the new text fields)
-- Chat examples UI (add/remove pairs)
-- Relationships UI (dropdown + text input)
-- Model settings toggles (temperature, memory on/off)
-- Tags system (add tags to characters)
-- Sort/filter in hub (sort by recent, filter by tags)
-- Community hub (browse/import shared characters)
+See [Issues](https://github.com/ccalde29/CHAIT-world/issues) for full list.
 
 ---
 
-## 📄 License
+## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -373,45 +474,54 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- OpenAI for GPT models
-- Anthropic for Claude
-- Ollama for local AI capabilities
-- Supabase for backend infrastructure
-- React and Express.js communities
-- All contributors and testers
+- **OpenAI** - GPT models
+- **Anthropic** - Claude models
+- **Supabase** - Backend infrastructure
+- **Lucide** - Beautiful icons
+- **Tailwind CSS** - Styling framework
 
 ---
 
-## 📞 Support
+## 📧 Contact
 
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/YOUR_USERNAME/chait-world/issues)
-- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/YOUR_USERNAME/chait-world/discussions)
-- 📧 **Contact**: your-email@example.com
+**Project Link:** [https://github.com/ccalde29/CHAIT-world](https://github.com/ccalde29/CHAIT-world)
 
----
-
-## ⚠️ Important Notes
-
-### API Costs
-- OpenAI and Anthropic charge per token used
-- Monitor your usage in their respective dashboards
-- Set spending limits to avoid unexpected charges
-- Ollama is free but requires local installation
-
-### Privacy
-- All conversations are stored in your Supabase database
-- API keys are encrypted before storage
-- User data is never shared with third parties
-- You control your data - export or delete anytime
-
-### Performance
-- Optimal with 2-4 active characters
-- Maximum 10 characters per conversation
-- Chat history loads last 20 sessions
-- Memory system stores up to 100 memories per character
+**Issues:** [https://github.com/ccalde29/CHAIT-world/issues](https://github.com/ccalde29/CHAIT-world/issues)
 
 ---
 
-**Made with ❤️ for the AI community**
+## 💡 FAQ
 
-*Version 2.0.0 - Now with character learning and memory!*
+### Q: Do I need to pay for AI usage?
+**A:** Yes, you'll need your own OpenAI or Anthropic API key. Both offer pay-as-you-go pricing. Alternatively, use Ollama for free local AI (no API key needed).
+
+### Q: Is my data private?
+**A:** Yes! All data is stored in your own Supabase instance. We don't have access to your conversations or API keys.
+
+### Q: Can I use this commercially?
+**A:** Yes, the MIT license allows commercial use. Just provide attribution.
+
+### Q: How many characters can I create?
+**A:** Unlimited! Create as many custom characters as you want.
+
+### Q: Can I import characters multiple times?
+**A:** Yes, you can import the same community character multiple times and customize each copy.
+
+### Q: How do I reset everything?
+**A:** Delete your Supabase tables and re-run the migration script. Make sure to export any characters you want to keep first.
+
+### Q: Does this work offline?
+**A:** Not yet, but offline mode with Ollama is planned for a future update.
+
+### Q: Can I self-host this?
+**A:** Yes! You control both the frontend and backend. Just deploy to your own servers.
+
+---
+
+<div align="center">
+
+**Built with ❤️ for creative conversations**
+
+[⭐ Star this repo](https://github.com/ccalde29/CHAIT-world) | [🐛 Report Bug](https://github.com/ccalde29/CHAIT-world/issues) | [💡 Request Feature](https://github.com/ccalde29/CHAIT-world/issues)
+
+</div>
