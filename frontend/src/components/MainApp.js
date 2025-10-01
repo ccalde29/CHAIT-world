@@ -44,6 +44,9 @@ const MainApp = () => {
   const [activeCharacters, setActiveCharacters] = useState([]);
   const [scenarios, setScenarios] = useState([]);
   const [currentScenario, setCurrentScenario] = useState('coffee-shop');
+  const [characterSort, setCharacterSort] = useState('recent'); // recent, alphabetical, mostUsed
+  const [characterFilter, setCharacterFilter] = useState(''); // tag filter
+  const [characterSearch, setCharacterSearch] = useState(''); // search query
   
   // Settings and configuration
   const [userSettings, setUserSettings] = useState({});
@@ -245,10 +248,35 @@ const MainApp = () => {
     }
   };
 
-  // ============================================================================
+  const filteredCharacters = characters
+    .filter(char => {
+        // Search filter
+        if (characterSearch) {
+          const searchLower = characterSearch.toLowerCase();
+          return (
+            char.name.toLowerCase().includes(searchLower) ||
+            char.personality.toLowerCase().includes(searchLower) ||
+            char.tags?.some(tag => tag.toLowerCase().includes(searchLower))
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        switch (characterSort) {
+        case 'alphabetical':
+          return a.name.localeCompare(b.name);
+        case 'recent':
+          return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        case 'mostUsed':
+            // Would need usage tracking - for now just use recent
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      default:
+        return 0;
+    }
+  });
+  // =====================================================================
   // DATA LOADING FUNCTIONS
-  // ============================================================================
-
+  // =====================================================================
   const loadCharacters = async () => {
     try {
       const data = await apiRequest('/api/characters');
@@ -661,7 +689,28 @@ const MainApp = () => {
               <option value="all-respond" className="bg-gray-800">Everyone Responds</option>
             </select>
           </div>
-
+          {/* Character Filters - Add before character list */}
+          <div className="mb-4 space-y-2">
+            <input
+              type="text"
+              value={characterSearch}
+              onChange={(e) => setCharacterSearch(e.target.value)}
+              placeholder="Search characters..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-400"
+            />
+            
+            <div className="flex gap-2">
+              <select
+                value={characterSort}
+                onChange={(e) => setCharacterSort(e.target.value)}
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-purple-400"
+              >
+                <option value="recent" className="bg-gray-800">Recent</option>
+                <option value="alphabetical" className="bg-gray-800">A-Z</option>
+                <option value="mostUsed" className="bg-gray-800">Most Used</option>
+              </select>
+            </div>
+          </div>
           {/* Character List */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -671,81 +720,98 @@ const MainApp = () => {
             </div>
             
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {characters.map((character) => (
+            {filteredCharacters.map((character) => (
+             <div
+              key={character.id}
+              className={`p-3 rounded-lg border transition-all ${
+                isGenerating ? 'opacity-50 cursor-not-allowed' : ''
+              } ${
+                activeCharacters.includes(character.id)
+                  ? `bg-gradient-to-r ${character.color} border-white/20`
+                  : 'bg-white/5 border-white/10 hover:bg-white/10'
+              }`}
+            >
+              <div className="flex items-center gap-3">
                 <div
-                  key={character.id}
-                  className={`p-3 rounded-lg border transition-all ${
-                    isGenerating ? 'opacity-50 cursor-not-allowed' : ''
-                  } ${
-                    activeCharacters.includes(character.id)
-                      ? `bg-gradient-to-r ${character.color} border-white/20`
-                      : 'bg-white/5 border-white/10 hover:bg-white/10'
-                  }`}
+                  onClick={() => !isGenerating && toggleCharacter(character.id)}
+                  className={`flex-1 flex items-center gap-3 ${!isGenerating ? 'cursor-pointer' : ''}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div
-                      onClick={() => !isGenerating && toggleCharacter(character.id)}
-                      className={`flex-1 flex items-center gap-3 ${!isGenerating ? 'cursor-pointer' : ''}`}
-                    >
-                      {/* Character Avatar */}
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        character.uses_custom_image && character.avatar_image_url 
-                          ? '' 
-                          : `bg-gradient-to-r ${character.color}`
-                      }`}>
-                        {character.uses_custom_image && character.avatar_image_url ? (
-                          <img
-                            src={character.avatar_image_url}
-                            alt={`${character.name} avatar`}
-                            className="w-10 h-10 rounded-full object-cover border border-white/20"
-                          />
-                        ) : (
-                          <span className="text-2xl">
-                            {character.avatar}
+                  {/* Character Avatar */}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    character.uses_custom_image && character.avatar_image_url 
+                      ? '' 
+                      : `bg-gradient-to-r ${character.color}`
+                  }`}>
+                    {character.uses_custom_image && character.avatar_image_url ? (
+                      <img
+                        src={character.avatar_image_url}
+                        alt={`${character.name} avatar`}
+                        className="w-10 h-10 rounded-full object-cover border border-white/20"
+                      />
+                    ) : (
+                      <span className="text-2xl">
+                        {character.avatar}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium text-white text-sm">{character.name}</div>
+                      {/* NEW: Show age */}
+                      {character.age && (
+                        <span className="text-xs text-gray-400">({character.age})</span>
+                      )}
+                      {character.is_default && (
+                        <span className="text-xs bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded">
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-300 line-clamp-2">{character.personality}</div>
+                    {/* NEW: Show tags */}
+                    {character.tags && character.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {character.tags.slice(0, 3).map((tag, idx) => (
+                          <span key={idx} className="text-xs bg-purple-500/20 text-purple-300 px-1 py-0.5 rounded">
+                            {tag}
                           </span>
+                        ))}
+                        {character.tags.length > 3 && (
+                          <span className="text-xs text-gray-500">+{character.tags.length - 3}</span>
                         )}
                       </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="font-medium text-white text-sm">{character.name}</div>
-                          {character.is_default && (
-                            <span className="text-xs bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded">
-                              Default
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-300 line-clamp-2">{character.personality}</div>
-                      </div>
-                    </div>
-                    
-                    {/* Character Actions */}
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openMemoryViewer(character);
-                        }}
-                        className="p-1 text-gray-400 hover:text-purple-400 transition-colors"
-                        title="View memories"
-                      >
-                        <Brain size={12} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingCharacter(character);
-                          setShowCharacterEditor(true);
-                        }}
-                        className="p-1 text-gray-400 hover:text-white transition-colors"
-                        title="Edit character"
-                      >
-                        <Settings size={12} />
-                      </button>
-                    </div>
+                    )}
                   </div>
                 </div>
-              ))}
+                
+                {/* Character Actions remain the same */}
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openMemoryViewer(character);
+                    }}
+                    className="p-1 text-gray-400 hover:text-purple-400 transition-colors"
+                    title="View memories"
+                  >
+                    <Brain size={12} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingCharacter(character);
+                      setShowCharacterEditor(true);
+                    }}
+                    className="p-1 text-gray-400 hover:text-white transition-colors"
+                    title="Edit character"
+                  >
+                    <Settings size={12} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
             </div>
           </div>
         </div>
@@ -907,24 +973,25 @@ const MainApp = () => {
           />
         )}
 
-        {showCharacterEditor && (
-          <CharacterEditor
-            character={editingCharacter}
-            onSave={async (characterData) => {
-              if (editingCharacter) {
-                await updateCharacter(editingCharacter.id, characterData);
-              } else {
-                await createCharacter(characterData);
-              }
-              setShowCharacterEditor(false);
-              setEditingCharacter(null);
-            }}
-            onClose={() => {
-              setShowCharacterEditor(false);
-              setEditingCharacter(null);
-            }}
-          />
-        )}
+          {showCharacterEditor && (
+            <CharacterEditor
+              character={editingCharacter}
+              allCharacters={characters.filter(c => !c.is_default)} // Pass custom characters for relationships
+              onSave={async (characterData) => {
+                if (editingCharacter) {
+                  await updateCharacter(editingCharacter.id, characterData);
+                } else {
+                  await createCharacter(characterData);
+                }
+                setShowCharacterEditor(false);
+                setEditingCharacter(null);
+              }}
+              onClose={() => {
+                setShowCharacterEditor(false);
+                setEditingCharacter(null);
+              }}
+            />
+          )}
 
         {showMemoryViewer && selectedCharacterForMemory && (
           <CharacterMemoryViewer

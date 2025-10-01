@@ -8,6 +8,9 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const DatabaseService = require('./services/database');
+const CharacterService = require('./services/characterService');
+const CommunityService = require('./services/communityService');
+const profanityFilter = require('./utils/profanityFilter');
 require('dotenv').config();
 
 const app = express();
@@ -15,6 +18,8 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize database service
 const db = new DatabaseService();
+const characterService = new CharacterService(db.supabase);
+const communityService = new CommunityService(db.supabase);
 
 // ============================================================================
 // MIDDLEWARE CONFIGURATION
@@ -498,7 +503,11 @@ app.post('/api/chat/group-response', requireAuth, async (req, res) => {
           currentSessionId,
           otherCharacterIds  // ← NEW: Pass other character IDs for context
         );
-        
+        const enhancedPrompt = characterService.buildSystemPrompt(
+          character,
+          characterContext.userPersona,
+          characterContext
+        );
         const recentOwnMessages = conversationHistory
           .filter(m => m.type === 'character' && m.character === characterId)
           .slice(-3)
@@ -508,7 +517,7 @@ app.post('/api/chat/group-response', requireAuth, async (req, res) => {
         // Generate AI response
         const response = await callAIProviderWithMemory(
           contextualMessages,
-          character.personality,
+          enhancedPrompt,
           apiProvider,
           req.userId,
           userSettings.ollamaSettings || {
@@ -680,8 +689,40 @@ app.delete('/api/chat/sessions/:sessionId', requireAuth, async (req, res) => {
 
 app.get('/api/characters', requireAuth, async (req, res) => {
   try {
-    const result = await db.getCharacters(req.userId);
-    res.json(result);
+    const { sortBy, tags, search } = req.query;
+    
+    const result = await characterService.getCharacters(req.userId);
+    
+    // Apply client-side filters if provided
+    let characters = result.characters;
+    
+    if (tags) {
+      const tagArray = tags.split(',');
+      characters = characters.filter(char =>
+        char.tags?.some(tag => tagArray.includes(tag))
+      );
+    }
+    
+    if (search) {
+      const searchLower = search.toLowerCase();
+      characters = characters.filter(char =>
+        char.name.toLowerCase().includes(searchLower) ||
+        char.personality.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    if (sortBy === 'alphabetical') {
+      characters.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'recent') {
+      characters.sort((a, b) =>
+        new Date(b.created_at || 0) - new Date(a.created_at || 0)
+      );
+    }
+    
+    res.json({
+      characters,
+      total: characters.length
+    });
   } catch (error) {
     console.error('Error fetching characters:', error);
     res.status(500).json({ error: 'Failed to fetch characters' });
@@ -690,23 +731,19 @@ app.get('/api/characters', requireAuth, async (req, res) => {
 
 app.post('/api/characters', requireAuth, async (req, res) => {
   try {
-    const { name, personality, avatar, color, avatar_image_url, avatar_image_filename, uses_custom_image } = req.body;
+    const characterData = req.body;
     
-    if (!name || !personality) {
-      return res.status(400).json({ 
-        error: 'Name and personality are required fields' 
+    // Validate age
+    if (!characterData.age || characterData.age < 18) {
+      return res.status(400).json({
+        error: 'Character must be 18 or older'
       });
     }
     
-    const character = await db.createCharacter(req.userId, {
-      name: name.trim(),
-      personality: personality.trim(),
-      avatar: avatar || '🤖',
-      color: color || 'from-gray-500 to-slate-500',
-      avatar_image_url,
-      avatar_image_filename,
-      uses_custom_image
-    });
+    const character = await characterService.createCharacter(
+      req.userId,
+      characterData
+    );
     
     res.status(201).json({
       ...character,
@@ -716,9 +753,15 @@ app.post('/api/characters', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error creating character:', error);
     
+    if (error.validationErrors) {
+      return res.status(400).json({
+        error: error.validationErrors[0]
+      });
+    }
+    
     if (error.code === '23505') {
-      return res.status(400).json({ 
-        error: 'Character name already exists' 
+      return res.status(400).json({
+        error: 'Character name already exists'
       });
     }
     
@@ -728,23 +771,20 @@ app.post('/api/characters', requireAuth, async (req, res) => {
 
 app.put('/api/characters/:id', requireAuth, async (req, res) => {
   try {
-    const { name, personality, avatar, color, avatar_image_url, avatar_image_filename, uses_custom_image } = req.body;
+    const characterData = req.body;
     
-    if (!name || !personality) {
+    // Validate age
+    if (characterData.age && characterData.age < 18) {
       return res.status(400).json({
-        error: 'Name and personality are required fields'
+        error: 'Character must be 18 or older'
       });
     }
     
-    const character = await db.updateCharacter(req.userId, req.params.id, {
-      name: name.trim(),
-      personality: personality.trim(),
-      avatar,
-      color,
-      avatar_image_url,
-      avatar_image_filename,
-      uses_custom_image
-    });
+    const character = await characterService.updateCharacter(
+      req.userId,
+      req.params.id,
+      characterData
+    );
     
     res.json({
       ...character,
@@ -753,6 +793,12 @@ app.put('/api/characters/:id', requireAuth, async (req, res) => {
     
   } catch (error) {
     console.error('Error updating character:', error);
+    
+    if (error.validationErrors) {
+      return res.status(400).json({
+        error: error.validationErrors[0]
+      });
+    }
     
     if (error.code === '23505') {
       return res.status(400).json({
@@ -766,14 +812,228 @@ app.put('/api/characters/:id', requireAuth, async (req, res) => {
 
 app.delete('/api/characters/:id', requireAuth, async (req, res) => {
   try {
-    const result = await db.deleteCharacter(req.userId, req.params.id);
+    const result = await characterService.deleteCharacter(
+      req.userId,
+      req.params.id
+    );
     res.json(result);
   } catch (error) {
     console.error('Error deleting character:', error);
     res.status(500).json({ error: 'Failed to delete character' });
   }
 });
+// ============================================================================
+// COMMUNITY HUB ROUTES
+// ============================================================================
 
+/**
+ * Get community characters (public)
+ * GET /api/community/characters
+ */
+app.get('/api/community/characters', async (req, res) => {
+  try {
+    const {
+      limit = 20,
+      offset = 0,
+      sortBy = 'recent',
+      tags,
+      search
+    } = req.query;
+    
+    const options = {
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      sortBy,
+      tags: tags ? tags.split(',') : [],
+      searchQuery: search || ''
+    };
+    
+    const result = await communityService.getCommunityCharacters(options);
+    res.json(result);
+    
+  } catch (error) {
+    console.error('Error fetching community characters:', error);
+    res.status(500).json({ error: 'Failed to fetch community characters' });
+  }
+});
+
+/**
+ * Get popular tags
+ * GET /api/community/tags
+ */
+app.get('/api/community/tags', async (req, res) => {
+  try {
+    const tags = await communityService.getPopularTags(20);
+    res.json({ tags });
+  } catch (error) {
+    console.error('Error fetching popular tags:', error);
+    res.status(500).json({ error: 'Failed to fetch popular tags' });
+  }
+});
+
+/**
+ * Import a community character
+ * POST /api/community/characters/:id/import
+ */
+app.post('/api/community/characters/:id/import', requireAuth, async (req, res) => {
+  try {
+    const character = await communityService.importCharacter(
+      req.userId,
+      req.params.id
+    );
+    
+    res.status(201).json({
+      ...character,
+      message: 'Character imported successfully'
+    });
+  } catch (error) {
+    console.error('Error importing character:', error);
+    res.status(500).json({ error: 'Failed to import character' });
+  }
+});
+
+/**
+ * Increment view count
+ * POST /api/community/characters/:id/view
+ */
+app.post('/api/community/characters/:id/view', async (req, res) => {
+  try {
+    await communityService.incrementViewCount(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error incrementing view count:', error);
+    res.status(500).json({ error: 'Failed to update view count' });
+  }
+});
+
+/**
+ * Publish character to community
+ * POST /api/characters/:id/publish
+ */
+app.post('/api/characters/:id/publish', requireAuth, async (req, res) => {
+  try {
+    // Get character
+    const { characters } = await characterService.getCharacters(req.userId);
+    const character = characters.find(c => c.id === req.params.id);
+    
+    if (!character) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+    
+    // Validate content
+    const validation = profanityFilter.validateCharacterContent(character);
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'Character contains inappropriate content',
+        details: validation.errors
+      });
+    }
+    
+    // Publish
+    const published = await communityService.publishCharacter(
+      req.userId,
+      req.params.id
+    );
+    
+    res.json({
+      ...published,
+      message: 'Character published to community'
+    });
+    
+  } catch (error) {
+    console.error('Error publishing character:', error);
+    res.status(500).json({ error: 'Failed to publish character' });
+  }
+});
+
+/**
+ * Unpublish character from community
+ * POST /api/characters/:id/unpublish
+ */
+app.post('/api/characters/:id/unpublish', requireAuth, async (req, res) => {
+  try {
+    const character = await communityService.unpublishCharacter(
+      req.userId,
+      req.params.id
+    );
+    
+    res.json({
+      ...character,
+      message: 'Character removed from community'
+    });
+  } catch (error) {
+    console.error('Error unpublishing character:', error);
+    res.status(500).json({ error: 'Failed to unpublish character' });
+  }
+});
+
+/**
+ * Add character to favorites
+ * POST /api/community/characters/:id/favorite
+ */
+app.post('/api/community/characters/:id/favorite', requireAuth, async (req, res) => {
+  try {
+    await communityService.addToFavorites(req.userId, req.params.id);
+    res.json({ message: 'Added to favorites' });
+  } catch (error) {
+    console.error('Error adding to favorites:', error);
+    res.status(500).json({ error: 'Failed to add to favorites' });
+  }
+});
+
+/**
+ * Remove character from favorites
+ * DELETE /api/community/characters/:id/favorite
+ */
+app.delete('/api/community/characters/:id/favorite', requireAuth, async (req, res) => {
+  try {
+    await communityService.removeFromFavorites(req.userId, req.params.id);
+    res.json({ message: 'Removed from favorites' });
+  } catch (error) {
+    console.error('Error removing from favorites:', error);
+    res.status(500).json({ error: 'Failed to remove from favorites' });
+  }
+});
+
+/**
+ * Get user's favorites
+ * GET /api/community/favorites
+ */
+app.get('/api/community/favorites', requireAuth, async (req, res) => {
+  try {
+    const favorites = await communityService.getUserFavorites(req.userId);
+    res.json({ favorites });
+  } catch (error) {
+    console.error('Error fetching favorites:', error);
+    res.status(500).json({ error: 'Failed to fetch favorites' });
+  }
+});
+
+/**
+ * Report a character
+ * POST /api/community/characters/:id/report
+ */
+app.post('/api/community/characters/:id/report', requireAuth, async (req, res) => {
+  try {
+    const { reason, details } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({ error: 'Reason is required' });
+    }
+    
+    await communityService.reportCharacter(
+      req.userId,
+      req.params.id,
+      reason,
+      details
+    );
+    
+    res.json({ message: 'Report submitted successfully' });
+  } catch (error) {
+    console.error('Error reporting character:', error);
+    res.status(500).json({ error: 'Failed to submit report' });
+  }
+});
 // ============================================================================
 // USER SETTINGS ROUTES
 // ============================================================================

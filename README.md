@@ -354,15 +354,14 @@ Contributions are welcome! Please follow these steps:
 - User personas
 
 ### Planned Features
-- [ ] Voice synthesis for character responses
-- [ ] Advanced memory consolidation
-- [ ] Character personality learning from interactions
-- [ ] Group chat statistics and analytics
-- [ ] Export conversations
-- [ ] Mobile app (React Native)
-- [ ] Character marketplace
-- [ ] Discord bot integration
-- [ ] Multi-language support
+- Database schema updates (add new columns)
+- Character form expansion (add all the new text fields)
+- Chat examples UI (add/remove pairs)
+- Relationships UI (dropdown + text input)
+- Model settings toggles (temperature, memory on/off)
+- Tags system (add tags to characters)
+- Sort/filter in hub (sort by recent, filter by tags)
+- Community hub (browse/import shared characters)
 
 ---
 
