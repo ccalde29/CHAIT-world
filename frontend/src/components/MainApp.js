@@ -542,7 +542,6 @@ const MainApp = () => {
         characters={characters}
         onHistoryUpdate={historyUpdateTrigger}
       />
-
       {/* Main Content */}
       <div className="flex-1 flex">
         {/* Character Selection Sidebar */}
@@ -553,7 +552,6 @@ const MainApp = () => {
               <Users className="text-purple-400" size={20} />
               <h2 className="text-lg font-bold text-white">Characters</h2>
             </div>
-            
             {/* User Avatar */}
             <div className="relative" ref={userMenuRef}>
               <button
@@ -581,7 +579,6 @@ const MainApp = () => {
                   )}
                 </div>
               </button>
-              
               {/* User Menu Dropdown */}
               {showUserMenu && (
                 <div className="absolute right-0 top-12 bg-slate-800 border border-white/10 rounded-lg shadow-xl p-2 min-w-48 z-[100]">
@@ -640,7 +637,6 @@ const MainApp = () => {
               </button>
             </div>
           )}
-
           {/* Quick Actions */}
           <div className="mb-6 space-y-2">
             <button
@@ -666,6 +662,36 @@ const MainApp = () => {
               <MessageCircle size={18} />
               <span>Manage Scenes</span>
             </button>
+          </div>
+          {/* Scenario Selection */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-gray-300 mb-3">Current Scene</h3>
+            <select
+              value={currentScenario}
+              onChange={(e) => setCurrentScenario(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-400"
+              disabled={isGenerating}
+            >
+              {scenarios.map((scenario) => (
+                <option key={scenario.id} value={scenario.id} className="bg-gray-800">
+                  {scenario.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {/* Group Dynamics Mode */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-gray-300 mb-3">Chat Style</h3>
+            <select
+              value={groupDynamicsMode}
+              onChange={(e) => setGroupDynamicsMode(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-400"
+              disabled={isGenerating}
+            >
+              <option value="natural" className="bg-gray-800">Natural Flow</option>
+              <option value="round-robin" className="bg-gray-800">Take Turns</option>
+              <option value="all-respond" className="bg-gray-800">Everyone Responds</option>
+            </select>
           </div>
           {/* Search and Filter */}
           <div className="mb-4 space-y-2">
@@ -711,60 +737,6 @@ const MainApp = () => {
                 Clear filters
               </button>
             )}
-          </div>
-
-          {/* Scenario Selection */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-300 mb-3">Current Scene</h3>
-            <select
-              value={currentScenario}
-              onChange={(e) => setCurrentScenario(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-400"
-              disabled={isGenerating}
-            >
-              {scenarios.map((scenario) => (
-                <option key={scenario.id} value={scenario.id} className="bg-gray-800">
-                  {scenario.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Group Dynamics Mode */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-300 mb-3">Chat Style</h3>
-            <select
-              value={groupDynamicsMode}
-              onChange={(e) => setGroupDynamicsMode(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-400"
-              disabled={isGenerating}
-            >
-              <option value="natural" className="bg-gray-800">Natural Flow</option>
-              <option value="round-robin" className="bg-gray-800">Take Turns</option>
-              <option value="all-respond" className="bg-gray-800">Everyone Responds</option>
-            </select>
-          </div>
-          {/* Character Filters - Add before character list */}
-          <div className="mb-4 space-y-2">
-            <input
-              type="text"
-              value={characterSearch}
-              onChange={(e) => setCharacterSearch(e.target.value)}
-              placeholder="Search characters..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-400"
-            />
-            
-            <div className="flex gap-2">
-              <select
-                value={characterSort}
-                onChange={(e) => setCharacterSort(e.target.value)}
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-purple-400"
-              >
-                <option value="recent" className="bg-gray-800">Recent</option>
-                <option value="alphabetical" className="bg-gray-800">A-Z</option>
-                <option value="mostUsed" className="bg-gray-800">Most Used</option>
-              </select>
-            </div>
           </div>
           {/* Character List */}
           <div>
