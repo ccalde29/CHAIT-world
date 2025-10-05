@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 3001;
 const providerRoutes = require('./routes/providers');
 
 
-const groupChatV15 = require('./routes/group-chat');
+const groupChat = require('./routes/group-chat');
 
 
 // ============================================================================
@@ -998,7 +998,8 @@ app.delete('/api/scenarios/:id', (req, res) => {
 // ============================================================================
 // HEALTH & UTILITY ROUTES
 // ============================================================================
-
+app.use('/api/providers', providerRoutes);
+app.use('/api/chat', groupChat);
 /**
  * Health check endpoint
  * GET /health
@@ -1037,8 +1038,7 @@ app.get('/api/stats', (req, res) => {
     res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
-app.use('/api/providers', providerRoutes);
-app.use('/api/chat', groupChat);
+
 // ============================================================================
 // ERROR HANDLING & SERVER STARTUP
 // ============================================================================
