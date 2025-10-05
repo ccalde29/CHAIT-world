@@ -12,7 +12,7 @@ const SpeakingQueue = require('../services/SpeakingQueue');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 /**
@@ -55,15 +55,31 @@ router.post('/group-response-v15', async (req, res) => {
     // STEP 2: LOAD USER SETTINGS (API KEYS)
     // ========================================================================
     
-    const { data: userSettings } = await supabase
-      .from('user_settings')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
-    const apiKeys = userSettings?.api_keys || {};
-    const ollamaSettings = userSettings?.ollama_settings || {};
-    
+      const { data: userSettings, error: settingsError } = await supabase
+        .from('user_settings')
+        .select('api_keys, ollama_settings')
+        .eq('user_id', userId)
+        .single();
+
+      // api_keys is already a JSONB object, no need to parse
+      const apiKeys = userSettings?.api_keys || {
+        openai: null,
+        anthropic: null,
+        openrouter: null,
+        google: null
+      };
+
+      const ollamaSettings = userSettings?.ollama_settings || {
+        baseUrl: 'http://localhost:11434'
+      };
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Settings] Loaded settings for user:', userId);
+        console.log('[Settings] Has OpenAI key:', !!apiKeys.openai);
+        console.log('[Settings] Has Anthropic key:', !!apiKeys.anthropic);
+        console.log('[Settings] Has OpenRouter key:', !!apiKeys.openrouter);
+        console.log('[Settings] Has Google key:', !!apiKeys.google);
+        // NEVER LOG: console.log('[Settings] API Keys:', apiKeys); // DANGEROUS!
+      }
     // ========================================================================
     // STEP 3: LOAD SESSION STATES AND CONTEXT
     // ========================================================================

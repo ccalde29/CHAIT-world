@@ -72,7 +72,28 @@ router.post('/models', async (req, res) => {
     });
   }
 });
-
+/**
+ * Get list of installed Ollama models
+ * POST /api/providers/ollama/models
+ * Body: { baseUrl }
+ */
+router.post('/ollama/models', async (req, res) => {
+  try {
+    const { baseUrl } = req.body;
+    const ollamaSettings = { baseUrl: baseUrl || 'http://localhost:11434' };
+    
+    const models = await AIProviderService.getOllamaModels(ollamaSettings);
+    
+    res.json({ models });
+    
+  } catch (error) {
+    console.error('Error fetching Ollama models:', error);
+    res.status(500).json({
+      error: 'Failed to fetch Ollama models. Make sure Ollama is running.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
 /**
  * Get all supported providers and their info
  * GET /api/providers/list
@@ -102,16 +123,16 @@ router.get('/list', (req, res) => {
       name: 'OpenRouter',
       description: 'Access 100+ models through one API',
       requiresKey: true,
-      defaultModel: 'openai/gpt-3.5-turbo',
+      defaultModel: 'openai/gpt-5',
       icon: '🌐',
       websiteUrl: 'https://openrouter.ai'
     },
     {
       id: 'google',
       name: 'Google Gemini',
-      description: 'Gemini Pro and Vision models',
+      description: 'Gemini 2.5 Flash',
       requiresKey: true,
-      defaultModel: 'gemini-pro',
+      defaultModel: 'gemini-2.5-pro-flash',
       icon: '✨',
       websiteUrl: 'https://ai.google.dev'
     },
@@ -120,7 +141,7 @@ router.get('/list', (req, res) => {
       name: 'Ollama (Local)',
       description: 'Run models locally on your machine',
       requiresKey: false,
-      defaultModel: 'llama2',
+      defaultModel: 'mtaylor91/l3-stheno-maid-blackroot:8b',
       icon: '💻',
       websiteUrl: 'https://ollama.ai'
     }
@@ -136,7 +157,7 @@ router.get('/list', (req, res) => {
 router.get('/recommendations', (req, res) => {
   const recommendations = {
     fastest: [
-      { provider: 'openai', model: 'gpt-3.5-turbo', description: 'Fast and affordable' },
+      { provider: 'openai', model: 'gpt-3.5', description: 'Fast and affordable' },
       { provider: 'google', model: 'gemini-pro', description: 'Quick responses' },
       { provider: 'anthropic', model: 'claude-3-haiku-20240307', description: 'Speedy Claude' }
     ],
@@ -146,7 +167,7 @@ router.get('/recommendations', (req, res) => {
       { provider: 'openrouter', model: 'anthropic/claude-3-opus-20240229', description: 'Opus via OpenRouter' }
     ],
     balanced: [
-      { provider: 'openai', model: 'gpt-3.5-turbo', description: 'Good balance of speed/quality' },
+      { provider: 'openai', model: 'gpt-5', description: 'Good balance of speed/quality' },
       { provider: 'anthropic', model: 'claude-3-sonnet-20240229', description: 'Middle-tier Claude' },
       { provider: 'google', model: 'gemini-pro', description: 'Balanced Gemini' }
     ],

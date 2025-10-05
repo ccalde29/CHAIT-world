@@ -311,8 +311,8 @@ class AIProviderService {
       'openai': 'gpt-3.5-turbo',
       'anthropic': 'claude-3-haiku-20240307',
       'openrouter': 'openai/gpt-3.5-turbo',
-      'google': 'gemini-pro',
-      'ollama': 'llama2'
+      'google': 'gemini-2.5-pro',
+      'ollama': 'mtaylor91/l3-stheno-maid-blackroot:8b'
     };
     
     return defaults[provider.toLowerCase()] || 'gpt-3.5-turbo';
@@ -382,20 +382,31 @@ class AIProviderService {
   
   static getGeminiModels() {
     return [
-      { id: 'gemini-pro', name: 'Gemini Pro' },
-      { id: 'gemini-pro-vision', name: 'Gemini Pro Vision' }
+        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Latest)' },
+        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+        { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+        { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' }
     ];
   }
   
   static async getOllamaModels(ollamaSettings) {
-    const baseUrl = ollamaSettings.baseUrl || 'http://localhost:11434';
-    
-    const response = await fetch(`${baseUrl}/api/tags`);
-    
-    if (!response.ok) return [];
-    
-    const data = await response.json();
-    return data.models.map(m => ({ id: m.name, name: m.name }));
+      const baseUrl = ollamaSettings.baseUrl || 'http://localhost:11434';
+      
+      try {
+          const response = await fetch(`${baseUrl}/api/tags`);
+          
+          if (!response.ok) return [];
+          
+          const data = await response.json();
+          return data.models.map(m => ({
+          id: m.name,
+          name: `${m.name} (${(m.size / 1e9).toFixed(1)}GB)` // Show model size
+          }));
+      } catch (error) {
+          console.error('Error fetching Ollama models:', error);
+          return [];
+      }
   }
 }
 

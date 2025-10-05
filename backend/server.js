@@ -17,12 +17,6 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-const providerRoutes = require('./routes/providers');
-
-
-const groupChat = require('./routes/group-chat');
-
-
 // ============================================================================
 // MIDDLEWARE CONFIGURATION
 // ============================================================================
@@ -998,8 +992,6 @@ app.delete('/api/scenarios/:id', (req, res) => {
 // ============================================================================
 // HEALTH & UTILITY ROUTES
 // ============================================================================
-app.use('/api/providers', providerRoutes);
-app.use('/api/chat', groupChat);
 /**
  * Health check endpoint
  * GET /health

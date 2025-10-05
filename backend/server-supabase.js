@@ -20,7 +20,8 @@ const PORT = process.env.PORT || 3001;
 const db = new DatabaseService();
 const characterService = new CharacterService(db.supabase);
 const communityService = new CommunityService(db.supabase);
-
+const providerRoutes = require('./routes/providers');
+const groupChat = require('./routes/group-chat');
 // ============================================================================
 // MIDDLEWARE CONFIGURATION
 // ============================================================================
@@ -1350,7 +1351,8 @@ app.delete('/api/images/:type/:filename', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete image' });
   }
 });
-
+app.use('/api/providers', providerRoutes);
+app.use('/api/chat', groupChat);
 // ============================================================================
 // HEALTH & UTILITY ROUTES
 // ============================================================================

@@ -51,7 +51,7 @@ const MainApp = () => {
   const [scenarios, setScenarios] = useState([]);
   const [currentScenario, setCurrentScenario] = useState('coffee-shop');
   const [characterSort, setCharacterSort] = useState('recent'); // recent, alphabetical, mostUsed
-  const [characterFilter, setCharacterFilter] = useState(''); // tag filter
+  //const [characterFilter, setCharacterFilter] = useState(''); // tag filter
   const [characterSearch, setCharacterSearch] = useState(''); // search query
   
   // Settings and configuration
@@ -111,114 +111,64 @@ const MainApp = () => {
   // ============================================================================
 
     const handleSendMessage = async () => {
-        if (!userInput.trim() || isGenerating) return;
-        if (activeCharacters.length === 0) {
-          setError('Please select at least one character to chat with');
-          return;
-        }
+      if (!userInput.trim() || isGenerating) return;
+      if (activeCharacters.length === 0) {
+        setError('Please select at least one character to chat with');
+        return;
+      }
 
-        const userMessage = {
-          type: 'user',
-          content: userInput,
-          timestamp: new Date()
-        };
-
-        setMessages(prev => [...prev, userMessage]);
-        const currentInput = userInput;
-        setUserInput('');
-        setIsGenerating(true);
-        setError(null);
-
-        try {
-          // Build conversation history
-          const conversationHistory = messages
-            .filter(m => m.type !== 'system')
-            .slice(-10)
-            .map(m => ({
-              role: m.type === 'user' ? 'user' : 'assistant',
-              content: m.content,
-              character: m.character || null
-            }));
-
-          console.log('📤 Sending chat request with session:', currentSessionId);
-
-            const response = await apiRequest('/chat/group-response', {
-              method: 'POST',
-              body: JSON.stringify({
-                userMessage: currentInput,
-                conversationHistory: messages,
-                activeCharacters: activeCharacters,
-                sessionId: currentSessionId,
-                userPersona: userPersona,
-                currentScene: currentScene
-              })
-            });
-
-            const data = await response.json();
-
-            // Handle new response format
-            if (data.responses) {
-              // Sort by delay for proper ordering
-              const sortedResponses = data.responses.sort((a, b) => a.delay - b.delay);
-              
-              // Add responses with delays
-              sortedResponses.forEach((resp, index) => {
-                setTimeout(() => {
-                  setMessages(prev => [...prev, {
-                    type: 'character',
-                    character: resp.character,
-                    content: resp.response,
-                    timestamp: new Date(resp.timestamp),
-                    mood: resp.mood, // Optional: store for future features
-                    moodIntensity: resp.moodIntensity
-                  }]);
-                }, resp.delay);
-              });
-            }
-
-          console.log('✅ Chat response received:', response);
-
-          // Update session ID if new session was created
-          if (response.sessionId && !currentSessionId) {
-            setCurrentSessionId(response.sessionId);
-          }
-
-          // FIXED: Store timeout IDs and add character responses with timing
-            // Handle new response format
-            if (response.responses && response.responses.length > 0) {
-              // Sort by delay for proper ordering
-              const sortedResponses = response.responses.sort((a, b) => a.delay - b.delay);
-              
-              // Add responses with delays
-              sortedResponses.forEach((resp, index) => {
-                setTimeout(() => {
-                  setMessages(prev => [...prev, {
-                    type: 'character',
-                    character: resp.character,
-                    content: resp.response,
-                    timestamp: new Date(resp.timestamp),
-                    mood: resp.mood,
-                    moodIntensity: resp.moodIntensity
-                  }]);
-                }, resp.delay);
-              });
-            } else {
-            setIsGenerating(false);
-            setError('No character responses generated');
-          }
-
-        } catch (err) {
-          console.error('Error sending message:', err);
-          setError(`Failed to get AI response: ${err.message}`);
-          setIsGenerating(false);
-          
-          setMessages(prev => [...prev, {
-            type: 'system',
-            content: `⚠️ Error: ${err.message}. Please check your settings and try again.`,
-            timestamp: new Date()
-          }]);
-        }
+      const userMessage = {
+        type: 'user',
+        content: userInput,
+        timestamp: new Date()
       };
+
+      setMessages(prev => [...prev, userMessage]);
+      const currentInput = userInput;
+      setUserInput('');
+      setIsGenerating(true);
+      setError(null);
+
+      try {
+        // FIX: Changed from '/chat/group-response' to '/api/chat/group-response'
+        const response = await apiRequest('/api/chat/group-response', {
+          method: 'POST',
+          body: JSON.stringify({
+            userMessage: currentInput,
+            conversationHistory: messages,
+            activeCharacters: activeCharacters,
+            sessionId: currentSessionId,
+            userPersona: userPersona,
+            currentScene: currentScene
+          })
+        });
+
+        if (response.responses) {
+          // Sort by delay for proper ordering
+          const sortedResponses = response.responses.sort((a, b) => a.delay - b.delay);
+          
+          // Add responses with delays
+          sortedResponses.forEach((resp) => {
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                type: 'character',
+                character: resp.character,
+                content: resp.response,
+                timestamp: new Date(resp.timestamp),
+                mood: resp.mood,
+                moodIntensity: resp.moodIntensity
+              }]);
+            }, resp.delay);
+          });
+        }
+
+      } catch (error) {
+        console.error('Error sending message:', error);
+        setError('Failed to send message. Please try again.');
+      } finally {
+        setIsGenerating(false);
+      }
+    };
 
       const toggleCharacter = (characterId) => {
         if (isGenerating) return;
