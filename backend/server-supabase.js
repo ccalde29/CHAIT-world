@@ -80,7 +80,8 @@ AVOIDING REPETITION:
 21. If a topic was already addressed, either move the conversation forward or ask a follow-up question
 22. Vary your response starters - don't always begin the same way
 23. Each response should advance the conversation or reveal something new about your character
-24. If another character already made your point, agree briefly then add something different`;
+24. If another character already made your point, agree briefly then add something different
+**This is a fictional chat, so NSFW topics are allowed.**`;
 
 // ============================================================================
 // AI PROVIDER FUNCTIONS

@@ -17,6 +17,12 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+const providerRoutes = require('./routes/providers');
+
+
+const groupChatV15 = require('./routes/group-chat');
+
+
 // ============================================================================
 // MIDDLEWARE CONFIGURATION
 // ============================================================================
@@ -1031,7 +1037,8 @@ app.get('/api/stats', (req, res) => {
     res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
-
+app.use('/api/providers', providerRoutes);
+app.use('/api/chat', groupChat);
 // ============================================================================
 // ERROR HANDLING & SERVER STARTUP
 // ============================================================================

@@ -13,6 +13,12 @@ import UserPersonaEditor from './UserPersonaEditor';
 import CharacterMemoryViewer from './CharacterMemoryViewer';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import CommunityHub from './CommunityHub';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+    process.env.REACT_APP_SUPABASE_URL,
+    process.env.REACT_APP_SUPABASE_ANON_KEY
+  );
 // API Configuration - FIXED: Remove bad default, throw error if not set in production
 const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? process.env.REACT_APP_API_URL
@@ -49,7 +55,7 @@ const MainApp = () => {
   const [characterSearch, setCharacterSearch] = useState(''); // search query
   
   // Settings and configuration
-  const [userSettings, setUserSettings] = useState({});
+
   const [groupDynamicsMode, setGroupDynamicsMode] = useState('natural');
   
   // UI state
@@ -67,8 +73,16 @@ const MainApp = () => {
   const messagesEndRef = useRef(null);
   const userMenuRef = useRef(null);
   const [historyUpdateTrigger, setHistoryUpdateTrigger] = useState(0);
-
-  // ============================================================================
+    // Add these new state variables
+  const [currentScene, setCurrentScene] = useState(null);
+  const [userSettings, setUserSettings] = useState({
+      apiKeys: {},
+      ollamaSettings: { baseUrl: 'http://localhost:11434' },
+      groupDynamicsMode: 'natural',
+      messageDelay: 1200
+    });
+ 
+// ============================================================================
   // API FUNCTIONS
   // ============================================================================
 
@@ -96,186 +110,199 @@ const MainApp = () => {
   // CHAT FUNCTIONS
   // ============================================================================
 
-  const handleSendMessage = async () => {
-    if (!userInput.trim() || isGenerating) return;
-    if (activeCharacters.length === 0) {
-      setError('Please select at least one character to chat with');
-      return;
-    }
-
-    const userMessage = {
-      type: 'user',
-      content: userInput,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    const currentInput = userInput;
-    setUserInput('');
-    setIsGenerating(true);
-    setError(null);
-
-    try {
-      // Build conversation history
-      const conversationHistory = messages
-        .filter(m => m.type !== 'system')
-        .slice(-10)
-        .map(m => ({
-          role: m.type === 'user' ? 'user' : 'assistant',
-          content: m.content,
-          character: m.character || null
-        }));
-
-      console.log('📤 Sending chat request with session:', currentSessionId);
-
-      const response = await apiRequest('/api/chat/group-response', {
-        method: 'POST',
-        body: JSON.stringify({
-          userMessage: currentInput,
-          activeCharacters: activeCharacters,
-          scenario: currentScenario,
-          groupMode: groupDynamicsMode,
-          conversationHistory: conversationHistory,
-          sessionId: currentSessionId,
-          autoCreateSession: !currentSessionId
-        })
-      });
-
-      console.log('✅ Chat response received:', response);
-
-      // Update session ID if new session was created
-      if (response.sessionId && !currentSessionId) {
-        setCurrentSessionId(response.sessionId);
-      }
-
-      // FIXED: Store timeout IDs and add character responses with timing
-      if (response.responses && response.responses.length > 0) {
-        const newTimeoutIds = [];
-        
-        response.responses.forEach((charResponse, index) => {
-          const timeoutId = setTimeout(() => {
-            const characterMessage = {
-              type: 'character',
-              character: charResponse.character,
-              content: charResponse.response,
-              timestamp: new Date(),
-              hasError: charResponse.error
-            };
-            
-            setMessages(prev => [...prev, characterMessage]);
-            
-            if (index === response.responses.length - 1) {
-              setIsGenerating(false);
-              // Clear timeout IDs after all responses are done
-              setResponseTimeouts([]);
-            }
-          }, charResponse.delay || (index * 1200));
-          
-          newTimeoutIds.push(timeoutId);
-        });
-        
-        setResponseTimeouts(newTimeoutIds);
-      } else {
-        setIsGenerating(false);
-        setError('No character responses generated');
-      }
-
-    } catch (err) {
-      console.error('Error sending message:', err);
-      setError(`Failed to get AI response: ${err.message}`);
-      setIsGenerating(false);
-      
-      setMessages(prev => [...prev, {
-        type: 'system',
-        content: `⚠️ Error: ${err.message}. Please check your settings and try again.`,
-        timestamp: new Date()
-      }]);
-    }
-  };
-
-  const toggleCharacter = (characterId) => {
-    if (isGenerating) return;
-    
-    setActiveCharacters(prev =>
-      prev.includes(characterId)
-        ? prev.filter(id => id !== characterId)
-        : [...prev, characterId]
-    );
-  };
-
-  const startNewChat = () => {
-    // FIXED: Clear any pending timeouts when starting new chat
-    responseTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
-    setResponseTimeouts([]);
-    
-    setCurrentSessionId(null);
-    setMessages([
-      {
-        type: 'system',
-        content: `New conversation started! Ready to chat with your AI characters?`,
-        timestamp: new Date()
-      }
-    ]);
-    setError(null);
-    setHistoryUpdateTrigger(prev => prev + 1);
-  };
-
-  const loadChatSession = async (session) => {
-    try {
-      // FIXED: Clear any pending timeouts when loading a chat
-      responseTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
-      setResponseTimeouts([]);
-      
-      console.log('📥 Loading chat session:', session.id);
-      const response = await apiRequest(`/api/chat/sessions/${session.id}`);
-      
-      setCurrentSessionId(session.id);
-      setCurrentScenario(response.scenario_id);
-      setActiveCharacters(response.active_characters || []);
-      
-      // Convert database messages to UI format
-      const uiMessages = response.messages.map(msg => ({
-        type: msg.type,
-        content: msg.content,
-        character: msg.character_id,
-        timestamp: new Date(msg.timestamp)
-      }));
-      
-      setMessages(uiMessages);
-      setError(null);
-      
-    } catch (err) {
-      console.error('Failed to load chat session:', err);
-      setError('Failed to load chat session');
-    }
-  };
-
-  const filteredCharacters = characters
-    .filter(char => {
-        // Search filter
-        if (characterSearch) {
-          const searchLower = characterSearch.toLowerCase();
-          return (
-            char.name.toLowerCase().includes(searchLower) ||
-            char.personality.toLowerCase().includes(searchLower) ||
-            char.tags?.some(tag => tag.toLowerCase().includes(searchLower))
-          );
+    const handleSendMessage = async () => {
+        if (!userInput.trim() || isGenerating) return;
+        if (activeCharacters.length === 0) {
+          setError('Please select at least one character to chat with');
+          return;
         }
-        return true;
-      })
-      .sort((a, b) => {
-        switch (characterSort) {
-        case 'alphabetical':
-          return a.name.localeCompare(b.name);
-        case 'recent':
-          return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-        case 'mostUsed':
-            // Would need usage tracking - for now just use recent
-        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-      default:
-        return 0;
-    }
-  });
+
+        const userMessage = {
+          type: 'user',
+          content: userInput,
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+        const currentInput = userInput;
+        setUserInput('');
+        setIsGenerating(true);
+        setError(null);
+
+        try {
+          // Build conversation history
+          const conversationHistory = messages
+            .filter(m => m.type !== 'system')
+            .slice(-10)
+            .map(m => ({
+              role: m.type === 'user' ? 'user' : 'assistant',
+              content: m.content,
+              character: m.character || null
+            }));
+
+          console.log('📤 Sending chat request with session:', currentSessionId);
+
+            const response = await apiRequest('/chat/group-response', {
+              method: 'POST',
+              body: JSON.stringify({
+                userMessage: currentInput,
+                conversationHistory: messages,
+                activeCharacters: activeCharacters,
+                sessionId: currentSessionId,
+                userPersona: userPersona,
+                currentScene: currentScene
+              })
+            });
+
+            const data = await response.json();
+
+            // Handle new response format
+            if (data.responses) {
+              // Sort by delay for proper ordering
+              const sortedResponses = data.responses.sort((a, b) => a.delay - b.delay);
+              
+              // Add responses with delays
+              sortedResponses.forEach((resp, index) => {
+                setTimeout(() => {
+                  setMessages(prev => [...prev, {
+                    type: 'character',
+                    character: resp.character,
+                    content: resp.response,
+                    timestamp: new Date(resp.timestamp),
+                    mood: resp.mood, // Optional: store for future features
+                    moodIntensity: resp.moodIntensity
+                  }]);
+                }, resp.delay);
+              });
+            }
+
+          console.log('✅ Chat response received:', response);
+
+          // Update session ID if new session was created
+          if (response.sessionId && !currentSessionId) {
+            setCurrentSessionId(response.sessionId);
+          }
+
+          // FIXED: Store timeout IDs and add character responses with timing
+            // Handle new response format
+            if (response.responses && response.responses.length > 0) {
+              // Sort by delay for proper ordering
+              const sortedResponses = response.responses.sort((a, b) => a.delay - b.delay);
+              
+              // Add responses with delays
+              sortedResponses.forEach((resp, index) => {
+                setTimeout(() => {
+                  setMessages(prev => [...prev, {
+                    type: 'character',
+                    character: resp.character,
+                    content: resp.response,
+                    timestamp: new Date(resp.timestamp),
+                    mood: resp.mood,
+                    moodIntensity: resp.moodIntensity
+                  }]);
+                }, resp.delay);
+              });
+            } else {
+            setIsGenerating(false);
+            setError('No character responses generated');
+          }
+
+        } catch (err) {
+          console.error('Error sending message:', err);
+          setError(`Failed to get AI response: ${err.message}`);
+          setIsGenerating(false);
+          
+          setMessages(prev => [...prev, {
+            type: 'system',
+            content: `⚠️ Error: ${err.message}. Please check your settings and try again.`,
+            timestamp: new Date()
+          }]);
+        }
+      };
+
+      const toggleCharacter = (characterId) => {
+        if (isGenerating) return;
+        
+        setActiveCharacters(prev =>
+          prev.includes(characterId)
+            ? prev.filter(id => id !== characterId)
+            : [...prev, characterId]
+        );
+      };
+
+      const startNewChat = () => {
+        // FIXED: Clear any pending timeouts when starting new chat
+        responseTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        setResponseTimeouts([]);
+        
+        setCurrentSessionId(null);
+        setMessages([
+          {
+            type: 'system',
+            content: `New conversation started! Ready to chat with your AI characters?`,
+            timestamp: new Date()
+          }
+        ]);
+        setError(null);
+        setHistoryUpdateTrigger(prev => prev + 1);
+      };
+
+      const loadChatSession = async (session) => {
+        try {
+          // FIXED: Clear any pending timeouts when loading a chat
+          responseTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+          setResponseTimeouts([]);
+          
+          console.log('📥 Loading chat session:', session.id);
+          const response = await apiRequest(`/api/chat/sessions/${session.id}`);
+          
+          setCurrentSessionId(session.id);
+          setCurrentScenario(response.scenario_id);
+          setActiveCharacters(response.active_characters || []);
+          
+          // Convert database messages to UI format
+          const uiMessages = response.messages.map(msg => ({
+            type: msg.type,
+            content: msg.content,
+            character: msg.character_id,
+            timestamp: new Date(msg.timestamp)
+          }));
+          
+          setMessages(uiMessages);
+          setError(null);
+          
+        } catch (err) {
+          console.error('Failed to load chat session:', err);
+          setError('Failed to load chat session');
+        }
+      };
+
+      const filteredCharacters = characters
+        .filter(char => {
+            // Search filter
+            if (characterSearch) {
+              const searchLower = characterSearch.toLowerCase();
+              return (
+                char.name.toLowerCase().includes(searchLower) ||
+                char.personality.toLowerCase().includes(searchLower) ||
+                char.tags?.some(tag => tag.toLowerCase().includes(searchLower))
+              );
+            }
+            return true;
+          })
+          .sort((a, b) => {
+            switch (characterSort) {
+            case 'alphabetical':
+              return a.name.localeCompare(b.name);
+            case 'recent':
+              return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+            case 'mostUsed':
+                // Would need usage tracking - for now just use recent
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+          default:
+            return 0;
+        }
+      });
   // =====================================================================
   // DATA LOADING FUNCTIONS
   // =====================================================================
@@ -306,19 +333,135 @@ const MainApp = () => {
     }
   };
 
-  const loadUserSettings = async () => {
-    try {
-      const settings = await apiRequest('/api/user/settings');
-      setUserSettings(settings);
+    const loadUserSettings = async () => {
+      if (!user?.id) return;
       
-      if (settings.defaultScenario) {
-        setCurrentScenario(settings.defaultScenario);
+      try {
+        const { data, error } = await supabase
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle(); // Use maybeSingle() to avoid error when no rows
+        
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+        
+        if (data) {
+          setUserSettings({
+            apiKeys: data.api_keys || {},
+            ollamaSettings: data.ollama_settings || { baseUrl: 'http://localhost:11434' },
+            groupDynamicsMode: data.group_dynamics_mode || 'natural',
+            messageDelay: data.message_delay || 1200
+          });
+          console.log('✅ User settings loaded');
+        } else {
+          setUserSettings({
+            apiKeys: {},
+            ollamaSettings: { baseUrl: 'http://localhost:11434' },
+            groupDynamicsMode: 'natural',
+            messageDelay: 1200
+          });
+          console.log('ℹ️ No settings found, using defaults');
+        }
+      } catch (error) {
+        console.error('❌ Error loading settings:', error);
+        setUserSettings({
+          apiKeys: {},
+          ollamaSettings: { baseUrl: 'http://localhost:11434' },
+          groupDynamicsMode: 'natural',
+          messageDelay: 1200
+        });
       }
-    } catch (err) {
-      console.error('Failed to load user settings:', err);
-    }
-  };
+    };
+    /**
+     * Save user settings to database
+     */
+    const handleSaveSettings = async (newSettings) => {
+      try {
+        setUserSettings(newSettings);
+        
+        const { error } = await supabase
+          .from('user_settings')
+          .upsert({
+            user_id: user.id,
+            api_keys: newSettings.apiKeys,
+            ollama_settings: newSettings.ollamaSettings,
+            group_dynamics_mode: newSettings.groupDynamicsMode,
+            message_delay: newSettings.messageDelay,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
+        
+        if (error) throw error;
+        console.log('✅ Settings saved');
+      } catch (error) {
+        console.error('❌ Error saving settings:', error);
+        throw error;
+      }
+    };
 
+    /**
+     * Save character (create or update)
+     */
+    const handleSaveCharacter = async (characterData) => {
+      try {
+        if (editingCharacter) {
+          const { data, error } = await supabase
+            .from('characters')
+            .update({
+              name: characterData.name,
+              personality: characterData.personality,
+              tags: characterData.tags,
+              temperature: characterData.temperature,
+              max_tokens: characterData.max_tokens,
+              ai_provider: characterData.ai_provider,
+              ai_model: characterData.ai_model,
+              fallback_provider: characterData.fallback_provider || null,
+              fallback_model: characterData.fallback_model || null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', editingCharacter.id)
+            .eq('user_id', user.id)
+            .select()
+            .single();
+          
+          if (error) throw error;
+          setCharacters(prev => prev.map(c => c.id === editingCharacter.id ? data : c));
+          console.log('✅ Character updated:', data.name);
+        } else {
+          const newChar = {
+            id: `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            user_id: user.id,
+            name: characterData.name,
+            personality: characterData.personality,
+            tags: characterData.tags,
+            temperature: characterData.temperature,
+            max_tokens: characterData.max_tokens,
+            ai_provider: characterData.ai_provider,
+            ai_model: characterData.ai_model,
+            fallback_provider: characterData.fallback_provider || null,
+            fallback_model: characterData.fallback_model || null,
+            is_public: false,
+            created_at: new Date().toISOString()
+          };
+          
+          const { data, error } = await supabase
+            .from('characters')
+            .insert(newChar)
+            .select()
+            .single();
+          
+          if (error) throw error;
+          setCharacters(prev => [...prev, data]);
+          console.log('✅ Character created:', data.name);
+        }
+      } catch (error) {
+        console.error('❌ Error saving character:', error);
+        throw error;
+      }
+    };
   const loadUserPersona = async () => {
     try {
       const persona = await apiRequest('/api/user/persona');
@@ -333,7 +476,7 @@ const MainApp = () => {
           interests: [],
           communication_style: 'casual and friendly',
           avatar: '👤',
-          color: 'from-blue-500 to-indigo-500'
+          color: 'from-grey-500 to-indigo-500'
         }
       });
     }
@@ -470,34 +613,52 @@ const MainApp = () => {
   // EFFECTS
   // ============================================================================
 
-  useEffect(() => {
-    const initializeApp = async () => {
-      if (user) {
+    useEffect(() => {
+      if (!user?.id) return;
+      
+      let isMounted = true;
+      
+      const initializeApp = async () => {
         console.log('🚀 Initializing app for user:', user?.email);
-        await Promise.all([
-          loadCharacters(),
-          loadScenarios(),
-          loadUserSettings(),
-          loadUserPersona()
+        
+        try {
+          await Promise.all([
+            loadCharacters(),
+            loadScenarios(),
+            loadUserSettings(),
+            loadUserPersona()
+          ]);
+          
+          if (isMounted) {
+            console.log('✅ App initialized');
+          }
+        } catch (error) {
+          console.error('❌ Error initializing:', error);
+          if (isMounted) {
+            setError('Failed to initialize. Please refresh.');
+          }
+        }
+      };
+
+      initializeApp();
+      
+      return () => {
+        isMounted = false;
+      };
+    }, [user?.id]); // CRITICAL: Only user.id, not entire user object
+
+    useEffect(() => {
+      if (messages.length === 0 && user) {
+        const userName = userPersona?.persona?.name || user?.user_metadata?.full_name || 'User';
+        setMessages([
+          {
+            type: 'system',
+            content: `Welcome back, ${userName}! Select characters to start chatting.`,
+            timestamp: new Date()
+          }
         ]);
       }
-    };
-
-    initializeApp();
-  }, [user]);
-
-  useEffect(() => {
-    if (messages.length === 0) {
-      const userName = userPersona?.persona?.name || user?.user_metadata?.full_name || 'User';
-      setMessages([
-        {
-          type: 'system',
-          content: `Welcome back, ${userName}! Ready to chat with your AI characters?`,
-          timestamp: new Date()
-        }
-      ]);
-    }
-  }, [userPersona, user]);
+    }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -526,13 +687,18 @@ const MainApp = () => {
       responseTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     };
   }, [responseTimeouts]);
-
+    // Cleanup timeouts on unmount
+    useEffect(() => {
+      return () => {
+        responseTimeouts.forEach(id => clearTimeout(id));
+      };
+    }, [responseTimeouts]);
   // ============================================================================
   // RENDER
   // ============================================================================
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex">
+    <div className="h-screen bg-gradient-to-br from-gray-800 via-gray-900 to-gray-950 flex">
       {/* Chat History Sidebar */}
       <ChatHistorySidebar
         apiRequest={apiRequest}
@@ -549,8 +715,11 @@ const MainApp = () => {
           {/* Header with User Menu */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <Users className="text-purple-400" size={20} />
-              <h2 className="text-lg font-bold text-white">Characters</h2>
+              <Users className="text-red-500" size={20} />
+              <h2 className="text-2xl font-bold">
+                    <span className="text-white">CH</span>
+                    <span className="text-red-500">AI</span>
+                    <span className="text-white">T World</span></h2>
             </div>
             {/* User Avatar */}
             <div className="relative" ref={userMenuRef}>
@@ -564,7 +733,7 @@ const MainApp = () => {
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                   userPersona?.hasPersona && userPersona.persona.uses_custom_image && userPersona.persona.avatar_image_url
                     ? ''
-                    : `bg-gradient-to-r ${userPersona?.hasPersona ? userPersona.persona.color : 'from-purple-500 to-blue-500'}`
+                    : `bg-gradient-to-r ${userPersona?.hasPersona ? userPersona.persona.color : 'from-red-500 to-red-500'}`
                 }`}>
                   {userPersona?.hasPersona && userPersona.persona.uses_custom_image && userPersona.persona.avatar_image_url ? (
                     <img
@@ -641,7 +810,7 @@ const MainApp = () => {
           <div className="mb-6 space-y-2">
             <button
               onClick={() => setShowCharacterEditor(true)}
-              className="w-full flex items-center gap-2 bg-purple-500/20 border border-purple-400/30 rounded-lg p-3 text-white hover:bg-purple-500/30 transition-colors"
+              className="w-full flex items-center gap-2 bg-red-500/20 border border-red-500/30 rounded-lg p-3 text-white hover:bg-red-500/30 transition-colors"
             >
               <Plus size={18} />
               <span>Create Character</span>
@@ -649,7 +818,7 @@ const MainApp = () => {
             
             <button
               onClick={() => setShowCommunityHub(true)}
-              className="w-full flex items-center gap-2 bg-blue-500/20 border border-blue-400/30 rounded-lg p-3 text-white hover:bg-blue-500/30 transition-colors"
+              className="w-full flex items-center gap-2 bg-grey-500/20 border border-grey-400/30 rounded-lg p-3 text-white hover:bg-grey-500/30 transition-colors"
             >
               <Users size={18} />
               <span>Community Hub</span>
@@ -669,7 +838,7 @@ const MainApp = () => {
             <select
               value={currentScenario}
               onChange={(e) => setCurrentScenario(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-400"
+              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-red-500"
               disabled={isGenerating}
             >
               {scenarios.map((scenario) => (
@@ -685,7 +854,7 @@ const MainApp = () => {
             <select
               value={groupDynamicsMode}
               onChange={(e) => setGroupDynamicsMode(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-purple-400"
+              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-red-500"
               disabled={isGenerating}
             >
               <option value="natural" className="bg-gray-800">Natural Flow</option>
@@ -700,14 +869,14 @@ const MainApp = () => {
               value={characterSearch}
               onChange={(e) => setCharacterSearch(e.target.value)}
               placeholder="Search characters..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-400"
+              className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
             />
             
             <div className="flex gap-2">
               <select
                 value={characterSort}
                 onChange={(e) => setCharacterSort(e.target.value)}
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-purple-400"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-red-500"
               >
                 <option value="recent" className="bg-gray-800">Recent</option>
                 <option value="alphabetical" className="bg-gray-800">A-Z</option>
@@ -717,7 +886,7 @@ const MainApp = () => {
               <select
                 value={selectedTagFilter}
                 onChange={(e) => setSelectedTagFilter(e.target.value)}
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-purple-400"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-red-500"
               >
                 <option value="" className="bg-gray-800">All Tags</option>
                 {Array.from(new Set(characters.flatMap(c => c.tags || []))).map(tag => (
@@ -732,7 +901,7 @@ const MainApp = () => {
                   setCharacterSearch('');
                   setSelectedTagFilter('');
                 }}
-                className="text-xs text-purple-400 hover:text-purple-300"
+                className="text-xs text-red-500 hover:text-red-300"
               >
                 Clear filters
               </button>
@@ -822,7 +991,7 @@ const MainApp = () => {
                         <span className="text-xs text-gray-400">({character.age})</span>
                       )}
                       {character.is_default && (
-                        <span className="text-xs bg-blue-500/20 text-blue-300 px-1 py-0.5 rounded">
+                        <span className="text-xs bg-grey-500/20 text-grey-300 px-1 py-0.5 rounded">
                           Default
                         </span>
                       )}
@@ -832,7 +1001,7 @@ const MainApp = () => {
                     {character.tags && character.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {character.tags.slice(0, 3).map((tag, idx) => (
-                          <span key={idx} className="text-xs bg-purple-500/20 text-purple-300 px-1 py-0.5 rounded">
+                          <span key={idx} className="text-xs bg-red-500/20 text-red-300 px-1 py-0.5 rounded">
                             {tag}
                           </span>
                         ))}
@@ -851,7 +1020,7 @@ const MainApp = () => {
                       e.stopPropagation();
                       openMemoryViewer(character);
                     }}
-                    className="p-1 text-gray-400 hover:text-purple-400 transition-colors"
+                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
                     title="View memories"
                   >
                     <Brain size={12} />
@@ -902,7 +1071,7 @@ const MainApp = () => {
                         className={`p-1 transition-colors ${
                           character.is_public 
                             ? 'text-green-400 hover:text-green-300' 
-                            : 'text-gray-400 hover:text-blue-400'
+                            : 'text-gray-400 hover:text-grey-400'
                         }`}
                         title={character.is_public ? 'Published to community' : 'Publish to community'}
                       >
@@ -982,13 +1151,13 @@ const MainApp = () => {
                 <div key={index} className="animate-in slide-in-from-bottom-2 duration-300">
                   {message.type === 'system' ? (
                     <div className="text-center">
-                      <span className="bg-purple-500/30 backdrop-blur-sm text-purple-100 px-3 py-1 rounded-full text-sm border border-purple-400/30">
+                      <span className="bg-red-500/30 backdrop-blur-sm text-red-100 px-3 py-1 rounded-full text-sm border border-red-500/30">
                         {message.content}
                       </span>
                     </div>
                   ) : message.type === 'user' ? (
                     <div className="flex justify-end">
-                      <div className="bg-gradient-to-r from-blue-500/90 to-purple-600/90 backdrop-blur-sm text-white rounded-2xl rounded-br-sm px-4 py-2 max-w-xs border border-white/20">
+                      <div className="bg-gradient-to-r from-grey-500/90 to-red-600/90 backdrop-blur-sm text-white rounded-2xl rounded-br-sm px-4 py-2 max-w-xs border border-white/20">
                         {message.content}
                       </div>
                     </div>
@@ -1050,13 +1219,13 @@ const MainApp = () => {
                         ? "Select characters first..."
                         : `Chat with ${activeCharacters.length} AI character${activeCharacters.length === 1 ? '' : 's'}...`
                     }
-                    className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-white placeholder-gray-300 focus:outline-none focus:border-purple-400"
+                    className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-white placeholder-gray-300 focus:outline-none focus:border-red-500"
                     disabled={isGenerating || activeCharacters.length === 0}
                   />
                   <button
                     onClick={handleSendMessage}
                     disabled={!userInput.trim() || isGenerating || activeCharacters.length === 0}
-                    className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 transition-all backdrop-blur-sm"
+                    className="bg-gradient-to-r from-red-500 to-red-400 hover:from-red-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 transition-all backdrop-blur-sm"
                   >
                     <Send size={18} />
                   </button>
@@ -1067,27 +1236,20 @@ const MainApp = () => {
         </div>
 
         {/* Modals */}
-        {showSettings && (
-          <SettingsModal
-            userSettings={userSettings}
-            onSave={saveUserSettings}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
-
+          {showSettings && (
+            <SettingsModal
+              user={user}
+              settings={userSettings}
+              onSave={handleSaveSettings}
+              onClose={() => setShowSettings(false)}
+            />
+          )}
           {showCharacterEditor && (
             <CharacterEditor
               character={editingCharacter}
-              allCharacters={characters.filter(c => !c.is_default)} // Pass custom characters for relationships
-              onSave={async (characterData) => {
-                if (editingCharacter) {
-                  await updateCharacter(editingCharacter.id, characterData);
-                } else {
-                  await createCharacter(characterData);
-                }
-                setShowCharacterEditor(false);
-                setEditingCharacter(null);
-              }}
+              user={user}
+              userSettings={userSettings}
+              onSave={handleSaveCharacter}
               onClose={() => {
                 setShowCharacterEditor(false);
                 setEditingCharacter(null);

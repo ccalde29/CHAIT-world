@@ -23,15 +23,15 @@ const LoginScreen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-grey-900 to-slate-900 flex items-center justify-center p-4">
       <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-2xl p-8 w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Users className="text-purple-400" size={32} />
+            <Users className="text-red-400" size={32} />
             <h1 className="text-2xl font-bold text-white">
               CH
-              <span className="text-purple-400">AI</span>
+              <span className="text-red-400">AI</span>
               T World
             </h1>
           </div>
@@ -44,7 +44,7 @@ const LoginScreen = () => {
         <div className="mb-8">
           <div className="grid grid-cols-1 gap-3 text-sm">
             <div className="flex items-center gap-3 text-gray-300">
-              <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+              <div className="w-2 h-2 bg-grey-400 rounded-full"></div>
               <span>Create custom AI characters with unique personalities</span>
             </div>
             <div className="flex items-center gap-3 text-gray-300">

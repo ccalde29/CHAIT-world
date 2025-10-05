@@ -211,7 +211,7 @@ const ChatHistorySidebar = ({
           
           <button
             onClick={handleNewChat}
-            className="p-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors mb-4"
+            className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors mb-4"
             title="New chat"
           >
             <Plus size={20} />
@@ -222,7 +222,7 @@ const ChatHistorySidebar = ({
           </div>
           
           {chatSessions.length > 0 && (
-            <div className="mt-4 bg-purple-500/20 text-purple-300 text-xs px-2 py-1 rounded-full">
+            <div className="mt-4 bg-red-500/20 text-red-300 text-xs px-2 py-1 rounded-full">
               {chatSessions.length}
             </div>
           )}
@@ -236,10 +236,10 @@ const ChatHistorySidebar = ({
           <div className="p-4 border-b border-white/10">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <MessageCircle className="text-purple-400" size={20} />
+                <MessageCircle className="text-red-400" size={20} />
                 <h2 className="text-lg font-semibold text-white">Chat History</h2>
                 {chatSessions.length > 0 && (
-                  <span className="bg-purple-500/20 text-purple-300 text-xs px-2 py-0.5 rounded-full">
+                  <span className="bg-red-500/20 text-red-300 text-xs px-2 py-0.5 rounded-full">
                     {chatSessions.length}
                   </span>
                 )}
@@ -248,7 +248,7 @@ const ChatHistorySidebar = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleNewChat}
-                  className="flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white px-3 py-1.5 rounded-lg transition-colors text-sm"
+                  className="flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors text-sm"
                   title="Start new chat"
                 >
                   <Plus size={16} />
@@ -270,7 +270,7 @@ const ChatHistorySidebar = ({
           <div className="flex-1 overflow-y-auto p-4">
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-400"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-400"></div>
               </div>
             ) : chatSessions.length === 0 ? (
               <div className="text-center py-8">
@@ -285,7 +285,7 @@ const ChatHistorySidebar = ({
                     key={session.id}
                     className={`group relative rounded-lg border transition-all ${
                       session.id === currentSessionId
-                        ? 'bg-purple-500/20 border-purple-400/30'
+                        ? 'bg-red-500/20 border-red-400/30'
                         : 'bg-white/5 border-white/10 hover:bg-white/10'
                     } ${
                       deletingSessionId === session.id ? 'opacity-50 pointer-events-none' : 'cursor-pointer'
@@ -320,7 +320,7 @@ const ChatHistorySidebar = ({
                                   cancelEditing();
                                 }
                               }}
-                              className="flex-1 bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-purple-400"
+                              className="flex-1 bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-red-400"
                               autoFocus
                             />
                             <button
@@ -389,7 +389,7 @@ const ChatHistorySidebar = ({
 
                     {/* Current Session Indicator */}
                     {session.id === currentSessionId && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-purple-400 rounded-l-lg"></div>
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-400 rounded-l-lg"></div>
                     )}
                   </div>
                 ))}
