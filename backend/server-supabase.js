@@ -202,7 +202,9 @@ async function callOllama(messages, characterPrompt, baseUrl = 'http://localhost
  */
 async function callAIProviderWithMemory(messages, characterPrompt, provider, userId, ollamaSettings, characterContext) {
   try {
-    const apiKeys = await db.getDecryptedApiKeys(userId);
+    // Get user settings which includes api_keys JSONB
+    const userSettings = await db.getUserSettings(userId);
+    const apiKeys = userSettings.api_keys || {};
     
     // Build enhanced system prompt with memory and persona
     const enhancedPrompt = buildEnhancedCharacterPrompt(characterPrompt, characterContext);
@@ -216,10 +218,20 @@ async function callAIProviderWithMemory(messages, characterPrompt, provider, use
         if (!apiKeys.anthropic) throw new Error('Anthropic API key not configured');
         return await callAnthropic(messages, enhancedPrompt, apiKeys.anthropic);
         
+      case 'openrouter':
+        if (!apiKeys.openrouter) throw new Error('OpenRouter API key not configured');
+        // You'll need to add callOpenRouter function or use AIProviderService
+        return await callOpenRouter(messages, enhancedPrompt, apiKeys.openrouter);
+        
+      case 'google':
+        if (!apiKeys.google) throw new Error('Google API key not configured');
+        // You'll need to add callGoogle function or use AIProviderService
+        return await callGoogle(messages, enhancedPrompt, apiKeys.google);
+        
       case 'ollama':
         return await callOllama(
-          messages, 
-          enhancedPrompt, 
+          messages,
+          enhancedPrompt,
           ollamaSettings.baseUrl || 'http://localhost:11434',
           ollamaSettings.model || 'llama2'
         );

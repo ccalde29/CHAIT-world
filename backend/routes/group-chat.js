@@ -19,7 +19,7 @@ const supabase = createClient(
  * POST /api/chat/group-response-v15
  * Enhanced group chat with mood system and multi-pass generation
  */
-router.post('/group-response-v15', async (req, res) => {
+router.post('/group-response', async (req, res) => {
   try {
     const {
       userMessage,

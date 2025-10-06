@@ -12,77 +12,8 @@ class DatabaseService {
         if (!supabaseUrl || !supabaseServiceKey) {
             throw new Error('Missing Supabase environment variables');
         }
-        
-        if (!process.env.ENCRYPTION_KEY) {
-            throw new Error('ENCRYPTION_KEY environment variable is required');
-        }
-        
         this.supabase = createClient(supabaseUrl, supabaseServiceKey);
-        
-        this.encryptionKey = crypto
-        .createHash('sha256')
-        .update(process.env.ENCRYPTION_KEY)
-        .digest();
     }
-    
-    // ============================================================================
-    // ENCRYPTION UTILITIES
-    // ============================================================================
-    
-    encryptApiKey(text) {
-        if (!text) return null;
-        
-        try {
-            const algorithm = 'aes-256-gcm';
-            const iv = crypto.randomBytes(16);
-            const cipher = crypto.createCipheriv(algorithm, this.encryptionKey, iv);
-            
-            let encrypted = cipher.update(text, 'utf8', 'hex');
-            encrypted += cipher.final('hex');
-            
-            const authTag = cipher.getAuthTag();
-            
-            return {
-                encrypted,
-                iv: iv.toString('hex'),
-                authTag: authTag.toString('hex'),
-                algorithm: 'aes-256-gcm',
-                version: 1
-            };
-        } catch (error) {
-            console.error('Encryption error:', error);
-            throw new Error('Failed to encrypt API key securely');
-        }
-    }
-    
-    decryptApiKey(encryptedData) {
-        if (!encryptedData) return null;
-        
-        try {
-            if (encryptedData.algorithm === 'base64') {
-                console.warn('WARNING: Found legacy base64 encoded API key');
-                return Buffer.from(encryptedData.encrypted, 'base64').toString('utf8');
-            }
-            
-            if (encryptedData.algorithm === 'aes-256-gcm') {
-                const iv = Buffer.from(encryptedData.iv, 'hex');
-                const decipher = crypto.createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
-                decipher.setAuthTag(Buffer.from(encryptedData.authTag, 'hex'));
-                
-                let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
-                decrypted += decipher.final('utf8');
-                
-                return decrypted;
-            }
-            
-            throw new Error('Unknown encryption algorithm');
-            
-        } catch (error) {
-            console.error('Decryption error:', error);
-            throw new Error('Failed to decrypt API key');
-        }
-    }
-    
     // ============================================================================
     // CHAT SESSION & MESSAGE MANAGEMENT - FIXED
     // ============================================================================
@@ -346,168 +277,74 @@ class DatabaseService {
                 .from('user_settings')
                 .select('*')
                 .eq('user_id', userId)
-                .single();
+                .maybeSingle();
             
             if (error && error.code !== 'PGRST116') {
                 throw error;
             }
             
             if (!data) {
-                const defaultSettings = {
+                // Return defaults if no settings
+                return {
                     user_id: userId,
-                    api_provider: 'openai',
-                    ollama_base_url: 'http://localhost:11434',
-                    ollama_model: 'llama2',
-                    default_scenario: 'coffee-shop',
-                    preferences: {
-                        responseDelay: true,
-                        showTypingIndicator: true,
-                        maxCharactersInGroup: 5
-                    }
+                    api_keys: {},
+                    ollama_settings: { baseUrl: 'http://localhost:11434' },
+                    group_dynamics_mode: 'natural',
+                    message_delay: 1200
                 };
-                
-                const { data: newSettings, error: createError } = await this.supabase
-                    .from('user_settings')
-                    .insert(defaultSettings)
-                    .select()
-                    .single();
-                
-                if (createError) throw createError;
-                
-                return this.convertSettingsToFrontend(newSettings);
             }
             
-            return this.convertSettingsToFrontend(data);
+            // Return data as-is (api_keys is already JSONB)
+            return {
+                user_id: data.user_id,
+                api_keys: data.api_keys || {},
+                ollama_settings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
+                group_dynamics_mode: data.group_dynamics_mode || 'natural',
+                message_delay: data.message_delay || 1200,
+                created_at: data.created_at,
+                updated_at: data.updated_at
+            };
             
         } catch (error) {
-          console.error('Database error getting user settings:', error);
-          throw error;
-      }
-  }
+            console.error('Database error getting user settings:', error);
+            throw error;
+        }
+    }
   
-  async updateUserSettings(userId, updates) {
-      try {
-          const dbUpdates = this.convertSettingsToDatabase(updates);
-          
-          if (updates.apiKeys) {
-              if (updates.apiKeys.openai) {
-                  dbUpdates.openai_key_encrypted = JSON.stringify(this.encryptApiKey(updates.apiKeys.openai));
-              }
-              if (updates.apiKeys.anthropic) {
-                  dbUpdates.anthropic_key_encrypted = JSON.stringify(this.encryptApiKey(updates.apiKeys.anthropic));
-              }
-          }
-          
-          const { data, error } = await this.supabase
-              .from('user_settings')
-              .upsert({
-                  user_id: userId,
-                  ...dbUpdates,
-                  updated_at: new Date().toISOString()
-              })
-              .select()
-              .single();
-          
-          if (error) throw error;
-          
-          return this.convertSettingsToFrontend(data);
-          
-      } catch (error) {
-          console.error('Database error updating user settings:', error);
-          throw error;
-      }
-  }
-  
-  convertSettingsToFrontend(dbSettings) {
-      return {
-          user_id: dbSettings.user_id,
-          apiProvider: dbSettings.api_provider,
-          apiKeys: {
-              openai: dbSettings.openai_key_encrypted ? '***configured***' : '',
-              anthropic: dbSettings.anthropic_key_encrypted ? '***configured***' : ''
-          },
-          ollamaSettings: {
-              baseUrl: dbSettings.ollama_base_url,
-              model: dbSettings.ollama_model
-          },
-          defaultScenario: dbSettings.default_scenario,
-          preferences: dbSettings.preferences || {
-              responseDelay: true,
-              showTypingIndicator: true,
-              maxCharactersInGroup: 5
-          },
-          created_at: dbSettings.created_at,
-          updated_at: dbSettings.updated_at
-      };
-  }
-  
-  convertSettingsToDatabase(frontendSettings) {
-      const dbSettings = {};
-      
-      if (frontendSettings.apiProvider !== undefined) {
-          dbSettings.api_provider = frontendSettings.apiProvider;
-      }
-      
-      if (frontendSettings.ollamaSettings) {
-          if (frontendSettings.ollamaSettings.baseUrl !== undefined) {
-              dbSettings.ollama_base_url = frontendSettings.ollamaSettings.baseUrl;
-          }
-          if (frontendSettings.ollamaSettings.model !== undefined) {
-              dbSettings.ollama_model = frontendSettings.ollamaSettings.model;
-          }
-      }
-      
-      if (frontendSettings.defaultScenario !== undefined) {
-          dbSettings.default_scenario = frontendSettings.defaultScenario;
-      }
-      
-      if (frontendSettings.preferences !== undefined) {
-          dbSettings.preferences = frontendSettings.preferences;
-      }
-         
-         return dbSettings;
-     }
-     
-     async getDecryptedApiKeys(userId) {
-         try {
-             const { data, error } = await this.supabase
-                 .from('user_settings')
-                 .select('openai_key_encrypted, anthropic_key_encrypted')
-                 .eq('user_id', userId)
-                 .single();
-             
-             if (error) throw error;
-             
-             const apiKeys = {
-                 openai: null,
-                 anthropic: null
-             };
-             
-             if (data.openai_key_encrypted) {
-                 try {
-                     const encryptedData = JSON.parse(data.openai_key_encrypted);
-                     apiKeys.openai = this.decryptApiKey(encryptedData);
-                 } catch (e) {
-                     console.error('Error decrypting OpenAI key:', e);
-                 }
-             }
-             
-             if (data.anthropic_key_encrypted) {
-                 try {
-                     const encryptedData = JSON.parse(data.anthropic_key_encrypted);
-                     apiKeys.anthropic = this.decryptApiKey(encryptedData);
-                 } catch (e) {
-                     console.error('Error decrypting Anthropic key:', e);
-                 }
-             }
-             
-             return apiKeys;
-             
-         } catch (error) {
-             console.error('Database error getting API keys:', error);
-             throw error;
-         }
-     }
+    async updateUserSettings(userId, updates) {
+        try {
+            const { data, error } = await this.supabase
+                .from('user_settings')
+                .upsert({
+                    user_id: userId,
+                    api_keys: updates.api_keys || updates.apiKeys,
+                    ollama_settings: updates.ollama_settings ||updates.ollamaSettings,
+                    group_dynamics_mode: updates.group_dynamics_mode ||updates.groupDynamicsMode,
+                    message_delay: updates.message_delay || updates.messageDelay,
+                    updated_at: new Date().toISOString()
+                }, {
+                    onConflict: 'user_id'
+                })
+                .select()
+                .single();
+            
+            if (error) throw error;
+            
+            return {
+                user_id: data.user_id,
+                api_keys: data.api_keys || {},
+                ollama_settings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
+                group_dynamics_mode: data.group_dynamics_mode || 'natural',
+                message_delay: data.message_delay || 1200,
+                created_at: data.created_at,
+                updated_at: data.updated_at
+            };
+            
+        } catch (error) {
+            console.error('Database error updating user settings:', error);
+            throw error;
+        }
+    }
 
      // ============================================================================
      // USER PERSONA MANAGEMENT
