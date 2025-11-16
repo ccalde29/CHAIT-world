@@ -8,6 +8,7 @@ import {
   X, Save, User, MessageCircle, Sparkles, Sliders,
   Brain, Zap, Tag, Globe, RefreshCw, AlertCircle
 } from 'lucide-react';
+import ImageUpload from './ImageUpload';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -25,12 +26,27 @@ const CharacterEditorV15 = ({
   
   const [formData, setFormData] = useState({
     name: '',
+    age: 18,
+    sex: '',
     personality: '',
+    appearance: '',
+    background: '',
+    avatar: '🤖',
+    color: 'from-gray-500 to-slate-500',
     tags: [],
     temperature: 0.8,
     max_tokens: 150,
-    
-    // NEW v1.5: AI Provider settings
+    context_window: 8000,
+    memory_enabled: true,
+    chat_examples: [],
+    relationships: [],
+
+    // Image fields
+    avatar_image_url: null,
+    avatar_image_filename: null,
+    uses_custom_image: false,
+
+    // AI Provider settings
     ai_provider: 'openai',
     ai_model: 'gpt-3.5-turbo',
     fallback_provider: '',
@@ -52,10 +68,23 @@ const CharacterEditorV15 = ({
       // Edit mode - populate existing character
       setFormData({
         name: character.name || '',
+        age: character.age || 18,
+        sex: character.sex || '',
         personality: character.personality || '',
+        appearance: character.appearance || '',
+        background: character.background || '',
+        avatar: character.avatar || '🤖',
+        color: character.color || 'from-gray-500 to-slate-500',
         tags: character.tags || [],
         temperature: character.temperature || 0.8,
         max_tokens: character.max_tokens || 150,
+        context_window: character.context_window || 8000,
+        memory_enabled: character.memory_enabled !== false,
+        chat_examples: character.chat_examples || [],
+        relationships: character.relationships || [],
+        avatar_image_url: character.avatar_image_url || null,
+        avatar_image_filename: character.avatar_image_filename || null,
+        uses_custom_image: character.uses_custom_image || false,
         ai_provider: character.ai_provider || 'openai',
         ai_model: character.ai_model || 'gpt-3.5-turbo',
         fallback_provider: character.fallback_provider || '',
@@ -177,17 +206,27 @@ const CharacterEditorV15 = ({
       setError('Character name is required');
       return false;
     }
-    
+
+    if (!formData.age || formData.age < 18) {
+      setError('Character must be 18 years or older');
+      return false;
+    }
+
     if (!formData.personality.trim()) {
       setError('Personality description is required');
       return false;
     }
-    
+
+    if (formData.personality.trim().length < 20) {
+      setError('Personality description must be at least 20 characters');
+      return false;
+    }
+
     if (!formData.ai_model) {
       setError('Please select an AI model');
       return false;
     }
-    
+
     return true;
   };
   
@@ -311,7 +350,127 @@ const CharacterEditorV15 = ({
                 className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400"
               />
             </div>
-            
+
+            {/* Age and Sex */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Age * (18+)
+                </label>
+                <input
+                  type="number"
+                  min="18"
+                  max="150"
+                  value={formData.age}
+                  onChange={(e) => handleInputChange('age', parseInt(e.target.value) || 18)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Sex/Gender
+                </label>
+                <select
+                  value={formData.sex}
+                  onChange={(e) => handleInputChange('sex', e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-400"
+                >
+                  <option value="" className="bg-gray-800">Prefer not to say</option>
+                  <option value="male" className="bg-gray-800">Male</option>
+                  <option value="female" className="bg-gray-800">Female</option>
+                  <option value="non-binary" className="bg-gray-800">Non-binary</option>
+                  <option value="other" className="bg-gray-800">Other</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Avatar and Color */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Avatar Emoji
+                </label>
+                <input
+                  type="text"
+                  value={formData.avatar}
+                  onChange={(e) => handleInputChange('avatar', e.target.value)}
+                  placeholder="🤖"
+                  maxLength={2}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white text-2xl text-center focus:outline-none focus:border-red-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Color Theme
+                </label>
+                <select
+                  value={formData.color}
+                  onChange={(e) => handleInputChange('color', e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-400"
+                >
+                  <option value="from-red-500 to-pink-500" className="bg-gray-800">Red/Pink</option>
+                  <option value="from-blue-500 to-indigo-500" className="bg-gray-800">Blue/Indigo</option>
+                  <option value="from-green-500 to-teal-500" className="bg-gray-800">Green/Teal</option>
+                  <option value="from-orange-500 to-red-500" className="bg-gray-800">Orange/Red</option>
+                  <option value="from-purple-500 to-pink-500" className="bg-gray-800">Purple/Pink</option>
+                  <option value="from-yellow-500 to-orange-500" className="bg-gray-800">Yellow/Orange</option>
+                  <option value="from-gray-500 to-slate-500" className="bg-gray-800">Gray/Slate</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Custom Avatar Image Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Custom Avatar Image (Optional)
+              </label>
+              <ImageUpload
+                currentImage={formData.avatar_image_url}
+                currentEmoji={formData.avatar}
+                onImageChange={(imageData) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    avatar_image_url: imageData.url,
+                    avatar_image_filename: imageData.filename,
+                    uses_custom_image: imageData.useCustomImage
+                  }));
+                }}
+                type="character"
+                aspectRatio="square"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Upload a custom avatar image or use the emoji above
+              </p>
+            </div>
+
+            {/* Appearance */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Appearance
+              </label>
+              <textarea
+                value={formData.appearance}
+                onChange={(e) => handleInputChange('appearance', e.target.value)}
+                placeholder="Physical description, style, notable features..."
+                rows={2}
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-none"
+              />
+            </div>
+
+            {/* Background */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Background/History
+              </label>
+              <textarea
+                value={formData.background}
+                onChange={(e) => handleInputChange('background', e.target.value)}
+                placeholder="Character backstory, history, life experiences..."
+                rows={3}
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-none"
+              />
+            </div>
+
             {/* Personality */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
