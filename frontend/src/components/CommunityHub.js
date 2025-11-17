@@ -4,19 +4,17 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Search, 
-  Download, 
-  Star, 
-  Eye, 
+import {
+  X,
+  Search,
+  Download,
+  Star,
+  Eye,
   TrendingUp,
   Clock,
   Users,
   Filter,
-  Heart,
-  Flag,
-  CheckCircle
+  Heart
 } from 'lucide-react';
 
 const CommunityHub = ({ onImport, onClose, apiRequest }) => {

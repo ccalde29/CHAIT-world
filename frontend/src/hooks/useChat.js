@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 
-export const useChat = (apiRequest, user) => {
+export const useChat = (apiRequest) => {
   // State
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
@@ -27,7 +27,7 @@ export const useChat = (apiRequest, user) => {
     setResponseTimeouts([]);
   };
 
-  const sendMessage = async (activeCharacters, currentScenario, groupDynamicsMode) => {
+  const sendMessage = async (activeCharacters, currentScenario, userPersona) => {
     if (!userInput.trim() || isGenerating || activeCharacters.length === 0) {
       return;
     }
@@ -49,15 +49,15 @@ export const useChat = (apiRequest, user) => {
     setMessages(prev => [...prev, newUserMessage]);
 
     try {
-      const response = await apiRequest('/api/chat/send', {
+      const response = await apiRequest('/api/chat/group-response', {
         method: 'POST',
         body: JSON.stringify({
-          message: userMessage,
+          userMessage: userMessage,
           activeCharacters: activeCharacters.map(c => c.id),
-          scenario: currentScenario,
+          currentScene: currentScenario,
           conversationHistory: messages,
-          groupMode: groupDynamicsMode,
-          sessionId: currentSessionId
+          sessionId: currentSessionId,
+          userPersona: userPersona?.persona || null
         })
       });
 
@@ -72,8 +72,9 @@ export const useChat = (apiRequest, user) => {
           setMessages(prev => [...prev, {
             id: Date.now() + index,
             type: 'character',
-            character: charResponse.characterId,
-            content: charResponse.message,
+            character: charResponse.character,
+            characterName: charResponse.characterName,
+            content: charResponse.response,
             timestamp: new Date()
           }]);
         }, charResponse.delay || 0);

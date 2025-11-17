@@ -3,13 +3,14 @@
 
 const express = require('express');
 const router = express.Router();
+const { uploadLimiter } = require('../middleware/rateLimiter');
 
 module.exports = (db) => {
     /**
      * Update character image
      * PUT /api/characters/:id/image
      */
-    router.put('/characters/:id/image', async (req, res) => {
+    router.put('/characters/:id/image', uploadLimiter, async (req, res) => {
         try {
             const { url, filename, useCustomImage } = req.body;
 
@@ -34,7 +35,7 @@ module.exports = (db) => {
      * Update user persona image
      * PUT /api/user/persona/image
      */
-    router.put('/user/persona/image', async (req, res) => {
+    router.put('/user/persona/image', uploadLimiter, async (req, res) => {
         try {
             const { url, filename, useCustomImage } = req.body;
 
@@ -59,7 +60,7 @@ module.exports = (db) => {
      * Update scenario image
      * PUT /api/scenarios/:id/image
      */
-    router.put('/scenarios/:id/image', async (req, res) => {
+    router.put('/scenarios/:id/image', uploadLimiter, async (req, res) => {
         try {
             const { url, filename, useCustomImage } = req.body;
 

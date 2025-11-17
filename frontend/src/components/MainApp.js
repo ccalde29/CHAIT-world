@@ -3,16 +3,19 @@
  * Uses custom hooks and modular components for better maintainability
  */
 
-import React, { useState, useRef } from 'react';
-import { Settings, Plus, Zap, User, LogOut, MessageCircle, Users } from 'lucide-react';
+import React, { useState, useRef, useMemo } from 'react';
+import { Settings, Plus, Zap, User, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../hooks/useChat';
 import { useCharacters } from '../hooks/useCharacters';
 import { useSettings } from '../hooks/useSettings';
+import { createApiClient } from '../utils/apiClient';
 
 // Components
 import ChatInterface from './ChatInterface';
-import CharacterPanel from './CharacterPanel';
+import ActiveChatPanel from './ActiveChatPanel';
+import NewChatModal from './NewChatModal';
+import CharacterSceneHub from './CharacterSceneHub';
 import SettingsModal from './SettingsModal';
 import CharacterEditor from './CharacterEditor';
 import SceneEditor from './SceneEditor';
@@ -21,47 +24,20 @@ import CharacterMemoryViewer from './CharacterMemoryViewer';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import CommunityHub from './CommunityHub';
 
-// API Configuration
-const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? process.env.REACT_APP_API_URL
-  : 'http://localhost:3001';
-
-if (process.env.NODE_ENV === 'production' && !API_BASE_URL) {
-  throw new Error('REACT_APP_API_URL environment variable must be set in production');
-}
-
 const MainApp = () => {
   const { user, signOut } = useAuth();
 
   // ============================================================================
-  // API REQUEST HELPER
+  // API CLIENT
   // ============================================================================
 
-  const apiRequest = async (endpoint, options = {}) => {
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        'user-id': user.id,
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  };
+  const apiRequest = useMemo(() => createApiClient(user.id), [user.id]);
 
   // ============================================================================
   // CUSTOM HOOKS
   // ============================================================================
 
-  const chat = useChat(apiRequest, user);
+  const chat = useChat(apiRequest);
   const charactersState = useCharacters(apiRequest);
   const settings = useSettings(apiRequest);
 
@@ -76,8 +52,12 @@ const MainApp = () => {
   const [showMemoryViewer, setShowMemoryViewer] = useState(false);
   const [showPersonaEditor, setShowPersonaEditor] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showChatHistory, setShowChatHistory] = useState(false);
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [showManagementHub, setShowManagementHub] = useState(true); // Show by default
+  const [chatHistoryCollapsed, setChatHistoryCollapsed] = useState(true); // Collapsed by default
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(true); // Collapsed by default
   const [editingCharacter, setEditingCharacter] = useState(null);
+  const [editingScene, setEditingScene] = useState(null);
   const [selectedCharacterForMemory, setSelectedCharacterForMemory] = useState(null);
 
   const userMenuRef = useRef(null);
@@ -86,11 +66,23 @@ const MainApp = () => {
   // HANDLERS
   // ============================================================================
 
+  const handleStartNewChat = (scene, characters) => {
+    // Set scene and characters
+    charactersState.setCurrentScenario(scene.id);
+    charactersState.setActiveCharacters(characters);
+
+    // Clear current chat
+    chat.clearChat();
+
+    // Close modal
+    setShowNewChatModal(false);
+  };
+
   const handleSendMessage = () => {
     chat.sendMessage(
       charactersState.activeCharacters,
       charactersState.currentScenario,
-      settings.groupDynamicsMode
+      settings.userPersona
     );
   };
 
@@ -133,6 +125,17 @@ const MainApp = () => {
     }
   };
 
+  const handleDeleteScene = async (sceneId) => {
+    try {
+      await apiRequest(`/api/scenarios/${sceneId}`, {
+        method: 'DELETE'
+      });
+      await charactersState.loadScenarios();
+    } catch (error) {
+      console.error('Error deleting scene:', error);
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -149,43 +152,50 @@ const MainApp = () => {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
-      {/* Chat History Sidebar */}
-      {showChatHistory && (
-        <ChatHistorySidebar
-          apiRequest={apiRequest}
-          onLoadSession={(sessionId) => {
-            chat.loadChatSession(sessionId);
-            setShowChatHistory(false);
+      {/* Leftmost - Chat History Sidebar (Always visible) */}
+      <ChatHistorySidebar
+        apiRequest={apiRequest}
+        currentSessionId={chat.currentSessionId}
+        onSessionSelect={(session) => {
+          chat.loadChatSession(session.id);
+        }}
+        onNewChat={() => {
+          chat.clearChat();
+        }}
+        characters={charactersState.characters}
+        isCollapsed={chatHistoryCollapsed}
+        onToggleCollapse={() => setChatHistoryCollapsed(!chatHistoryCollapsed)}
+      />
+
+      {/* Left Sidebar - Character/Scene Management Hub */}
+      {showManagementHub && (
+        <CharacterSceneHub
+          characters={charactersState.characters}
+          scenes={charactersState.scenarios}
+          onAddCharacter={() => {
+            setEditingCharacter(null);
+            setShowCharacterEditor(true);
           }}
-          onClose={() => setShowChatHistory(false)}
+          onEditCharacter={(character) => {
+            setEditingCharacter(character);
+            setShowCharacterEditor(true);
+          }}
+          onDeleteCharacter={handleDeleteCharacter}
+          onAddScene={() => {
+            setEditingScene(null);
+            setShowSceneEditor(true);
+          }}
+          onEditScene={(scene) => {
+            setEditingScene(scene);
+            setShowSceneEditor(true);
+          }}
+          onDeleteScene={handleDeleteScene}
+          onOpenMemoryViewer={(character) => {
+            setSelectedCharacterForMemory(character);
+            setShowMemoryViewer(true);
+          }}
         />
       )}
-
-      {/* Character Panel */}
-      <CharacterPanel
-        characters={filteredCharacters}
-        activeCharacters={charactersState.activeCharacters}
-        characterSort={charactersState.characterSort}
-        characterSearch={charactersState.characterSearch}
-        selectedTagFilter={charactersState.selectedTagFilter}
-        onToggleCharacter={charactersState.toggleCharacter}
-        onAddCharacter={() => {
-          setEditingCharacter(null);
-          setShowCharacterEditor(true);
-        }}
-        onEditCharacter={(character) => {
-          setEditingCharacter(character);
-          setShowCharacterEditor(true);
-        }}
-        onDeleteCharacter={handleDeleteCharacter}
-        onSortChange={charactersState.setCharacterSort}
-        onSearchChange={charactersState.setCharacterSearch}
-        onTagFilterChange={charactersState.setSelectedTagFilter}
-        onOpenMemoryViewer={(character) => {
-          setSelectedCharacterForMemory(character);
-          setShowMemoryViewer(true);
-        }}
-      />
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
@@ -200,27 +210,30 @@ const MainApp = () => {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowChatHistory(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              title="Chat History"
+              onClick={() => setShowNewChatModal(true)}
+              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 rounded-lg transition-all font-medium flex items-center gap-2"
+              title="Start New Chat"
             >
-              <MessageCircle size={20} />
+              <Plus size={18} />
+              New Chat
             </button>
 
             <button
-              onClick={() => setShowSceneEditor(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              title="Scenes"
+              onClick={() => setShowManagementHub(!showManagementHub)}
+              className={`p-2 rounded-lg transition-colors ${
+                showManagementHub ? 'bg-purple-500 text-white' : 'hover:bg-white/10'
+              }`}
+              title="Toggle Management Hub"
             >
-              <Zap size={20} />
+              <Users size={20} />
             </button>
 
             <button
               onClick={() => setShowCommunityHub(true)}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              title="Community"
+              title="Community Hub"
             >
-              <Users size={20} />
+              <Zap size={20} />
             </button>
 
             <button
@@ -285,7 +298,29 @@ const MainApp = () => {
         />
       </div>
 
+      {/* Active Chat Panel (Right Sidebar) */}
+      <ActiveChatPanel
+        currentScene={charactersState.findScenarioById(charactersState.currentScenario)}
+        activeCharacters={charactersState.activeCharacters}
+        onRemoveCharacter={(character) => {
+          charactersState.setActiveCharacters(prev => prev.filter(c => c.id !== character.id));
+        }}
+        onChangeScene={() => setShowNewChatModal(true)}
+        isCollapsed={rightPanelCollapsed}
+        onToggleCollapse={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+      />
+
       {/* Modals */}
+      {showNewChatModal && (
+        <NewChatModal
+          scenes={charactersState.scenarios}
+          characters={charactersState.characters}
+          onStart={handleStartNewChat}
+          onClose={() => setShowNewChatModal(false)}
+        />
+      )}
+
+      {/* Other Modals */}
       {showSettings && (
         <SettingsModal
           currentSettings={settings.userSettings}
@@ -338,6 +373,7 @@ const MainApp = () => {
       {showCommunityHub && (
         <CommunityHub
           apiRequest={apiRequest}
+          userCharacters={charactersState.characters}
           onImport={async () => {
             await charactersState.loadCharacters();
             setShowCommunityHub(false);

@@ -28,6 +28,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
   });
   const [validationErrors, setValidationErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
   // Scene templates for inspiration
   const sceneTemplates = [
@@ -126,9 +127,10 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
 
   const handleSave = async () => {
     if (!validateForm()) return;
-    
+
     setSaving(true);
-    
+    setError(null);
+
     try {
       const sceneData = {
         ...formData,
@@ -137,17 +139,18 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
         context: formData.context.trim(),
         atmosphere: formData.atmosphere.trim() || 'neutral'
       };
-      
+
       if (editingScene) {
         sceneData.id = editingScene.id;
       }
-      
+
       await onSave(sceneData);
       resetForm();
       setShowCreateForm(false);
       setEditingScene(null);
     } catch (error) {
       console.error('Failed to save scene:', error);
+      setError(error.message || 'Failed to save scene. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -303,12 +306,20 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
                     setShowCreateForm(false);
                     setEditingScene(null);
                     resetForm();
+                    setError(null);
                   }}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
                   Back to List
                 </button>
               </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4">
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              )}
 
               {/* Scene Preview with Background */}
               <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">

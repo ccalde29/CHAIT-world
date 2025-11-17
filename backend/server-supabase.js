@@ -9,6 +9,7 @@ const cors = require('cors');
 const DatabaseService = require('./services/database');
 const CharacterService = require('./services/characterService');
 const CommunityService = require('./services/communityService');
+const { generalLimiter } = require('./middleware/rateLimiter');
 require('dotenv').config();
 
 const app = express();
@@ -32,6 +33,9 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '10mb' }));
+
+// Apply general rate limiting to all API routes
+app.use('/api', generalLimiter);
 
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);

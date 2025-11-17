@@ -3,6 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
+const { STRING_LIMITS } = require('../constants/defaults');
 
 module.exports = (db) => {
     /**
@@ -59,9 +60,28 @@ module.exports = (db) => {
         try {
             const { name, personality, interests, communication_style, avatar, color } = req.body;
 
+            // Validation
             if (!name || !personality) {
                 return res.status(400).json({
                     error: 'Name and personality are required fields'
+                });
+            }
+
+            if (name.trim().length === 0 || name.trim().length > 50) {
+                return res.status(400).json({
+                    error: 'Name must be between 1 and 50 characters'
+                });
+            }
+
+            if (personality.trim().length === 0) {
+                return res.status(400).json({
+                    error: 'Personality cannot be empty'
+                });
+            }
+
+            if (personality.length > STRING_LIMITS.USER_PERSONA_PERSONALITY_MAX) {
+                return res.status(400).json({
+                    error: `Personality must be ${STRING_LIMITS.USER_PERSONA_PERSONALITY_MAX} characters or less`
                 });
             }
 

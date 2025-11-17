@@ -453,7 +453,7 @@ const CharacterEditorV15 = ({
                 onChange={(e) => handleInputChange('appearance', e.target.value)}
                 placeholder="Physical description, style, notable features..."
                 rows={2}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-none"
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[60px]"
               />
             </div>
 
@@ -467,7 +467,7 @@ const CharacterEditorV15 = ({
                 onChange={(e) => handleInputChange('background', e.target.value)}
                 placeholder="Character backstory, history, life experiences..."
                 rows={3}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-none"
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[80px]"
               />
             </div>
 
@@ -481,7 +481,7 @@ const CharacterEditorV15 = ({
                 onChange={(e) => handleInputChange('personality', e.target.value)}
                 placeholder="Describe who this character is, their personality traits, background, speaking style, interests, etc."
                 rows={6}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-none"
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[140px]"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Be specific! This shapes how the character thinks and responds.

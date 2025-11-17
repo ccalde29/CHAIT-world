@@ -9,6 +9,7 @@ const { createClient } = require('@supabase/supabase-js');
 const AIProviderService = require('../services/AIProviderService');
 const MoodEngine = require('../services/MoodEngine');
 const SpeakingQueue = require('../services/SpeakingQueue');
+const { aiCallLimiter } = require('../middleware/rateLimiter');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -19,7 +20,7 @@ const supabase = createClient(
  * POST /api/chat/group-response-v15
  * Enhanced group chat with mood system and multi-pass generation
  */
-router.post('/group-response', async (req, res) => {
+router.post('/group-response', aiCallLimiter, async (req, res) => {
   try {
     const {
       userMessage,
@@ -83,12 +84,25 @@ router.post('/group-response', async (req, res) => {
     // ========================================================================
     // STEP 3: LOAD SESSION STATES AND CONTEXT
     // ========================================================================
-    
-    const [sessionStates, topicEngagements, relationships] = await Promise.all([
+
+    const results = await Promise.allSettled([
       SpeakingQueue.getSessionStates(activeCharacters, sessionId, userId, supabase),
       SpeakingQueue.getTopicEngagements(activeCharacters, userId, supabase),
       SpeakingQueue.getRelationships(activeCharacters, userId, supabase)
     ]);
+
+    // Handle results with fallbacks
+    const sessionStates = results[0].status === 'fulfilled' ? results[0].value : [];
+    const topicEngagements = results[1].status === 'fulfilled' ? results[1].value : [];
+    const relationships = results[2].status === 'fulfilled' ? results[2].value : [];
+
+    // Log any failures (but don't block the request)
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        const labels = ['session states', 'topic engagements', 'relationships'];
+        console.error(`Failed to load ${labels[index]}:`, result.reason);
+      }
+    });
     
     // ========================================================================
     // STEP 4: UPDATE CHARACTER MOODS BASED ON USER MESSAGE

@@ -16,19 +16,20 @@ import {
   X
 } from 'lucide-react';
 
-const ChatHistorySidebar = ({ 
-  apiRequest, 
-  currentSessionId, 
-  onSessionSelect, 
+const ChatHistorySidebar = ({
+  apiRequest,
+  currentSessionId,
+  onSessionSelect,
   onNewChat,
   characters,
-  onHistoryUpdate // Add this prop to trigger updates from parent
+  onHistoryUpdate, // Add this prop to trigger updates from parent
+  isCollapsed = false, // Accept collapse state from parent
+  onToggleCollapse // Accept toggle function from parent
 }) => {
   const [chatSessions, setChatSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [deletingSessionId, setDeletingSessionId] = useState(null);
 
   // Load chat history
@@ -191,18 +192,13 @@ const ChatHistorySidebar = ({
     }
   }, [onHistoryUpdate]);
 
-  // Toggle collapse
-  const toggleCollapse = () => {
-    setIsCollapsed(!isCollapsed);
-  };
-
   return (
     <>
       {/* Collapsed View - Thin Bar */}
       {isCollapsed && (
         <div className="w-12 bg-black/20 backdrop-blur-sm border-r border-white/10 flex flex-col items-center py-4">
           <button
-            onClick={toggleCollapse}
+            onClick={onToggleCollapse}
             className="p-2 text-gray-400 hover:text-white transition-colors mb-4"
             title="Expand chat history"
           >
@@ -254,9 +250,9 @@ const ChatHistorySidebar = ({
                   <Plus size={16} />
                   New
                 </button>
-                
+
                 <button
-                  onClick={toggleCollapse}
+                  onClick={onToggleCollapse}
                   className="p-1.5 text-gray-400 hover:text-white transition-colors"
                   title="Collapse sidebar"
                 >

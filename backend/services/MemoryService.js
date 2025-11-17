@@ -274,16 +274,17 @@ class MemoryService {
 
                 console.log(' Found memory:', memoryContent);
             }
-            // If no patterns matched but message is substantial, create a general memory
-            if (memories.length === 0 && userMessage.length > 75) {
-              memories.push({
+        });
+
+        // If no patterns matched but message is substantial, create a general memory
+        if (memories.length === 0 && userMessage.length > 75) {
+            memories.push({
                 type: 'conversation',
                 content: `Discussed: ${userMessage.substring(0, 100)}`,
                 importance_score: 0.2,
                 target_entity: userId
-              });
-            }
-        });
+            });
+        }
 
         // Boost importance if character showed understanding
         const showsUnderstanding = /i understand|that makes sense|i can see|i hear you/i.test(characterResponse);
