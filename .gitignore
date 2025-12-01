@@ -118,3 +118,5 @@ screenshots/
 backend/.env
 frontend/.env
 .env.*
+supabase/config.toml
+supabase/migrations/20251119152345_remote_schema.sql
