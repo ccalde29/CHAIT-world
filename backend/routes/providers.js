@@ -14,29 +14,35 @@ const AIProviderService = require('../services/AIProviderService');
  */
 router.post('/test', async (req, res) => {
   try {
-    const { provider, apiKey, ollamaSettings } = req.body;
-    
+    const { provider, apiKey, ollamaSettings, model } = req.body;
+
     if (!provider) {
       return res.status(400).json({ error: 'Provider is required' });
     }
-    
-    // For Ollama, we don't need an API key
+
+    // For Ollama, we don't need an API key but we need a model
     if (provider.toLowerCase() === 'ollama') {
-      const result = await AIProviderService.testApiKey(provider, null, ollamaSettings);
+      if (!model) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please specify an Ollama model to test'
+        });
+      }
+      const result = await AIProviderService.testApiKey(provider, null, ollamaSettings, model);
       return res.json(result);
     }
-    
+
     if (!apiKey) {
       return res.status(400).json({ error: 'API key is required' });
     }
-    
-    const result = await AIProviderService.testApiKey(provider, apiKey, ollamaSettings);
+
+    const result = await AIProviderService.testApiKey(provider, apiKey, ollamaSettings, model);
     res.json(result);
-    
+
   } catch (error) {
     console.error('Error testing API key:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Failed to test API key',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });

@@ -279,8 +279,19 @@ class CommunityService {
 
       if (validationError) throw validationError;
 
-      if (!validation[0].is_valid) {
-        throw new Error(validation[0].error_message);
+      // RPC may return a single object or an array; handle both shapes
+      const validationResult = Array.isArray(validation) ? validation[0] : validation;
+
+      if (!validationResult) {
+        console.error('Publish validation returned no result for', characterId);
+        throw new Error('Publish validation returned no result');
+      }
+
+      console.log('Publish validation result for', characterId, validationResult);
+
+      if (!validationResult.is_valid) {
+        console.error('Publish validation failed for', characterId, validationResult);
+        throw new Error(validationResult.error_message || 'Character failed validation');
       }
 
       // Update character to public
@@ -296,7 +307,15 @@ class CommunityService {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating character publish state:', error);
+        throw error;
+      }
+      console.log('Publish update result for', characterId, data);
+      if (!data) {
+        console.error('Publish update returned no data for', characterId);
+        throw new Error('Character not found or you are not the owner');
+      }
       return data;
     } catch (error) {
       console.error('Error publishing character:', error);
@@ -321,6 +340,9 @@ class CommunityService {
         .single();
 
       if (error) throw error;
+      if (!data) {
+        throw new Error('Character not found or you are not the owner');
+      }
       return data;
     } catch (error) {
       console.error('Error unpublishing character:', error);

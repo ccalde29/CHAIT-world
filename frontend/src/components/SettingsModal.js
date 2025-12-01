@@ -23,6 +23,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
     
     // Ollama settings
     ollamaUrl: 'http://localhost:11434',
+    ollamaTestModel: 'llama2',
     
     // Group dynamics
     groupDynamicsMode: 'natural',
@@ -134,17 +135,24 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
       }
       
       // Test the key
+      const requestBody = {
+        provider,
+        apiKey,
+        ollamaSettings
+      };
+
+      // For Ollama, send the user-specified model to test
+      if (provider === 'ollama') {
+        requestBody.model = formData.ollamaTestModel || 'llama2';
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/providers/test`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'user-id': user.id
         },
-        body: JSON.stringify({
-          provider,
-          apiKey,
-          ollamaSettings
-        })
+        body: JSON.stringify(requestBody)
       });
       
       const result = await response.json();
@@ -334,44 +342,60 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
               <div className="pt-4 border-t border-white/10">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-300">
-                    Ollama URL (Local Models)
+                    Ollama (Local Models)
                   </label>
                   {keyStatus.ollama && (
                     <span className={`text-xs px-2 py-1 rounded ${
-                      keyStatus.ollama.success 
-                        ? 'text-green-400 bg-green-400/20' 
+                      keyStatus.ollama.success
+                        ? 'text-green-400 bg-green-400/20'
                         : 'text-red-400 bg-red-400/20'
                     }`}>
                       {keyStatus.ollama.success ? '✓ Connected' : '✗ Offline'}
                     </span>
                   )}
                 </div>
-                
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={formData.ollamaUrl}
-                    onChange={(e) => handleInputChange('ollamaUrl', e.target.value)}
-                    placeholder="http://localhost:11434"
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400"
-                  />
-                  
+
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-gray-400 mb-1 block">Server URL</label>
+                      <input
+                        type="text"
+                        value={formData.ollamaUrl}
+                        onChange={(e) => handleInputChange('ollamaUrl', e.target.value)}
+                        placeholder="http://localhost:11434"
+                        className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400"
+                      />
+                    </div>
+
+                    <div className="flex-1">
+                      <label className="text-xs text-gray-400 mb-1 block">Model to Test</label>
+                      <input
+                        type="text"
+                        value={formData.ollamaTestModel}
+                        onChange={(e) => handleInputChange('ollamaTestModel', e.target.value)}
+                        placeholder="llama2"
+                        className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400"
+                      />
+                    </div>
+                  </div>
+
                   <button
                     onClick={() => testApiKey('ollama')}
                     disabled={testingKey === 'ollama'}
-                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {testingKey === 'ollama' ? (
                       <>
                         <Loader size={16} className="animate-spin" />
-                        Testing...
+                        Testing connection to {formData.ollamaTestModel}...
                       </>
                     ) : (
-                      'Test'
+                      'Test Connection'
                     )}
                   </button>
                 </div>
-                
+
                 <p className="text-xs text-gray-500 mt-2">
                   Run models locally with Ollama. <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer" className="text-red-400 hover:underline">Learn more</a>
                 </p>

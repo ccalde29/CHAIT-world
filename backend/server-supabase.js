@@ -6,11 +6,12 @@
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const DatabaseService = require('./services/database');
 const CharacterService = require('./services/characterService');
 const CommunityService = require('./services/communityService');
 const { generalLimiter } = require('./middleware/rateLimiter');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,6 +31,12 @@ const communityService = new CommunityService(db.supabase);
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
   credentials: true
+}));
+// Ensure custom auth header names are allowed through CORS preflight
+app.options('*', cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'user-id', 'x-user-id']
 }));
 
 app.use(express.json({ limit: '10mb' }));

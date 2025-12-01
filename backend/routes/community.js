@@ -57,6 +57,11 @@ module.exports = (communityService, characterService) => {
      */
     router.post('/characters/:id/import', async (req, res) => {
         try {
+            if (!req.userId) {
+                console.warn('Import called without req.userId. Request headers:', req.headers);
+                return res.status(401).json({ error: 'Authentication required' });
+            }
+
             const character = await communityService.importCharacter(
                 req.userId,
                 req.params.id
@@ -89,9 +94,15 @@ module.exports = (communityService, characterService) => {
     /**
      * Publish character to community
      * POST /api/characters/:id/publish
+     * POST /api/community/publish/:id (legacy)
      */
-    router.post('/publish/:id', async (req, res) => {
+    // Preferred path: /:id/publish (matches frontend & README)
+    router.post('/:id/publish', async (req, res) => {
         try {
+            if (!req.userId) {
+                console.warn('Publish called without req.userId. Request headers:', req.headers);
+                return res.status(401).json({ error: 'Authentication required' });
+            }
             // Get character
             const { characters } = await characterService.getCharacters(req.userId);
             const character = characters.find(c => c.id === req.params.id);
@@ -116,12 +127,55 @@ module.exports = (communityService, characterService) => {
             );
 
             res.json({
-                ...published,
+                ...(published || {}),
                 message: 'Character published to community'
             });
 
         } catch (error) {
             console.error('Error publishing character:', error);
+            // If validation or user error, surface as 400 so frontend can show the message
+            if (error && (error.message && (error.message.includes('Character') || error.message.includes('validation') || error.message.includes('required')))) {
+                return res.status(400).json({ error: error.message });
+            }
+            res.status(500).json({ error: 'Failed to publish character' });
+        }
+    });
+
+    // Legacy path kept for backward compatibility
+    router.post('/publish/:id', async (req, res) => {
+        try {
+            if (!req.userId) {
+                console.warn('Legacy publish called without req.userId. Request headers:', req.headers);
+                return res.status(401).json({ error: 'Authentication required' });
+            }
+            // Delegate to the preferred route logic above
+            const { characters } = await characterService.getCharacters(req.userId);
+            const character = characters.find(c => c.id === req.params.id);
+
+            if (!character) {
+                return res.status(404).json({ error: 'Character not found' });
+            }
+
+            const validation = profanityFilter.validateCharacterContent(character);
+            if (!validation.valid) {
+                return res.status(400).json({
+                    error: 'Character contains inappropriate content',
+                    details: validation.errors
+                });
+            }
+
+            const published = await communityService.publishCharacter(
+                req.userId,
+                req.params.id
+            );
+
+            res.json({
+                ...(published || {}),
+                message: 'Character published to community'
+            });
+
+        } catch (error) {
+            console.error('Error publishing character (legacy):', error);
             res.status(500).json({ error: 'Failed to publish character' });
         }
     });
@@ -130,8 +184,13 @@ module.exports = (communityService, characterService) => {
      * Unpublish character from community
      * POST /api/characters/:id/unpublish
      */
-    router.post('/unpublish/:id', async (req, res) => {
+    // Preferred path: /:id/unpublish
+    router.post('/:id/unpublish', async (req, res) => {
         try {
+            if (!req.userId) {
+                console.warn('Unpublish called without req.userId. Request headers:', req.headers);
+                return res.status(401).json({ error: 'Authentication required' });
+            }
             const character = await communityService.unpublishCharacter(
                 req.userId,
                 req.params.id
@@ -143,6 +202,28 @@ module.exports = (communityService, characterService) => {
             });
         } catch (error) {
             console.error('Error unpublishing character:', error);
+            res.status(500).json({ error: 'Failed to unpublish character' });
+        }
+    });
+
+    // Legacy path for backward compatibility
+    router.post('/unpublish/:id', async (req, res) => {
+        try {
+            if (!req.userId) {
+                console.warn('Legacy unpublish called without req.userId. Request headers:', req.headers);
+                return res.status(401).json({ error: 'Authentication required' });
+            }
+            const character = await communityService.unpublishCharacter(
+                req.userId,
+                req.params.id
+            );
+
+            res.json({
+                ...character,
+                message: 'Character removed from community'
+            });
+        } catch (error) {
+            console.error('Error unpublishing character (legacy):', error);
             res.status(500).json({ error: 'Failed to unpublish character' });
         }
     });

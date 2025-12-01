@@ -17,6 +17,7 @@ export const createApiClient = (userId) => {
       headers: {
         'Content-Type': 'application/json',
         'user-id': userId,
+        'x-user-id': userId,
         ...options.headers,
       },
       ...options,

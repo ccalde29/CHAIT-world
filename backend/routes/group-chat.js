@@ -15,6 +15,8 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+const MemoryService = require('../services/MemoryService');
+const memoryService = new MemoryService(supabase);
 
 /**
  * POST /api/chat/group-response-v15
@@ -32,13 +34,55 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     } = req.body;
     
     const userId = req.headers['user-id'];
-    
+
     if (!userId || !userMessage || !activeCharacters || activeCharacters.length === 0) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    
+
     console.log(`[Group Chat v1.5] Processing for ${activeCharacters.length} characters`);
-    
+
+    // ========================================================================
+    // STEP 0: CREATE OR USE EXISTING SESSION
+    // ========================================================================
+
+    let activeSessionId = sessionId;
+
+    // If no session provided, create a new one
+    if (!activeSessionId) {
+      const { data: newSession, error: sessionError } = await supabase
+        .from('chat_sessions')
+        .insert({
+          user_id: userId,
+          scenario_id: currentScene || 'default',
+          active_characters: activeCharacters,
+          title: currentScene ? `Chat in ${currentScene}` : 'New Chat',
+          group_mode: 'natural'
+        })
+        .select()
+        .single();
+
+      if (sessionError) {
+        console.error('[Session] Error creating session:', sessionError);
+        return res.status(500).json({ error: 'Failed to create chat session' });
+      }
+
+      activeSessionId = newSession.id;
+      console.log(`[Session] Created new session: ${activeSessionId}`);
+    } else {
+      console.log(`[Session] Using existing session: ${activeSessionId}`);
+    }
+
+    // Save user message to database
+    await supabase
+      .from('messages')
+      .insert({
+        session_id: activeSessionId,
+        type: 'user',
+        content: userMessage
+      });
+
+    console.log(`[Session] Saved user message to session ${activeSessionId}`);
+
     // ========================================================================
     // STEP 1: LOAD CHARACTER DATA
     // ========================================================================
@@ -86,7 +130,7 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     // ========================================================================
 
     const results = await Promise.allSettled([
-      SpeakingQueue.getSessionStates(activeCharacters, sessionId, userId, supabase),
+      SpeakingQueue.getSessionStates(activeCharacters, activeSessionId, userId, supabase),
       SpeakingQueue.getTopicEngagements(activeCharacters, userId, supabase),
       SpeakingQueue.getRelationships(activeCharacters, userId, supabase)
     ]);
@@ -130,7 +174,7 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       // Save to database
       await supabase.rpc('upsert_character_mood', {
         p_character_id: character.id,
-        p_session_id: sessionId,
+        p_session_id: activeSessionId,
         p_user_id: userId,
         p_mood: newMoodState.mood,
         p_intensity: newMoodState.intensity
@@ -144,7 +188,7 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       } else {
         sessionStates.push({
           character_id: character.id,
-          session_id: sessionId,
+          session_id: activeSessionId,
           user_id: userId,
           current_mood: newMoodState.mood,
           mood_intensity: newMoodState.intensity,
@@ -207,10 +251,9 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       const { data: savedMessage } = await supabase
         .from('messages')
         .insert({
-          session_id: sessionId,
-          user_id: userId,
+          session_id: activeSessionId,
           type: 'character',
-          character: primaryChar.id,
+          character_id: primaryChar.id,
           content: response,
           mood_at_time: primaryState.current_mood,
           mood_intensity: primaryState.mood_intensity,
@@ -231,8 +274,33 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       });
       
       // Update session state
-      await SpeakingQueue.updateSessionState(primaryChar.id, sessionId, userId, supabase);
+      await SpeakingQueue.updateSessionState(primaryChar.id, activeSessionId, userId, supabase);
       await SpeakingQueue.updateTopicEngagement(primaryChar.id, userId, userMessage, supabase);
+
+      // Persist memories and relationships for primary response
+      try {
+        const newMemories = memoryService.analyzeConversationForMemories(
+          userMessage,
+          response,
+          userPersona,
+          userId
+        );
+
+        for (const mem of newMemories) {
+          await memoryService.addCharacterMemory(primaryChar.id, userId, mem);
+        }
+
+        const currentRelationship = await memoryService.getCharacterRelationship(primaryChar.id, userId);
+        const relationshipUpdate = memoryService.calculateRelationshipUpdate(
+          currentRelationship,
+          userMessage,
+          response
+        );
+
+        await memoryService.updateCharacterRelationship(primaryChar.id, userId, relationshipUpdate);
+      } catch (memErr) {
+        console.error('[Memory] Error processing primary character memories:', memErr);
+      }
       
       console.log(`[Primary] ${primaryChar.name}: "${response}"`);
       
@@ -296,10 +364,9 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           await supabase
             .from('messages')
             .insert({
-              session_id: sessionId,
-              user_id: userId,
+              session_id: activeSessionId,
               type: 'character',
-              character: char.id,
+              character_id: char.id,
               content: response,
               mood_at_time: state.current_mood,
               mood_intensity: state.mood_intensity,
@@ -307,8 +374,33 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
             });
           
           // Update session state
-          await SpeakingQueue.updateSessionState(char.id, sessionId, userId, supabase);
+          await SpeakingQueue.updateSessionState(char.id, activeSessionId, userId, supabase);
           await SpeakingQueue.updateTopicEngagement(char.id, userId, userMessage, supabase);
+
+          // Persist memories and relationships for secondary response
+          try {
+            const newMemories = memoryService.analyzeConversationForMemories(
+              userMessage,
+              response,
+              userPersona,
+              userId
+            );
+
+            for (const mem of newMemories) {
+              await memoryService.addCharacterMemory(char.id, userId, mem);
+            }
+
+            const currentRelationship = await memoryService.getCharacterRelationship(char.id, userId);
+            const relationshipUpdate = memoryService.calculateRelationshipUpdate(
+              currentRelationship,
+              userMessage,
+              response
+            );
+
+            await memoryService.updateCharacterRelationship(char.id, userId, relationshipUpdate);
+          } catch (memErr) {
+            console.error(`[Memory] Error processing secondary memories for ${char.name}:`, memErr);
+          }
           
           console.log(`[Secondary] ${char.name}: "${response}"`);
           
@@ -342,8 +434,9 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     // ========================================================================
     
     console.log(`[Group Chat v1.5] Generated ${responses.length} responses`);
-    
+
     res.json({
+      sessionId: activeSessionId,
       responses,
       queue: {
         primary: queue.primary.character.name,
@@ -373,9 +466,11 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 function buildSystemPrompt(character, userPersona, currentScene, moodPrompt) {
   let prompt = `You are ${character.name}.\n\n`;
   prompt += `PERSONALITY & BACKGROUND:\n${character.personality}\n\n`;
-  
+
   if (userPersona) {
-    prompt += `USER PERSONA:\n${userPersona.description}\n\n`;
+    const personaDescription = userPersona.personality || userPersona.description || '';
+    const personaName = userPersona.name || 'the user';
+    prompt += `USER PERSONA:\nYou are talking to ${personaName}. ${personaDescription}\n\n`;
   }
   
   if (currentScene) {

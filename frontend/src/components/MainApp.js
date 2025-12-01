@@ -125,6 +125,46 @@ const MainApp = () => {
     }
   };
 
+  const handlePublishCharacter = async (characterId) => {
+    try {
+      const data = await apiRequest(`/api/characters/${characterId}/publish`, {
+        method: 'POST'
+      });
+
+      // Update local character state with returned published data if present
+      if (data) {
+        charactersState.setCharacters(prev => prev.map(c => c.id === characterId ? { ...c, ...data } : c));
+      } else {
+        charactersState.setCharacters(prev => prev.map(c => c.id === characterId ? { ...c, is_public: true } : c));
+      }
+
+      window.alert(data?.message || 'Character published to community');
+    } catch (error) {
+      console.error('Error publishing character:', error);
+      window.alert('Failed to publish character: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  const handleUnpublishCharacter = async (characterId) => {
+    try {
+      const data = await apiRequest(`/api/characters/${characterId}/unpublish`, {
+        method: 'POST'
+      });
+
+      // Update local character state with returned data if present
+      if (data) {
+        charactersState.setCharacters(prev => prev.map(c => c.id === characterId ? { ...c, ...data } : c));
+      } else {
+        charactersState.setCharacters(prev => prev.map(c => c.id === characterId ? { ...c, is_public: false } : c));
+      }
+
+      window.alert(data?.message || 'Character unpublished from community');
+    } catch (error) {
+      console.error('Error unpublishing character:', error);
+      window.alert('Failed to unpublish character: ' + (error.message || 'Unknown error'));
+    }
+  };
+
   const handleDeleteScene = async (sceneId) => {
     try {
       await apiRequest(`/api/scenarios/${sceneId}`, {
@@ -194,6 +234,8 @@ const MainApp = () => {
             setSelectedCharacterForMemory(character);
             setShowMemoryViewer(true);
           }}
+          onPublishCharacter={handlePublishCharacter}
+          onUnpublishCharacter={handleUnpublishCharacter}
         />
       )}
 
@@ -323,7 +365,8 @@ const MainApp = () => {
       {/* Other Modals */}
       {showSettings && (
         <SettingsModal
-          currentSettings={settings.userSettings}
+          user={user}
+          settings={settings.userSettings}
           onSave={settings.saveUserSettings}
           onClose={() => setShowSettings(false)}
         />

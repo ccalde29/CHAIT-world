@@ -187,7 +187,7 @@ class AIProviderService {
     if (!apiKey) {
       throw new Error('Google API key not configured');
     }
-    
+
     // Convert to Gemini format
     const contents = messages
       .filter(m => m.role !== 'system')
@@ -195,7 +195,7 @@ class AIProviderService {
         role: m.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: m.content }]
       }));
-    
+
     // Add system message as first user message if exists
     const systemMessage = messages.find(m => m.role === 'system');
     if (systemMessage) {
@@ -204,7 +204,16 @@ class AIProviderService {
         parts: [{ text: `System instructions: ${systemMessage.content}` }]
       });
     }
-    
+
+    // Ensure alternating user/model messages (Gemini requirement)
+    // If first message is not 'user', add a dummy user message
+    if (contents.length > 0 && contents[0].role !== 'user') {
+      contents.unshift({
+        role: 'user',
+        parts: [{ text: 'Hello' }]
+      });
+    }
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
@@ -221,13 +230,22 @@ class AIProviderService {
         })
       }
     );
-    
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.error?.message || `Gemini API error: ${response.status}`);
+      const errorMessage = error.error?.message || `Gemini API error: ${response.status}`;
+      console.error('Gemini API Error:', errorMessage, error);
+      throw new Error(errorMessage);
     }
-    
+
     const data = await response.json();
+
+    // Validate response structure
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      console.error('Invalid Gemini response structure:', data);
+      throw new Error('Invalid response from Gemini API');
+    }
+
     return data.candidates[0].content.parts[0].text.trim();
   }
   
@@ -275,29 +293,29 @@ class AIProviderService {
   /**
    * Test API key validity for a provider
    */
-  static async testApiKey(provider, apiKey, ollamaSettings = {}) {
+  static async testApiKey(provider, apiKey, ollamaSettings = {}, model = null) {
     try {
       const testMessages = [
         { role: 'system', content: 'You are a test assistant.' },
         { role: 'user', content: 'Say "OK" if you can read this.' }
       ];
-      
+
       const testCharacter = {
         ai_provider: provider,
-        ai_model: this.getDefaultModel(provider),
+        ai_model: model || this.getDefaultModel(provider),
         temperature: 0.7,
         max_tokens: 10
       };
-      
+
       const response = await this.generateResponse(
         testCharacter,
         testMessages,
         { [provider]: apiKey },
         ollamaSettings
       );
-      
+
       return { success: true, message: 'API key is valid', response };
-      
+
     } catch (error) {
       return { success: false, message: error.message };
     }
@@ -308,14 +326,14 @@ class AIProviderService {
    */
   static getDefaultModel(provider) {
     const defaults = {
-      'openai': 'gpt-3.5-turbo',
-      'anthropic': 'claude-3-haiku-20240307',
-      'openrouter': 'openai/gpt-3.5-turbo',
-      'google': 'gemini-2.5-pro',
-      'ollama': 'mtaylor91/l3-stheno-maid-blackroot:8b'
+      'openai': 'gpt-4o-mini',
+      'anthropic': 'claude-3-5-haiku-20241022',
+      'openrouter': 'openai/gpt-4o-mini',
+      'google': 'gemini-1.5-flash-latest',
+      'ollama': 'llama2'
     };
-    
-    return defaults[provider.toLowerCase()] || 'gpt-3.5-turbo';
+
+    return defaults[provider.toLowerCase()] || 'gpt-4o-mini';
   }
   
   /**
@@ -349,20 +367,74 @@ class AIProviderService {
   }
   
   static async getOpenAIModels(apiKey) {
-    const response = await fetch('https://api.openai.com/v1/models', {
-      headers: { 'Authorization': `Bearer ${apiKey}` }
-    });
-    
-    if (!response.ok) return [];
-    
-    const data = await response.json();
-    return data.data
-      .filter(m => m.id.includes('gpt'))
-      .map(m => ({ id: m.id, name: m.id }));
+    // If no API key, return static list of common models
+    if (!apiKey) {
+      return [
+        { id: 'gpt-4o', name: 'GPT-4o (Latest)' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+        { id: 'gpt-4', name: 'GPT-4' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+      ];
+    }
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+
+      if (!response.ok) {
+        // Return static list if API call fails
+        return [
+          { id: 'gpt-4o', name: 'GPT-4o (Latest)' },
+          { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+          { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+          { id: 'gpt-4', name: 'GPT-4' },
+          { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+        ];
+      }
+
+      const data = await response.json();
+      const gptModels = data.data
+        .filter(m => m.id.includes('gpt'))
+        .sort((a, b) => {
+          // Sort by version (4 before 3.5)
+          if (a.id.includes('gpt-4') && !b.id.includes('gpt-4')) return -1;
+          if (!a.id.includes('gpt-4') && b.id.includes('gpt-4')) return 1;
+          return a.id.localeCompare(b.id);
+        })
+        .map(m => ({ id: m.id, name: m.id }));
+
+      // If we got models from API, return them
+      if (gptModels.length > 0) {
+        return gptModels;
+      }
+
+      // Otherwise return static list
+      return [
+        { id: 'gpt-4o', name: 'GPT-4o (Latest)' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+        { id: 'gpt-4', name: 'GPT-4' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+      ];
+    } catch (error) {
+      console.error('Error fetching OpenAI models:', error);
+      // Return static list on error
+      return [
+        { id: 'gpt-4o', name: 'GPT-4o (Latest)' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+        { id: 'gpt-4', name: 'GPT-4' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+      ];
+    }
   }
   
   static getAnthropicModels() {
     return [
+      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Latest)' },
+      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' },
       { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
       { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
       { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' }
@@ -382,11 +454,11 @@ class AIProviderService {
   
   static getGeminiModels() {
     return [
-        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Latest)' },
-        { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-        { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
-        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
-        { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' }
+      { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Experimental)' },
+      { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash (Latest)' },
+      { id: 'gemini-1.5-flash-8b-latest', name: 'Gemini 1.5 Flash-8B (Latest)' },
+      { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Latest)' },
+      { id: 'gemini-pro', name: 'Gemini Pro (Legacy)' }
     ];
   }
   

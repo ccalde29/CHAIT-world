@@ -190,9 +190,9 @@ class SpeakingQueue {
     if (!relationships || relationships.length === 0) return 0;
     
     // Find relationship between this character and last speaker
-    const relationship = relationships.find(r => 
-      (r.character_id === character.id && r.related_character_id === lastSpeaker) ||
-      (r.character_id === lastSpeaker && r.related_character_id === character.id)
+    const relationship = relationships.find(r =>
+      (r.character_id === character.id && r.target_id === lastSpeaker) ||
+      (r.character_id === lastSpeaker && r.target_id === character.id)
     );
     
     if (!relationship) return 0;
@@ -382,9 +382,9 @@ class SpeakingQueue {
       const { data, error } = await supabase
         .from('character_relationships')
         .select('*')
-        .or(`character_id.in.(${characterIds.join(',')}),related_character_id.in.(${characterIds.join(',')})`)
+        .or(`character_id.in.(${characterIds.join(',')}),target_id.in.(${characterIds.join(',')})`)
         .eq('user_id', userId);
-      
+
       if (error) throw error;
       return data || [];
     } catch (error) {

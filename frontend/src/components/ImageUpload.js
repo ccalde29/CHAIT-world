@@ -9,12 +9,13 @@ import { Upload, X, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
-const ImageUpload = ({ 
-  currentImage, 
-  currentEmoji, 
-  onImageChange, 
-  type = 'character', 
-  aspectRatio = 'square' 
+const ImageUpload = ({
+  currentImage,
+  currentEmoji,
+  onImageChange,
+  type = 'character',
+  aspectRatio = 'square',
+  imageOnly = false
 }) => {
   const { user } = useAuth();
   const fileInputRef = useRef(null);
@@ -22,10 +23,14 @@ const ImageUpload = ({
   const [error, setError] = useState(null);
   const [useCustomImage, setUseCustomImage] = useState(!!currentImage);
 
-  // Update useCustomImage when currentImage changes
+  // Update useCustomImage when currentImage changes or imageOnly prop
   React.useEffect(() => {
-    setUseCustomImage(!!currentImage);
-  }, [currentImage]);
+    if (imageOnly) {
+      setUseCustomImage(true);
+    } else {
+      setUseCustomImage(!!currentImage);
+    }
+  }, [currentImage, imageOnly]);
 
   // Handle file selection
   const handleFileSelect = async (event) => {
@@ -192,35 +197,37 @@ const ImageUpload = ({
 
   return (
     <div className="space-y-3">
-      {/* Toggle Controls */}
-      <div className="flex items-center gap-4">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="radio"
-            name={`${type}-image-mode`}
-            checked={!useCustomImage}
-            onChange={handleSwitchToEmoji}
-            className="text-purple-500 focus:ring-purple-500"
-          />
-          <span className="text-sm text-gray-300">
-            {type === 'scene' ? 'No Background' : 'Use Emoji'}
-          </span>
-        </label>
+      {/* Toggle Controls - Only show if not imageOnly mode */}
+      {!imageOnly && (
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name={`${type}-image-mode`}
+              checked={!useCustomImage}
+              onChange={handleSwitchToEmoji}
+              className="text-purple-500 focus:ring-purple-500"
+            />
+            <span className="text-sm text-gray-300">
+              {type === 'scene' ? 'No Background' : 'Use Emoji'}
+            </span>
+          </label>
 
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="radio"
-            name={`${type}-image-mode`}
-            checked={useCustomImage}
-            onChange={handleSwitchToCustomImage}
-            className="text-purple-500 focus:ring-purple-500"
-          />
-          <span className="text-sm text-gray-300">Custom Image</span>
-        </label>
-      </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name={`${type}-image-mode`}
+              checked={useCustomImage}
+              onChange={handleSwitchToCustomImage}
+              className="text-purple-500 focus:ring-purple-500"
+            />
+            <span className="text-sm text-gray-300">Custom Image</span>
+          </label>
+        </div>
+      )}
 
       {/* Image Upload/Preview Area */}
-      {useCustomImage && (
+      {(useCustomImage || imageOnly) && (
         <div className="space-y-3">
           {/* Current Image Preview */}
           {currentImage ? (

@@ -86,16 +86,25 @@ const CharacterEditorV15 = ({
         avatar_image_filename: character.avatar_image_filename || null,
         uses_custom_image: character.uses_custom_image || false,
         ai_provider: character.ai_provider || 'openai',
-        ai_model: character.ai_model || 'gpt-3.5-turbo',
+        ai_model: character.ai_model || '',  // Will be set by loadAvailableModels
         fallback_provider: character.fallback_provider || '',
         fallback_model: character.fallback_model || ''
       });
+    } else {
+      // Create mode - use defaults
+      setFormData(prev => ({
+        ...prev,
+        ai_provider: 'openai',
+        ai_model: ''  // Will be set by loadAvailableModels
+      }));
     }
   }, [character]);
   
-  // Load available models when provider changes
+  // Load available models when provider changes or on initial mount
   useEffect(() => {
-    loadAvailableModels(formData.ai_provider);
+    if (formData.ai_provider) {
+      loadAvailableModels(formData.ai_provider);
+    }
   }, [formData.ai_provider]);
   
   // ============================================================================
@@ -105,11 +114,11 @@ const CharacterEditorV15 = ({
   const loadAvailableModels = async (provider) => {
     setLoadingModels(true);
     setError(null);
-    
+
     try {
       // Get the appropriate API key from user settings
       let apiKey = null;
-      
+
       if (userSettings?.apiKeys) {
         switch (provider) {
           case 'openai':
@@ -126,7 +135,7 @@ const CharacterEditorV15 = ({
             break;
         }
       }
-      
+
       const response = await fetch(`${API_BASE_URL}/api/providers/models`, {
         method: 'POST',
         headers: {
@@ -139,21 +148,27 @@ const CharacterEditorV15 = ({
           ollamaSettings: userSettings?.ollamaSettings
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.models && data.models.length > 0) {
         setAvailableModels(data.models);
-        
-        // Auto-select first model if current model not in list
-        if (!data.models.find(m => m.id === formData.ai_model)) {
+
+        // Auto-select first model if current model not in list or is empty
+        const currentModelExists = data.models.find(m => m.id === formData.ai_model);
+        if (!currentModelExists || !formData.ai_model) {
           setFormData(prev => ({ ...prev, ai_model: data.models[0].id }));
         }
+        // Clear any previous errors since models loaded successfully
+        setError(null);
       } else {
         setAvailableModels([]);
-        setError(`No models available for ${provider}. Configure API key in Settings.`);
+        // Only show error if no models returned
+        if (!data.models || data.models.length === 0) {
+          setError(`No models available for ${provider}. Configure API key in Settings.`);
+        }
       }
-      
+
     } catch (err) {
       console.error('Error loading models:', err);
       setAvailableModels([]);
@@ -190,10 +205,19 @@ const CharacterEditorV15 = ({
   };
   
   const handleProviderChange = (provider) => {
+    // Set default models for each provider
+    const defaultModels = {
+      'openai': 'gpt-4o-mini',
+      'anthropic': 'claude-3-5-haiku-20241022',
+      'openrouter': 'openai/gpt-4o-mini',
+      'google': 'gemini-1.5-flash-latest',
+      'ollama': 'llama2'
+    };
+
     setFormData(prev => ({
       ...prev,
       ai_provider: provider,
-      ai_model: '' // Will be set when models load
+      ai_model: defaultModels[provider] || 'gpt-4o-mini' // Set default, will be updated when models load
     }));
   };
   
@@ -319,8 +343,8 @@ const CharacterEditorV15 = ({
           </button>
         </div>
         
-        {/* Error Message */}
-        {error && (
+        {/* Error Message - Only show if there's an error and no models loaded */}
+        {error && availableModels.length === 0 && (
           <div className="mx-6 mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-400">
             <AlertCircle size={16} />
             <span className="text-sm">{error}</span>
@@ -384,45 +408,30 @@ const CharacterEditorV15 = ({
               </div>
             </div>
 
-            {/* Avatar and Color */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Avatar Emoji
-                </label>
-                <input
-                  type="text"
-                  value={formData.avatar}
-                  onChange={(e) => handleInputChange('avatar', e.target.value)}
-                  placeholder="🤖"
-                  maxLength={2}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white text-2xl text-center focus:outline-none focus:border-red-400"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Color Theme
-                </label>
-                <select
-                  value={formData.color}
-                  onChange={(e) => handleInputChange('color', e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-400"
-                >
-                  <option value="from-red-500 to-pink-500" className="bg-gray-800">Red/Pink</option>
-                  <option value="from-blue-500 to-indigo-500" className="bg-gray-800">Blue/Indigo</option>
-                  <option value="from-green-500 to-teal-500" className="bg-gray-800">Green/Teal</option>
-                  <option value="from-orange-500 to-red-500" className="bg-gray-800">Orange/Red</option>
-                  <option value="from-purple-500 to-pink-500" className="bg-gray-800">Purple/Pink</option>
-                  <option value="from-yellow-500 to-orange-500" className="bg-gray-800">Yellow/Orange</option>
-                  <option value="from-gray-500 to-slate-500" className="bg-gray-800">Gray/Slate</option>
-                </select>
-              </div>
+            {/* Color Theme */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Color Theme
+              </label>
+              <select
+                value={formData.color}
+                onChange={(e) => handleInputChange('color', e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-400"
+              >
+                <option value="from-red-500 to-pink-500" className="bg-gray-800">Red/Pink</option>
+                <option value="from-blue-500 to-indigo-500" className="bg-gray-800">Blue/Indigo</option>
+                <option value="from-green-500 to-teal-500" className="bg-gray-800">Green/Teal</option>
+                <option value="from-orange-500 to-red-500" className="bg-gray-800">Orange/Red</option>
+                <option value="from-purple-500 to-pink-500" className="bg-gray-800">Purple/Pink</option>
+                <option value="from-yellow-500 to-orange-500" className="bg-gray-800">Yellow/Orange</option>
+                <option value="from-gray-500 to-slate-500" className="bg-gray-800">Gray/Slate</option>
+              </select>
             </div>
 
             {/* Custom Avatar Image Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Custom Avatar Image (Optional)
+                Avatar Image *
               </label>
               <ImageUpload
                 currentImage={formData.avatar_image_url}
@@ -437,9 +446,10 @@ const CharacterEditorV15 = ({
                 }}
                 type="character"
                 aspectRatio="square"
+                imageOnly={true}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Upload a custom avatar image or use the emoji above
+                Upload a custom avatar image for this character (required)
               </p>
             </div>
 
@@ -454,20 +464,6 @@ const CharacterEditorV15 = ({
                 placeholder="Physical description, style, notable features..."
                 rows={2}
                 className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[60px]"
-              />
-            </div>
-
-            {/* Background */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Background/History
-              </label>
-              <textarea
-                value={formData.background}
-                onChange={(e) => handleInputChange('background', e.target.value)}
-                placeholder="Character backstory, history, life experiences..."
-                rows={3}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[80px]"
               />
             </div>
 
@@ -505,6 +501,7 @@ const CharacterEditorV15 = ({
                   className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-400"
                 />
                 <button
+                  type="button"
                   onClick={handleAddTag}
                   className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-sm transition-colors"
                 >
@@ -522,6 +519,7 @@ const CharacterEditorV15 = ({
                     >
                       {tag}
                       <button
+                        type="button"
                         onClick={() => handleRemoveTag(tag)}
                         className="hover:text-red-100"
                       >
@@ -561,6 +559,7 @@ const CharacterEditorV15 = ({
                   
                   return (
                     <button
+                      type="button"
                       key={provider}
                       onClick={() => handleProviderChange(provider)}
                       className={`p-3 rounded-lg border transition-all ${
@@ -598,6 +597,7 @@ const CharacterEditorV15 = ({
                   Model *
                 </label>
                 <button
+                  type="button"
                   onClick={() => loadAvailableModels(formData.ai_provider)}
                   disabled={loadingModels}
                   className="text-xs text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
@@ -612,24 +612,30 @@ const CharacterEditorV15 = ({
                   <div className="animate-spin inline-block w-5 h-5 border-2 border-white/20 border-t-red-500 rounded-full mb-2"></div>
                   <p className="text-sm text-gray-400">Loading models...</p>
                 </div>
-              ) : availableModels.length > 0 ? (
+              ) : (
                 <select
                   value={formData.ai_model}
                   onChange={(e) => handleInputChange('ai_model', e.target.value)}
                   className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-400"
                 >
+                  {/* Show current model as fallback if models haven't loaded */}
+                  {availableModels.length === 0 && formData.ai_model && (
+                    <option value={formData.ai_model} className="bg-gray-800">
+                      {formData.ai_model}
+                    </option>
+                  )}
                   {availableModels.map(model => (
                     <option key={model.id} value={model.id} className="bg-gray-800">
                       {model.name || model.id}
                     </option>
                   ))}
                 </select>
-              ) : (
-                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                  <p className="text-sm text-yellow-400">
-                    No models available. Configure your {providerInfo.name} API key in Settings.
-                  </p>
-                </div>
+              )}
+
+              {!loadingModels && availableModels.length === 0 && !formData.ai_model && (
+                <p className="text-xs text-yellow-400 mt-2">
+                  ⚠️ Configure your {providerInfo.name} API key in Settings to see available models
+                </p>
               )}
               
               <p className="text-xs text-gray-500 mt-1">

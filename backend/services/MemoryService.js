@@ -38,7 +38,7 @@ class MemoryService {
      */
     async addCharacterMemory(characterId, userId, memoryData) {
         try {
-            console.log('>à Adding memory for character:', characterId);
+            console.log('>ï¿½ Adding memory for character:', characterId);
 
             const { data, error } = await this.supabase
                 .from('character_memories')
@@ -142,27 +142,34 @@ class MemoryService {
         try {
             console.log('ðŸ’ž Updating relationship for character:', characterId);
 
+            // Ensure we include the target fields used by the DB unique constraint
+            // and provide sensible defaults for missing metrics.
+            const payload = {
+                character_id: characterId,
+                user_id: userId,
+                target_type: 'user',
+                target_id: userId,
+                relationship_type: relationshipData.relationship_type || 'neutral',
+                trust_level: relationshipData.trust_level ?? 0.5,
+                familiarity_level: relationshipData.familiarity_level ?? 0.1,
+                emotional_bond: relationshipData.emotional_bond ?? 0.0,
+                last_interaction: new Date().toISOString(),
+                interaction_count: relationshipData.interaction_count || 1
+            };
+
+            // Use explicit onConflict to match the DB unique constraint
             const { data, error } = await this.supabase
                 .from('character_relationships')
-                .upsert({
-                    character_id: characterId,
-                    user_id: userId,
-                    relationship_type: relationshipData.relationship_type,
-                    trust_level: relationshipData.trust_level,
-                    familiarity_level: relationshipData.familiarity_level,
-                    emotional_bond: relationshipData.emotional_bond,
-                    last_interaction: new Date().toISOString(),
-                    interaction_count: relationshipData.interaction_count || 1
-                })
+                .upsert(payload, { onConflict: 'character_id,user_id,target_type,target_id' })
                 .select()
                 .single();
 
             if (error) {
-                console.error('L Error updating relationship:', error);
+                console.error('Error updating relationship:', error);
                 throw error;
             }
 
-            console.log(' Relationship updated successfully');
+            console.log('Relationship updated successfully', data);
             return data;
 
         } catch (error) {
@@ -295,7 +302,7 @@ class MemoryService {
             console.log(' Boosted memory importance (character showed understanding)');
         }
 
-        console.log(`=Ê Total memories found: ${memories.length}`);
+        console.log(`=ï¿½ Total memories found: ${memories.length}`);
         return memories;
     }
 

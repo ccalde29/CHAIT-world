@@ -198,6 +198,10 @@ class CharacterService {
         avatar_image_url: updates.avatar_image_url,
         avatar_image_filename: updates.avatar_image_filename,
         uses_custom_image: updates.uses_custom_image,
+        ai_provider: updates.ai_provider,
+        ai_model: updates.ai_model,
+        fallback_provider: updates.fallback_provider,
+        fallback_model: updates.fallback_model,
         updated_at: new Date().toISOString()
       };
 

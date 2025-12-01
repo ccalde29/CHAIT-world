@@ -12,6 +12,8 @@ const CharacterSceneHub = ({
   onAddCharacter,
   onEditCharacter,
   onDeleteCharacter,
+  onPublishCharacter,
+  onUnpublishCharacter,
   onAddScene,
   onEditScene,
   onDeleteScene,
@@ -109,25 +111,44 @@ const CharacterSceneHub = ({
               filteredCharacters.map((character) => (
                 <div
                   key={character.id}
-                  className="bg-white/5 border border-white/10 rounded-lg p-3 hover:bg-white/10 transition-colors"
+                  className="relative bg-white/5 border border-white/10 rounded-lg p-3 hover:bg-white/10 transition-colors"
                 >
-                  <div className="flex items-start gap-3">
-                    {/* Avatar */}
-                    <div
-                      className={`flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br ${
-                        character.color || 'from-gray-500 to-slate-500'
-                      } flex items-center justify-center text-lg`}
-                    >
-                      {character.uses_custom_image && character.avatar_image_url ? (
-                        <img
-                          src={character.avatar_image_url}
-                          alt={character.name}
-                          className="w-full h-full object-cover rounded-full"
-                        />
-                      ) : (
-                        <span>{character.avatar || '🤖'}</span>
-                      )}
+                  {/* Delete button positioned inside the card (top-right) */}
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Delete "${character.name}"?`)) {
+                        onDeleteCharacter(character.id);
+                      }
+                    }}
+                    className="absolute right-2 top-2 flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
+                    aria-label={`Delete ${character.name}`}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+
+                  {/* Character Image (if custom) */}
+                  {character.uses_custom_image && character.avatar_image_url && (
+                    <div className="absolute left-0 top-0 bottom-0 w-24 overflow-hidden rounded-l-lg">
+                      <img
+                        src={character.avatar_image_url}
+                        alt={character.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-gray-800/50"></div>
                     </div>
+                  )}
+
+                  <div className={`flex items-start gap-3 ${character.uses_custom_image && character.avatar_image_url ? 'ml-24' : ''}`}>
+                    {/* Avatar (emoji/gradient only shown if no custom image) */}
+                    {!(character.uses_custom_image && character.avatar_image_url) && (
+                      <div
+                        className={`flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br ${
+                          character.color || 'from-gray-500 to-slate-500'
+                        } flex items-center justify-center text-lg`}
+                      >
+                        <span>{character.avatar || '🤖'}</span>
+                      </div>
+                    )}
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
@@ -140,7 +161,7 @@ const CharacterSceneHub = ({
                       </p>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-1 mt-2">
+                      <div className="flex items-center gap-1 mt-2 flex-wrap">
                         <button
                           onClick={() => onEditCharacter(character)}
                           className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
@@ -155,17 +176,42 @@ const CharacterSceneHub = ({
                           <Eye size={12} />
                           Memory
                         </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Delete "${character.name}"?`)) {
-                              onDeleteCharacter(character.id);
-                            }
-                          }}
-                          className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
-                        >
-                          <Trash2 size={12} />
-                          Delete
-                        </button>
+                        {character.is_public ? (
+                          <>
+                            <button
+                              disabled
+                              className="flex items-center gap-1 text-xs text-green-200 px-2 py-1 rounded bg-white/5 cursor-not-allowed whitespace-nowrap"
+                              title="Already published"
+                            >
+                              <Users size={12} />
+                              Published
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Unpublish "${character.name}" from the Community?`)) {
+                                  onUnpublishCharacter && onUnpublishCharacter(character.id);
+                                }
+                              }}
+                              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
+                            >
+                              <Trash2 size={12} />
+                              Unpublish
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Publish "${character.name}" to the Community?`)) {
+                                onPublishCharacter && onPublishCharacter(character.id);
+                              }
+                            }}
+                            className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
+                          >
+                            <Users size={12} />
+                            Publish
+                          </button>
+                        )}
+                        {/* Delete moved to top-right inside the card */}
                       </div>
                     </div>
                   </div>
