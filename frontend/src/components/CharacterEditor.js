@@ -32,7 +32,6 @@ const CharacterEditorV15 = ({
     appearance: '',
     background: '',
     avatar: '🤖',
-    color: 'from-gray-500 to-slate-500',
     tags: [],
     temperature: 0.8,
     max_tokens: 150,
@@ -48,9 +47,7 @@ const CharacterEditorV15 = ({
 
     // AI Provider settings
     ai_provider: 'openai',
-    ai_model: 'gpt-3.5-turbo',
-    fallback_provider: '',
-    fallback_model: ''
+    ai_model: 'gpt-3.5-turbo'
   });
   
   const [tagInput, setTagInput] = useState('');
@@ -74,7 +71,6 @@ const CharacterEditorV15 = ({
         appearance: character.appearance || '',
         background: character.background || '',
         avatar: character.avatar || '🤖',
-        color: character.color || 'from-gray-500 to-slate-500',
         tags: character.tags || [],
         temperature: character.temperature || 0.8,
         max_tokens: character.max_tokens || 150,
@@ -86,9 +82,7 @@ const CharacterEditorV15 = ({
         avatar_image_filename: character.avatar_image_filename || null,
         uses_custom_image: character.uses_custom_image || false,
         ai_provider: character.ai_provider || 'openai',
-        ai_model: character.ai_model || '',  // Will be set by loadAvailableModels
-        fallback_provider: character.fallback_provider || '',
-        fallback_model: character.fallback_model || ''
+        ai_model: character.ai_model || ''  // Will be set by loadAvailableModels
       });
     } else {
       // Create mode - use defaults
@@ -408,26 +402,6 @@ const CharacterEditorV15 = ({
               </div>
             </div>
 
-            {/* Color Theme */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Color Theme
-              </label>
-              <select
-                value={formData.color}
-                onChange={(e) => handleInputChange('color', e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-400"
-              >
-                <option value="from-red-500 to-pink-500" className="bg-gray-800">Red/Pink</option>
-                <option value="from-blue-500 to-indigo-500" className="bg-gray-800">Blue/Indigo</option>
-                <option value="from-green-500 to-teal-500" className="bg-gray-800">Green/Teal</option>
-                <option value="from-orange-500 to-red-500" className="bg-gray-800">Orange/Red</option>
-                <option value="from-purple-500 to-pink-500" className="bg-gray-800">Purple/Pink</option>
-                <option value="from-yellow-500 to-orange-500" className="bg-gray-800">Yellow/Orange</option>
-                <option value="from-gray-500 to-slate-500" className="bg-gray-800">Gray/Slate</option>
-              </select>
-            </div>
-
             {/* Custom Avatar Image Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -458,6 +432,9 @@ const CharacterEditorV15 = ({
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Appearance
               </label>
+              <p className="text-xs text-gray-400 mb-2">
+                Describe the character's physical appearance, style, and notable features. This helps paint a picture of who they are.
+              </p>
               <textarea
                 value={formData.appearance}
                 onChange={(e) => handleInputChange('appearance', e.target.value)}
@@ -472,6 +449,9 @@ const CharacterEditorV15 = ({
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Personality & Background *
               </label>
+              <p className="text-xs text-gray-400 mb-2">
+                This is the core of your character. Describe their personality traits, background story, speaking style, interests, and how they interact with others. Be specific and detailed - this directly shapes how the AI will roleplay this character.
+              </p>
               <textarea
                 value={formData.personality}
                 onChange={(e) => handleInputChange('personality', e.target.value)}
@@ -479,9 +459,6 @@ const CharacterEditorV15 = ({
                 rows={6}
                 className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[140px]"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Be specific! This shapes how the character thinks and responds.
-              </p>
             </div>
             
             {/* Tags */}
@@ -538,12 +515,15 @@ const CharacterEditorV15 = ({
               <Brain size={18} className="text-red-500" />
               AI Model Configuration
             </h3>
-            
+
             {/* Provider Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 AI Provider *
               </label>
+              <p className="text-xs text-gray-400 mb-2">
+                Choose which AI service will power this character. Each provider offers different models with unique strengths. Make sure you've configured the API key for your chosen provider in Settings.
+              </p>
               
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {['openai', 'anthropic', 'openrouter', 'google', 'ollama'].map(provider => {
@@ -606,6 +586,9 @@ const CharacterEditorV15 = ({
                   Refresh
                 </button>
               </div>
+              <p className="text-xs text-gray-400 mb-2">
+                Select the specific AI model for this character. Different models have different capabilities, speeds, and costs. Larger models (like GPT-4) are smarter but slower and more expensive.
+              </p>
               
               {loadingModels ? (
                 <div className="p-4 bg-white/5 border border-white/10 rounded-lg text-center">
@@ -650,12 +633,15 @@ const CharacterEditorV15 = ({
               <Sliders size={18} className="text-red-500" />
               Advanced Settings
             </h3>
-            
+
             {/* Temperature */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Temperature: {formData.temperature.toFixed(2)}
               </label>
+              <p className="text-xs text-gray-400 mb-2">
+                Controls the randomness and creativity of responses. Lower values (0.3-0.7) produce more consistent and focused responses. Higher values (0.8-1.5) produce more creative and unpredictable responses. Also affects mood volatility.
+              </p>
               <input
                 type="range"
                 min="0"
@@ -669,9 +655,6 @@ const CharacterEditorV15 = ({
                 <span>Focused & Consistent</span>
                 <span>Creative & Random</span>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Higher temperature = more creative/unpredictable responses. Also affects mood volatility in v1.5!
-              </p>
             </div>
             
             {/* Max Tokens */}
@@ -679,6 +662,9 @@ const CharacterEditorV15 = ({
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Response Length: {formData.max_tokens} tokens
               </label>
+              <p className="text-xs text-gray-400 mb-2">
+                Sets the maximum length of the character's responses. Approximately 1 token equals 0.75 words, so 150 tokens is about 2-3 sentences. Shorter responses are faster and cheaper, longer responses allow for more detailed replies.
+              </p>
               <input
                 type="range"
                 min="50"
@@ -693,45 +679,7 @@ const CharacterEditorV15 = ({
                 <span>Medium (250)</span>
                 <span>Long (500)</span>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                ~1 token ≈ 0.75 words. 150 tokens ≈ 2-3 sentences
-              </p>
             </div>
-            
-            {/* Fallback Provider (Optional) */}
-            <div className="pt-4 border-t border-white/10">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Fallback Provider (Optional)
-              </label>
-              <select
-                value={formData.fallback_provider}
-                onChange={(e) => handleInputChange('fallback_provider', e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-400"
-              >
-                <option value="" className="bg-gray-800">None</option>
-                <option value="openai" className="bg-gray-800">OpenAI</option>
-                <option value="anthropic" className="bg-gray-800">Anthropic</option>
-                <option value="openrouter" className="bg-gray-800">OpenRouter</option>
-                <option value="google" className="bg-gray-800">Google</option>
-                <option value="ollama" className="bg-gray-800">Ollama</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Backup provider if primary fails (requires API key configured)
-              </p>
-            </div>
-          </div>
-          
-          {/* Info Box */}
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <h4 className="text-sm font-semibold text-blue-400 mb-2">💡 Model Selection Tips</h4>
-            <ul className="text-xs text-gray-400 space-y-1">
-              <li>• <strong>GPT-3.5:</strong> Fast, affordable, good for most characters</li>
-              <li>• <strong>GPT-4:</strong> Smarter but slower and more expensive</li>
-              <li>• <strong>Claude:</strong> Thoughtful, great for complex personalities</li>
-              <li>• <strong>Gemini:</strong> Fast and efficient, good balance</li>
-              <li>• <strong>Ollama:</strong> Free local models, requires setup</li>
-              <li>• <strong>OpenRouter:</strong> Try different models easily</li>
-            </ul>
           </div>
         </div>
         

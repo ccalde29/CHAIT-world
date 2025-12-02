@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, Plus, Edit, Trash2, Sparkles, Image } from 'lucide-react';
+import { X, MapPin, Plus, Edit, Trash2, Image } from 'lucide-react';
 import ImageUpload from './ImageUpload';
 
 const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
@@ -20,7 +20,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    context: '',
+    initial_message: '',
     atmosphere: '',
     background_image_url: null,
     background_image_filename: null,
@@ -30,33 +30,6 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  // Scene templates for inspiration
-  const sceneTemplates = [
-    {
-      name: "Cozy Bookstore",
-      description: "A quiet bookstore with warm lighting and the smell of old books",
-      context: "The group is browsing books and having quiet conversations among the shelves of a cozy independent bookstore.",
-      atmosphere: "intimate and intellectual"
-    },
-    {
-      name: "Rooftop Bar",
-      description: "An upscale rooftop bar with city views and ambient music",
-      context: "The group is enjoying drinks on a rooftop bar with panoramic city views and a sophisticated atmosphere.",
-      atmosphere: "sophisticated and relaxed"
-    },
-    {
-      name: "Gaming Arcade",
-      description: "A retro arcade filled with flashing lights and electronic sounds",
-      context: "The group is hanging out at a bustling arcade, playing games and chatting between rounds.",
-      atmosphere: "energetic and nostalgic"
-    },
-    {
-      name: "Beach Bonfire",
-      description: "A nighttime gathering around a bonfire on the beach",
-      context: "The group is sitting around a crackling bonfire on the beach under the stars, sharing stories and marshmallows.",
-      atmosphere: "relaxed and intimate"
-    }
-  ];
 
   // ============================================================================
   // FORM HANDLING
@@ -66,7 +39,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
     setFormData({
       name: '',
       description: '',
-      context: '',
+      initial_message: '',
       atmosphere: '',
       background_image_url: null,
       background_image_filename: null,
@@ -111,10 +84,10 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
       errors.description = 'Description must be 200 characters or less';
     }
     
-    if (!formData.context.trim()) {
-      errors.context = 'Scene context is required';
-    } else if (formData.context.length > 300) {
-      errors.context = 'Context must be 300 characters or less';
+    if (!formData.initial_message.trim()) {
+      errors.initial_message = 'Initial message is required';
+    } else if (formData.initial_message.length > 500) {
+      errors.initial_message = 'Initial message must be 500 characters or less';
     }
     
     if (formData.atmosphere && formData.atmosphere.length > 100) {
@@ -136,7 +109,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
         ...formData,
         name: formData.name.trim(),
         description: formData.description.trim(),
-        context: formData.context.trim(),
+        initial_message: formData.initial_message.trim(),
         atmosphere: formData.atmosphere.trim() || 'neutral'
       };
 
@@ -161,24 +134,13 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
     setFormData({
       name: scene.name || '',
       description: scene.description || '',
-      context: scene.context || '',
+      initial_message: scene.initial_message || '',
       atmosphere: scene.atmosphere || '',
       background_image_url: scene.background_image_url || null,
       background_image_filename: scene.background_image_filename || null,
       uses_custom_background: scene.uses_custom_background || false
     });
     setShowCreateForm(true);
-  };
-
-  const applyTemplate = (template) => {
-    setFormData(prev => ({
-      ...prev,
-      name: template.name,
-      description: template.description,
-      context: template.context,
-      atmosphere: template.atmosphere
-    }));
-    setValidationErrors({});
   };
 
   const getFieldError = (field) => {
@@ -277,7 +239,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
                       </div>
                       <p className="text-sm text-gray-300 mb-2">{scene.description}</p>
                       <div className="text-xs text-gray-400">
-                        <span className="font-medium">Context:</span> {scene.context}
+                        <span className="font-medium">Initial Message:</span> {scene.initial_message}
                       </div>
                       {scene.atmosphere && (
                         <div className="text-xs text-purple-300 mt-1">
@@ -353,7 +315,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
                       {formData.description || 'Scene description will appear here...'}
                     </div>
                     <div className="text-xs text-gray-400">
-                      {formData.context || 'Scene context for AI characters...'}
+                      {formData.initial_message || 'Initial message will appear here...'}
                     </div>
                   </div>
                 )}
@@ -401,26 +363,6 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
                 <p className="text-xs text-gray-500 mt-1">{formData.description.length}/200 characters</p>
               </div>
 
-              {/* Scene Templates */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  <Sparkles size={16} className="inline mr-2" />
-                  Scene Templates (Optional)
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-                  {sceneTemplates.map((template, index) => (
-                    <button
-                      key={index}
-                      onClick={() => applyTemplate(template)}
-                      className="p-3 text-left bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-                    >
-                      <div className="text-sm font-medium text-white mb-1">{template.name}</div>
-                      <div className="text-xs text-gray-400">{template.description}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Background Image Upload */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -459,25 +401,28 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
                 </div>
               </div>
 
-              {/* Scene Context */}
+              {/* Initial Message */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Context for AI Characters *
+                  Initial Message *
                 </label>
+                <p className="text-xs text-gray-400 mb-2">
+                  This message will be shown at the start of every chat in this scene. Use it to set the atmosphere, describe the setting, or provide context for the conversation. This helps establish the mood and situation for the characters.
+                </p>
                 <textarea
-                  value={formData.context}
-                  onChange={(e) => handleInputChange('context', e.target.value)}
-                  placeholder="Describe the setting and situation for AI characters. This helps them understand how to behave in this scene."
+                  value={formData.initial_message}
+                  onChange={(e) => handleInputChange('initial_message', e.target.value)}
+                  placeholder="e.g., 'You all meet at the coffee shop on a rainy afternoon. The warm aroma of fresh coffee fills the air as you settle into comfortable chairs by the window.'"
                   rows={4}
-                  maxLength={300}
+                  maxLength={500}
                   className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none resize-none ${
-                    getFieldError('context') ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                    getFieldError('initial_message') ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
                   }`}
                 />
-                {getFieldError('context') && (
-                  <p className="text-red-400 text-xs mt-1">{getFieldError('context')}</p>
+                {getFieldError('initial_message') && (
+                  <p className="text-red-400 text-xs mt-1">{getFieldError('initial_message')}</p>
                 )}
-                <p className="text-xs text-gray-500 mt-1">{formData.context.length}/300 characters</p>
+                <p className="text-xs text-gray-500 mt-1">{formData.initial_message.length}/500 characters</p>
               </div>
 
               {/* Atmosphere */}
@@ -501,17 +446,6 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
                 <p className="text-xs text-gray-500 mt-1">{formData.atmosphere.length}/100 characters</p>
               </div>
 
-              {/* Tips */}
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-blue-300 mb-2">💡 Scene Creation Tips</h4>
-                <ul className="text-xs text-blue-200 space-y-1">
-                  <li>• Be specific about the physical environment and ambiance</li>
-                  <li>• Include sensory details (sounds, smells, lighting)</li>
-                  <li>• Consider how the setting affects conversation style</li>
-                  <li>• Think about what activities might be happening</li>
-                  <li>• The context helps AI characters understand the situation</li>
-                </ul>
-              </div>
 
               {/* Form Actions */}
               <div className="flex justify-end gap-3">
