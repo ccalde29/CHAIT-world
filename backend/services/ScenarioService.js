@@ -105,9 +105,8 @@ class ScenarioService {
 
             if (fetchError) throw fetchError;
 
-            if (scenario?.is_public) {
-                throw new Error('Cannot delete a published scene. Please unpublish it first.');
-            }
+            // Users can now delete their own copy even if published to community
+            // The community version will persist independently
 
             const { error } = await this.supabase
                 .from('scenarios')

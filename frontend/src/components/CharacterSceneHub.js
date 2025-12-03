@@ -13,12 +13,10 @@ const CharacterSceneHub = ({
   onEditCharacter,
   onDeleteCharacter,
   onPublishCharacter,
-  onUnpublishCharacter,
   onAddScene,
   onEditScene,
   onDeleteScene,
   onPublishScene,
-  onUnpublishScene,
   onOpenMemoryViewer
 }) => {
   const [activeTab, setActiveTab] = useState('characters'); // 'characters' or 'scenes'
@@ -179,27 +177,14 @@ const CharacterSceneHub = ({
                           Memory
                         </button>
                         {character.is_public ? (
-                          <>
-                            <button
-                              disabled
-                              className="flex items-center gap-1 text-xs text-green-200 px-2 py-1 rounded bg-white/5 cursor-not-allowed whitespace-nowrap"
-                              title="Already published"
-                            >
-                              <Users size={12} />
-                              Published
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (window.confirm(`Unpublish "${character.name}" from the Community?`)) {
-                                  onUnpublishCharacter && onUnpublishCharacter(character.id);
-                                }
-                              }}
-                              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
-                            >
-                              <Trash2 size={12} />
-                              Unpublish
-                            </button>
-                          </>
+                          <button
+                            disabled
+                            className="flex items-center gap-1 text-xs text-green-200 px-2 py-1 rounded bg-white/5 cursor-not-allowed whitespace-nowrap"
+                            title="Already published to Community"
+                          >
+                            <Users size={12} />
+                            Published
+                          </button>
                         ) : (
                           <button
                             onClick={() => {
@@ -278,27 +263,14 @@ const CharacterSceneHub = ({
                       Edit
                     </button>
                     {scene.is_public ? (
-                      <>
-                        <button
-                          disabled
-                          className="flex items-center gap-1 text-xs text-green-200 px-2 py-1 rounded bg-white/5 cursor-not-allowed whitespace-nowrap"
-                          title="Already published"
-                        >
-                          <MapPin size={12} />
-                          Published
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Unpublish "${scene.name}" from the Community?`)) {
-                              onUnpublishScene && onUnpublishScene(scene.id);
-                            }
-                          }}
-                          className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
-                        >
-                          <Trash2 size={12} />
-                          Unpublish
-                        </button>
-                      </>
+                      <button
+                        disabled
+                        className="flex items-center gap-1 text-xs text-green-200 px-2 py-1 rounded bg-white/5 cursor-not-allowed whitespace-nowrap"
+                        title="Already published to Community"
+                      >
+                        <MapPin size={12} />
+                        Published
+                      </button>
                     ) : (
                       <button
                         onClick={() => {

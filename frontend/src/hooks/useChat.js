@@ -114,9 +114,13 @@ export const useChat = (apiRequest) => {
       const session = await apiRequest(`/api/chat/sessions/${sessionId}`);
       setMessages(session.messages || []);
       setCurrentSessionId(sessionId);
+
+      // Return the full session data so the parent can restore UI state
+      return session;
     } catch (error) {
       console.error('Error loading chat session:', error);
       setError('Failed to load chat session');
+      throw error;
     }
   };
 

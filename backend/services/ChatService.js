@@ -105,6 +105,7 @@ class ChatService {
             if (sessionError) throw sessionError;
             if (!session) return null;
 
+            // First get all messages
             const { data: messages, error: messagesError } = await this.supabase
             .from('messages')
             .select('*')
@@ -113,9 +114,56 @@ class ChatService {
 
             if (messagesError) throw messagesError;
 
+            // Get unique character IDs from messages
+            const characterIds = [...new Set(
+                messages
+                    .filter(msg => msg.type === 'character' && msg.character_id)
+                    .map(msg => msg.character_id)
+            )];
+
+            // Fetch character data if there are any character messages
+            let charactersMap = {};
+            if (characterIds.length > 0) {
+                const { data: characters, error: charError } = await this.supabase
+                    .from('characters')
+                    .select('id, name, avatar, color, avatar_image_url, uses_custom_image')
+                    .in('id', characterIds);
+
+                if (!charError && characters) {
+                    charactersMap = Object.fromEntries(
+                        characters.map(char => [char.id, char])
+                    );
+                }
+            }
+
+            // Transform messages to match frontend expected format
+            const transformedMessages = (messages || []).map(msg => {
+                if (msg.type === 'character' && msg.character_id && charactersMap[msg.character_id]) {
+                    const char = charactersMap[msg.character_id];
+                    return {
+                        id: msg.id,
+                        type: msg.type,
+                        content: msg.content,
+                        timestamp: msg.timestamp,
+                        character: msg.character_id,
+                        characterName: char.name,
+                        characterAvatar: char.avatar,
+                        characterColor: char.color,
+                        characterImageUrl: char.avatar_image_url,
+                        characterUsesCustomImage: char.uses_custom_image
+                    };
+                }
+                return {
+                    id: msg.id,
+                    type: msg.type,
+                    content: msg.content,
+                    timestamp: msg.timestamp
+                };
+            });
+
             return {
                 ...session,
-                messages: messages || []
+                messages: transformedMessages
             };
 
         } catch (error) {

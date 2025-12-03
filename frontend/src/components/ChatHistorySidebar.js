@@ -219,9 +219,9 @@ const ChatHistorySidebar = ({
           <button
             onClick={handleNewChat}
             className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors mb-4"
-            title="New chat"
+            title="Clear chat"
           >
-            <Plus size={20} />
+            <X size={20} />
           </button>
           
           <div className="flex-1 flex items-center">
@@ -256,10 +256,10 @@ const ChatHistorySidebar = ({
                 <button
                   onClick={handleNewChat}
                   className="flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors text-sm"
-                  title="Start new chat"
+                  title="Clear chat"
                 >
-                  <Plus size={16} />
-                  New
+                  <X size={16} />
+                  Clear
                 </button>
 
                 <button

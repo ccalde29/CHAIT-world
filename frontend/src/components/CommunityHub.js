@@ -14,10 +14,19 @@ import {
   Clock,
   Users,
   Heart,
-  MapPin
+  MapPin,
+  Trash2
 } from 'lucide-react';
 
-const CommunityHub = ({ onImport, onClose, apiRequest }) => {
+const CommunityHub = ({
+  onImport,
+  onClose,
+  apiRequest,
+  userCharacters = [],
+  userScenes = [],
+  onUnpublishCharacter,
+  onUnpublishScene
+}) => {
   // ============================================================================
   // STATE MANAGEMENT
   // ============================================================================
@@ -37,7 +46,20 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
   const [offset, setOffset] = useState(0);
   const [likedCharacters, setLikedCharacters] = useState(new Set());
   const [likingCharacter, setLikingCharacter] = useState(null);
+  const [unpublishing, setUnpublishing] = useState(null);
   const LIMIT = 20;
+
+  // ============================================================================
+  // OWNERSHIP HELPERS
+  // ============================================================================
+
+  const isUserOwnedCharacter = (communityCharacter) => {
+    return userCharacters.some(char => char.id === communityCharacter.id);
+  };
+
+  const isUserOwnedScene = (communityScene) => {
+    return userScenes.some(scene => scene.id === communityScene.id);
+  };
 
   // ============================================================================
   // DATA LOADING
@@ -264,6 +286,62 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
     setSortBy('recent');
   };
 
+  const handleUnpublish = async (character, event) => {
+    if (event) {
+      event.stopPropagation();
+    }
+
+    if (unpublishing) return;
+
+    if (!window.confirm(`Unpublish "${character.name}" from the Community Hub?`)) {
+      return;
+    }
+
+    setUnpublishing(character.id);
+
+    try {
+      await onUnpublishCharacter(character.id);
+
+      // Remove from local state
+      setCharacters(prev => prev.filter(c => c.id !== character.id));
+
+      alert(`Successfully unpublished ${character.name} from the community`);
+    } catch (error) {
+      console.error('Failed to unpublish character:', error);
+      alert('Failed to unpublish character. Please try again.');
+    } finally {
+      setUnpublishing(null);
+    }
+  };
+
+  const handleUnpublishScene = async (scene, event) => {
+    if (event) {
+      event.stopPropagation();
+    }
+
+    if (unpublishing) return;
+
+    if (!window.confirm(`Unpublish "${scene.name}" from the Community Hub?`)) {
+      return;
+    }
+
+    setUnpublishing(scene.id);
+
+    try {
+      await onUnpublishScene(scene.id);
+
+      // Remove from local state
+      setScenes(prev => prev.filter(s => s.id !== scene.id));
+
+      alert(`Successfully unpublished ${scene.name} from the community`);
+    } catch (error) {
+      console.error('Failed to unpublish scene:', error);
+      alert('Failed to unpublish scene. Please try again.');
+    } finally {
+      setUnpublishing(null);
+    }
+  };
+
   // ============================================================================
   // RENDER HELPERS
   // ============================================================================
@@ -351,26 +429,46 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
             </button>
           </div>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleImport(character);
-            }}
-            disabled={importing === character.id}
-            className="flex items-center gap-1 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
-          >
-            {importing === character.id ? (
-              <>
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                <span>Importing...</span>
-              </>
-            ) : (
-              <>
-                <Download size={12} />
-                <span>Import</span>
-              </>
-            )}
-          </button>
+          {isUserOwnedCharacter(character) ? (
+            <button
+              onClick={(e) => handleUnpublish(character, e)}
+              disabled={unpublishing === character.id}
+              className="flex items-center gap-1 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
+            >
+              {unpublishing === character.id ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                  <span>Unpublishing...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 size={12} />
+                  <span>Unpublish</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleImport(character);
+              }}
+              disabled={importing === character.id}
+              className="flex items-center gap-1 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
+            >
+              {importing === character.id ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                  <span>Importing...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={12} />
+                  <span>Import</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -430,26 +528,46 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
             </div>
           </div>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleImportScene(scene);
-            }}
-            disabled={importing === scene.id}
-            className="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
-          >
-            {importing === scene.id ? (
-              <>
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                <span>Importing...</span>
-              </>
-            ) : (
-              <>
-                <Download size={12} />
-                <span>Import</span>
-              </>
-            )}
-          </button>
+          {isUserOwnedScene(scene) ? (
+            <button
+              onClick={(e) => handleUnpublishScene(scene, e)}
+              disabled={unpublishing === scene.id}
+              className="flex items-center gap-1 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
+            >
+              {unpublishing === scene.id ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                  <span>Unpublishing...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 size={12} />
+                  <span>Unpublish</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleImportScene(scene);
+              }}
+              disabled={importing === scene.id}
+              className="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
+            >
+              {importing === scene.id ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                  <span>Importing...</span>
+                </>
+              ) : (
+                <>
+                  <Download size={12} />
+                  <span>Import</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

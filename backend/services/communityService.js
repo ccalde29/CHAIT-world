@@ -443,9 +443,8 @@ class CommunityService {
       } = options;
 
       let query = this.supabase
-        .from('scenarios')
-        .select('*, user:users(id, display_name)', { count: 'exact' })
-        .eq('is_public', true);
+        .from('community_scenes') // Using the view, just like community_characters
+        .select('*', { count: 'exact' });
 
       // Apply search
       if (searchQuery) {

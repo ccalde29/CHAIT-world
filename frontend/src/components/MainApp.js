@@ -189,6 +189,26 @@ const MainApp = () => {
     }
   };
 
+  const handleUnpublishScene = async (sceneId) => {
+    try {
+      const data = await apiRequest(`/api/community/scenes/${sceneId}/unpublish`, {
+        method: 'POST'
+      });
+
+      // Update local scene state with returned data if present
+      if (data) {
+        charactersState.setScenarios(prev => prev.map(s => s.id === sceneId ? { ...s, ...data } : s));
+      } else {
+        charactersState.setScenarios(prev => prev.map(s => s.id === sceneId ? { ...s, is_public: false } : s));
+      }
+
+      window.alert(data?.message || 'Scene unpublished from community');
+    } catch (error) {
+      console.error('Error unpublishing scene:', error);
+      window.alert('Failed to unpublish scene: ' + (error.message || 'Unknown error'));
+    }
+  };
+
   const handleDeleteScene = async (sceneId) => {
     try {
       await apiRequest(`/api/scenarios/${sceneId}`, {
@@ -220,8 +240,26 @@ const MainApp = () => {
       <ChatHistorySidebar
         apiRequest={apiRequest}
         currentSessionId={chat.currentSessionId}
-        onSessionSelect={(session) => {
-          chat.loadChatSession(session.id);
+        onSessionSelect={async (session) => {
+          try {
+            // Load the chat session and get the full session data
+            const fullSession = await chat.loadChatSession(session.id);
+
+            // Restore the active characters from the session
+            if (fullSession.active_characters && fullSession.active_characters.length > 0) {
+              const sessionCharacters = fullSession.active_characters
+                .map(charId => charactersState.characters.find(c => c.id === charId))
+                .filter(Boolean); // Remove any not found
+              charactersState.setActiveCharacters(sessionCharacters);
+            }
+
+            // Restore the scene from the session
+            if (fullSession.scenario_id) {
+              charactersState.setCurrentScenario(fullSession.scenario_id);
+            }
+          } catch (error) {
+            console.error('Failed to load session:', error);
+          }
         }}
         onNewChat={() => {
           chat.clearChat();
@@ -497,6 +535,9 @@ const MainApp = () => {
         <CommunityHub
           apiRequest={apiRequest}
           userCharacters={charactersState.characters}
+          userScenes={charactersState.scenarios}
+          onUnpublishCharacter={handleUnpublishCharacter}
+          onUnpublishScene={handleUnpublishScene}
           onImport={async () => {
             await charactersState.loadCharacters();
             await charactersState.loadScenarios();

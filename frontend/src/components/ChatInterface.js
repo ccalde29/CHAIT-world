@@ -41,10 +41,24 @@ const ChatInterface = ({
             }
 
             const isUser = message.type === 'user';
-            const character = !isUser ? findCharacterById(message.character) : null;
+
+            // For character messages, use data from message first (from DB), fallback to findCharacterById
+            const character = !isUser
+              ? (message.characterName
+                  ? {
+                      id: message.character,
+                      name: message.characterName,
+                      avatar: message.characterAvatar,
+                      color: message.characterColor,
+                      avatar_image_url: message.characterImageUrl,
+                      uses_custom_image: message.characterUsesCustomImage
+                    }
+                  : findCharacterById(message.character))
+              : null;
+
             const displayAvatar = isUser
               ? userPersona?.persona?.avatar || '=d'
-              : character?.avatar || '>';
+              : character?.avatar || '>';
             const displayName = isUser
               ? userPersona?.persona?.name || 'You'
               : character?.name || 'Character';
