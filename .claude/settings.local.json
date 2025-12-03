@@ -7,7 +7,8 @@
       "Bash(netstat:*)",
       "Bash(cat:*)",
       "Bash(npx supabase db diff --schema public)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(npm start)"
     ],
     "deny": [],
     "ask": []

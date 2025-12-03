@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Users, MapPin, Plus, Edit, Trash2, Eye, Search, X } from 'lucide-react';
+import { Users, MapPin, Plus, Edit, Trash2, Eye, Search, X, Upload } from 'lucide-react';
 
 const CharacterSceneHub = ({
   characters,
@@ -17,6 +17,8 @@ const CharacterSceneHub = ({
   onAddScene,
   onEditScene,
   onDeleteScene,
+  onPublishScene,
+  onUnpublishScene,
   onOpenMemoryViewer
 }) => {
   const [activeTab, setActiveTab] = useState('characters'); // 'characters' or 'scenes'
@@ -267,7 +269,7 @@ const CharacterSceneHub = ({
                   )}
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-1 mt-2">
+                  <div className="flex items-center gap-1 mt-2 flex-wrap">
                     <button
                       onClick={() => onEditScene(scene)}
                       className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
@@ -275,6 +277,41 @@ const CharacterSceneHub = ({
                       <Edit size={12} />
                       Edit
                     </button>
+                    {scene.is_public ? (
+                      <>
+                        <button
+                          disabled
+                          className="flex items-center gap-1 text-xs text-green-200 px-2 py-1 rounded bg-white/5 cursor-not-allowed whitespace-nowrap"
+                          title="Already published"
+                        >
+                          <MapPin size={12} />
+                          Published
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Unpublish "${scene.name}" from the Community?`)) {
+                              onUnpublishScene && onUnpublishScene(scene.id);
+                            }
+                          }}
+                          className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
+                        >
+                          <Trash2 size={12} />
+                          Unpublish
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Publish "${scene.name}" to the Community?`)) {
+                            onPublishScene && onPublishScene(scene.id);
+                          }
+                        }}
+                        className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
+                      >
+                        <Upload size={12} />
+                        Publish
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         if (window.confirm(`Delete "${scene.name}"?`)) {

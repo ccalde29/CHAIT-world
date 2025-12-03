@@ -296,5 +296,130 @@ module.exports = (communityService, characterService) => {
         }
     });
 
+    // ============================================================================
+    // SCENE/SCENARIO ROUTES
+    // ============================================================================
+
+    /**
+     * Get community scenes
+     * GET /api/community/scenes
+     */
+    router.get('/scenes', async (req, res) => {
+        try {
+            const {
+                limit = 20,
+                offset = 0,
+                sortBy = 'recent',
+                search
+            } = req.query;
+
+            const options = {
+                limit: parseInt(limit),
+                offset: parseInt(offset),
+                sortBy,
+                searchQuery: search || ''
+            };
+
+            const result = await communityService.getCommunityScenes(options);
+            res.json(result);
+
+        } catch (error) {
+            console.error('Error fetching community scenes:', error);
+            res.status(500).json({ error: 'Failed to fetch community scenes' });
+        }
+    });
+
+    /**
+     * Publish scene to community
+     * POST /api/community/scenes/:id/publish
+     */
+    router.post('/scenes/:id/publish', async (req, res) => {
+        try {
+            if (!req.userId) {
+                return res.status(401).json({ error: 'Authentication required' });
+            }
+
+            const published = await communityService.publishScene(
+                req.userId,
+                req.params.id
+            );
+
+            res.json({
+                ...published,
+                message: 'Scene published to community'
+            });
+
+        } catch (error) {
+            console.error('Error publishing scene:', error);
+            res.status(500).json({ error: 'Failed to publish scene' });
+        }
+    });
+
+    /**
+     * Unpublish scene from community
+     * POST /api/community/scenes/:id/unpublish
+     */
+    router.post('/scenes/:id/unpublish', async (req, res) => {
+        try {
+            if (!req.userId) {
+                return res.status(401).json({ error: 'Authentication required' });
+            }
+
+            const scene = await communityService.unpublishScene(
+                req.userId,
+                req.params.id
+            );
+
+            res.json({
+                ...scene,
+                message: 'Scene removed from community'
+            });
+
+        } catch (error) {
+            console.error('Error unpublishing scene:', error);
+            res.status(500).json({ error: 'Failed to unpublish scene' });
+        }
+    });
+
+    /**
+     * Import a community scene
+     * POST /api/community/scenes/:id/import
+     */
+    router.post('/scenes/:id/import', async (req, res) => {
+        try {
+            if (!req.userId) {
+                return res.status(401).json({ error: 'Authentication required' });
+            }
+
+            const scene = await communityService.importScene(
+                req.userId,
+                req.params.id
+            );
+
+            res.status(201).json({
+                ...scene,
+                message: 'Scene imported successfully'
+            });
+
+        } catch (error) {
+            console.error('Error importing scene:', error);
+            res.status(500).json({ error: 'Failed to import scene' });
+        }
+    });
+
+    /**
+     * Increment scene view count
+     * POST /api/community/scenes/:id/view
+     */
+    router.post('/scenes/:id/view', async (req, res) => {
+        try {
+            await communityService.incrementSceneViewCount(req.params.id);
+            res.json({ success: true });
+        } catch (error) {
+            console.error('Error incrementing scene view count:', error);
+            res.status(500).json({ error: 'Failed to update view count' });
+        }
+    });
+
     return router;
 };

@@ -425,6 +425,209 @@ class CommunityService {
       throw error;
     }
   }
+
+  // ============================================================================
+  // SCENE/SCENARIO OPERATIONS
+  // ============================================================================
+
+  /**
+   * Get community scenes with filters and sorting
+   */
+  async getCommunityScenes(options = {}) {
+    try {
+      const {
+        limit = 20,
+        offset = 0,
+        sortBy = 'recent',
+        searchQuery = ''
+      } = options;
+
+      let query = this.supabase
+        .from('scenarios')
+        .select('*, user:users(id, display_name)', { count: 'exact' })
+        .eq('is_public', true);
+
+      // Apply search
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+      }
+
+      // Apply sorting
+      switch (sortBy) {
+        case 'popular':
+          query = query.order('import_count', { ascending: false });
+          break;
+        case 'recent':
+        default:
+          query = query.order('published_at', { ascending: false });
+          break;
+      }
+
+      query = query.range(offset, offset + limit - 1);
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        console.error('Supabase error fetching community scenes:', error);
+        throw error;
+      }
+
+      console.log(`Community scenes fetched: ${data?.length || 0} scenes, total: ${count}`);
+
+      return {
+        scenes: data || [],
+        total: count || 0,
+        hasMore: (offset + limit) < (count || 0)
+      };
+    } catch (error) {
+      console.error('Error getting community scenes:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Publish scene to community
+   */
+  async publishScene(userId, sceneId) {
+    try {
+      // Verify ownership
+      const { data: scene, error: fetchError } = await this.supabase
+        .from('scenarios')
+        .select('*')
+        .eq('id', sceneId)
+        .eq('user_id', userId)
+        .single();
+
+      if (fetchError || !scene) {
+        console.error('Scene not found for publishing:', fetchError);
+        throw new Error('Scene not found or access denied');
+      }
+
+      console.log(`Publishing scene: ${scene.name} (${sceneId})`);
+
+      // Update to public
+      const { data, error } = await this.supabase
+        .from('scenarios')
+        .update({
+          is_public: true,
+          published_at: new Date().toISOString()
+        })
+        .eq('id', sceneId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating scene to public:', error);
+        throw error;
+      }
+
+      console.log(`Scene published successfully: ${data.name}`);
+      return data;
+    } catch (error) {
+      console.error('Error publishing scene:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unpublish scene from community
+   */
+  async unpublishScene(userId, sceneId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('scenarios')
+        .update({
+          is_public: false,
+          published_at: null
+        })
+        .eq('id', sceneId)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error unpublishing scene:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Import a community scene
+   */
+  async importScene(userId, sceneId) {
+    try {
+      // Get the published scene
+      const { data: sourceScene, error: fetchError } = await this.supabase
+        .from('scenarios')
+        .select('*')
+        .eq('id', sceneId)
+        .eq('is_public', true)
+        .single();
+
+      if (fetchError || !sourceScene) {
+        throw new Error('Scene not found or not public');
+      }
+
+      // Create a copy for the user
+      const { data: newScene, error: insertError } = await this.supabase
+        .from('scenarios')
+        .insert({
+          user_id: userId,
+          name: sourceScene.name,
+          description: sourceScene.description,
+          initial_message: sourceScene.initial_message,
+          atmosphere: sourceScene.atmosphere,
+          background_image_url: sourceScene.background_image_url,
+          background_image_filename: sourceScene.background_image_filename,
+          uses_custom_background: sourceScene.uses_custom_background,
+          is_public: false
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Increment import count
+      await this.supabase
+        .from('scenarios')
+        .update({
+          import_count: (sourceScene.import_count || 0) + 1
+        })
+        .eq('id', sceneId);
+
+      return newScene;
+    } catch (error) {
+      console.error('Error importing scene:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Increment scene view count
+   */
+  async incrementSceneViewCount(sceneId) {
+    try {
+      await this.supabase.rpc('increment_scenario_views', {
+        scenario_id: sceneId
+      });
+    } catch (error) {
+      // If RPC doesn't exist, use manual update
+      const { data: scene } = await this.supabase
+        .from('scenarios')
+        .select('view_count')
+        .eq('id', sceneId)
+        .single();
+
+      if (scene) {
+        await this.supabase
+          .from('scenarios')
+          .update({ view_count: (scene.view_count || 0) + 1 })
+          .eq('id', sceneId);
+      }
+    }
+  }
 }
 
 module.exports = CommunityService;

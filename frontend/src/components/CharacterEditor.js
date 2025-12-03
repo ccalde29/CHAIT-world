@@ -431,6 +431,11 @@ const CharacterEditorV15 = ({
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Appearance
+                <span className={`ml-2 text-xs ${
+                  formData.appearance.length > 1000 ? 'text-red-400' : 'text-gray-500'
+                }`}>
+                  ({formData.appearance.length} / 1000 characters)
+                </span>
               </label>
               <p className="text-xs text-gray-400 mb-2">
                 Describe the character's physical appearance, style, and notable features. This helps paint a picture of who they are.
@@ -440,6 +445,7 @@ const CharacterEditorV15 = ({
                 onChange={(e) => handleInputChange('appearance', e.target.value)}
                 placeholder="Physical description, style, notable features..."
                 rows={2}
+                maxLength={1000}
                 className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[60px]"
               />
             </div>
@@ -448,6 +454,11 @@ const CharacterEditorV15 = ({
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Personality & Background *
+                <span className={`ml-2 text-xs ${
+                  formData.personality.length > 2000 ? 'text-red-400' : 'text-gray-500'
+                }`}>
+                  ({formData.personality.length} / 2000 characters)
+                </span>
               </label>
               <p className="text-xs text-gray-400 mb-2">
                 This is the core of your character. Describe their personality traits, background story, speaking style, interests, and how they interact with others. Be specific and detailed - this directly shapes how the AI will roleplay this character.
@@ -457,6 +468,7 @@ const CharacterEditorV15 = ({
                 onChange={(e) => handleInputChange('personality', e.target.value)}
                 placeholder="Describe who this character is, their personality traits, background, speaking style, interests, etc."
                 rows={6}
+                maxLength={2000}
                 className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[140px]"
               />
             </div>

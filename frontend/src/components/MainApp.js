@@ -225,6 +225,8 @@ const MainApp = () => {
         }}
         onNewChat={() => {
           chat.clearChat();
+          charactersState.setActiveCharacters([]);
+          charactersState.setCurrentScenario(null);
         }}
         characters={charactersState.characters}
         isCollapsed={chatHistoryCollapsed}
@@ -254,6 +256,30 @@ const MainApp = () => {
             setShowSceneEditor(true);
           }}
           onDeleteScene={handleDeleteScene}
+          onPublishScene={async (sceneId) => {
+            try {
+              await apiRequest(`/api/community/scenes/${sceneId}/publish`, {
+                method: 'POST'
+              });
+              await charactersState.loadScenarios();
+              alert('Scene published to community!');
+            } catch (error) {
+              console.error('Error publishing scene:', error);
+              alert('Failed to publish scene');
+            }
+          }}
+          onUnpublishScene={async (sceneId) => {
+            try {
+              await apiRequest(`/api/community/scenes/${sceneId}/unpublish`, {
+                method: 'POST'
+              });
+              await charactersState.loadScenarios();
+              alert('Scene removed from community');
+            } catch (error) {
+              console.error('Error unpublishing scene:', error);
+              alert('Failed to unpublish scene');
+            }
+          }}
           onOpenMemoryViewer={(character) => {
             setSelectedCharacterForMemory(character);
             setShowMemoryViewer(true);
@@ -434,6 +460,30 @@ const MainApp = () => {
             }
           }}
           onDelete={handleDeleteScene}
+          onPublish={async (sceneId) => {
+            try {
+              await apiRequest(`/api/community/scenes/${sceneId}/publish`, {
+                method: 'POST'
+              });
+              await charactersState.loadScenarios();
+              alert('Scene published to community!');
+            } catch (error) {
+              console.error('Error publishing scene:', error);
+              alert('Failed to publish scene');
+            }
+          }}
+          onUnpublish={async (sceneId) => {
+            try {
+              await apiRequest(`/api/community/scenes/${sceneId}/unpublish`, {
+                method: 'POST'
+              });
+              await charactersState.loadScenarios();
+              alert('Scene removed from community');
+            } catch (error) {
+              console.error('Error unpublishing scene:', error);
+              alert('Failed to unpublish scene');
+            }
+          }}
           onClose={() => {
             setShowSceneEditor(false);
             setEditingScene(null);
@@ -449,6 +499,7 @@ const MainApp = () => {
           userCharacters={charactersState.characters}
           onImport={async () => {
             await charactersState.loadCharacters();
+            await charactersState.loadScenarios();
             setShowCommunityHub(false);
           }}
           onClose={() => setShowCommunityHub(false)}

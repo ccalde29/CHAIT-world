@@ -13,16 +13,18 @@ import {
   TrendingUp,
   Clock,
   Users,
-  Filter,
-  Heart
+  Heart,
+  MapPin
 } from 'lucide-react';
 
 const CommunityHub = ({ onImport, onClose, apiRequest }) => {
   // ============================================================================
   // STATE MANAGEMENT
   // ============================================================================
-  
+
+  const [activeTab, setActiveTab] = useState('characters'); // 'characters' or 'scenes'
   const [characters, setCharacters] = useState([]);
+  const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,31 +32,34 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
   const [selectedTags, setSelectedTags] = useState([]);
   const [popularTags, setPopularTags] = useState([]);
   const [selectedCharacter, setSelectedCharacter] = useState(null);
+  const [selectedScene, setSelectedScene] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const [likedCharacters, setLikedCharacters] = useState(new Set());
+  const [likingCharacter, setLikingCharacter] = useState(null);
   const LIMIT = 20;
 
   // ============================================================================
   // DATA LOADING
   // ============================================================================
-  
+
   const loadCommunityCharacters = async (reset = false) => {
     try {
       setLoading(true);
-      
+
       const params = new URLSearchParams({
         limit: LIMIT,
         offset: reset ? 0 : offset,
         sortBy,
         search: searchQuery
       });
-      
+
       if (selectedTags.length > 0) {
         params.append('tags', selectedTags.join(','));
       }
-      
+
       const response = await apiRequest(`/api/community/characters?${params}`);
-      
+
       if (reset) {
         setCharacters(response.characters || []);
         setOffset(LIMIT);
@@ -62,11 +67,41 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
         setCharacters(prev => [...prev, ...(response.characters || [])]);
         setOffset(prev => prev + LIMIT);
       }
-      
+
       setHasMore(response.hasMore);
-      
+
     } catch (error) {
       console.error('Failed to load community characters:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCommunityScenes = async (reset = false) => {
+    try {
+      setLoading(true);
+
+      const params = new URLSearchParams({
+        limit: LIMIT,
+        offset: reset ? 0 : offset,
+        sortBy,
+        search: searchQuery
+      });
+
+      const response = await apiRequest(`/api/community/scenes?${params}`);
+
+      if (reset) {
+        setScenes(response.scenes || []);
+        setOffset(LIMIT);
+      } else {
+        setScenes(prev => [...prev, ...(response.scenes || [])]);
+        setOffset(prev => prev + LIMIT);
+      }
+
+      setHasMore(response.hasMore);
+
+    } catch (error) {
+      console.error('Failed to load community scenes:', error);
     } finally {
       setLoading(false);
     }
@@ -81,13 +116,28 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
     }
   };
 
+  const loadUserFavorites = async () => {
+    try {
+      const response = await apiRequest('/api/community/favorites');
+      const favoriteIds = new Set(response.favorites?.map(f => f.character_id) || []);
+      setLikedCharacters(favoriteIds);
+    } catch (error) {
+      console.error('Failed to load user favorites:', error);
+    }
+  };
+
   useEffect(() => {
     loadPopularTags();
+    loadUserFavorites();
   }, []);
 
   useEffect(() => {
-    loadCommunityCharacters(true);
-  }, [sortBy, selectedTags, searchQuery]);
+    if (activeTab === 'characters') {
+      loadCommunityCharacters(true);
+    } else if (activeTab === 'scenes') {
+      loadCommunityScenes(true);
+    }
+  }, [activeTab, sortBy, selectedTags, searchQuery]);
 
   // ============================================================================
   // ACTIONS
@@ -95,27 +145,27 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
   
   const handleImport = async (character) => {
     if (importing) return;
-    
+
     setImporting(character.id);
-    
+
     try {
       const response = await apiRequest(`/api/community/characters/${character.id}/import`, {
         method: 'POST'
       });
-      
+
       // Track view
       await apiRequest(`/api/community/characters/${character.id}/view`, {
         method: 'POST'
       });
-      
+
       // Call parent's onImport callback
       if (onImport) {
         await onImport(response);
       }
-      
+
       // Show success feedback
       alert(`Successfully imported ${character.name}!`);
-      
+
     } catch (error) {
       console.error('Failed to import character:', error);
       alert('Failed to import character. Please try again.');
@@ -124,9 +174,85 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
     }
   };
 
+  const handleLike = async (character, event) => {
+    if (event) {
+      event.stopPropagation();
+    }
+
+    if (likingCharacter) return;
+
+    const isLiked = likedCharacters.has(character.id);
+    setLikingCharacter(character.id);
+
+    try {
+      if (isLiked) {
+        await apiRequest(`/api/community/characters/${character.id}/favorite`, {
+          method: 'DELETE'
+        });
+        setLikedCharacters(prev => {
+          const next = new Set(prev);
+          next.delete(character.id);
+          return next;
+        });
+        // Update character's favorite count
+        setCharacters(prev => prev.map(c =>
+          c.id === character.id
+            ? { ...c, favorite_count: (c.favorite_count || 1) - 1 }
+            : c
+        ));
+      } else {
+        await apiRequest(`/api/community/characters/${character.id}/favorite`, {
+          method: 'POST'
+        });
+        setLikedCharacters(prev => new Set([...prev, character.id]));
+        // Update character's favorite count
+        setCharacters(prev => prev.map(c =>
+          c.id === character.id
+            ? { ...c, favorite_count: (c.favorite_count || 0) + 1 }
+            : c
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    } finally {
+      setLikingCharacter(null);
+    }
+  };
+
+  const handleImportScene = async (scene) => {
+    if (importing) return;
+
+    setImporting(scene.id);
+
+    try {
+      const response = await apiRequest(`/api/community/scenes/${scene.id}/import`, {
+        method: 'POST'
+      });
+
+      // Track view
+      await apiRequest(`/api/community/scenes/${scene.id}/view`, {
+        method: 'POST'
+      });
+
+      // Call parent's onImport callback
+      if (onImport) {
+        await onImport(response);
+      }
+
+      // Show success feedback
+      alert(`Successfully imported ${scene.name}!`);
+
+    } catch (error) {
+      console.error('Failed to import scene:', error);
+      alert('Failed to import scene. Please try again.');
+    } finally {
+      setImporting(null);
+    }
+  };
+
   const toggleTag = (tag) => {
-    setSelectedTags(prev => 
-      prev.includes(tag) 
+    setSelectedTags(prev =>
+      prev.includes(tag)
         ? prev.filter(t => t !== tag)
         : [...prev, tag]
     );
@@ -197,7 +323,7 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
           </div>
         )}
 
-        {/* Stats */}
+        {/* Stats and Actions */}
         <div className="flex items-center justify-between text-xs text-gray-400">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
@@ -208,12 +334,23 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
               <Download size={12} />
               <span>{character.import_count || 0}</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Heart size={12} />
+            <button
+              onClick={(e) => handleLike(character, e)}
+              disabled={likingCharacter === character.id}
+              className={`flex items-center gap-1 transition-colors ${
+                likedCharacters.has(character.id)
+                  ? 'text-red-400 hover:text-red-300'
+                  : 'text-gray-400 hover:text-red-400'
+              }`}
+            >
+              <Heart
+                size={12}
+                fill={likedCharacters.has(character.id) ? 'currentColor' : 'none'}
+              />
               <span>{character.favorite_count || 0}</span>
-            </div>
+            </button>
           </div>
-          
+
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -238,6 +375,182 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
       </div>
     </div>
   );
+
+  const renderSceneCard = (scene) => (
+    <div
+      key={scene.id}
+      className="bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 transition-all cursor-pointer"
+      onClick={() => setSelectedScene(scene)}
+    >
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-cyan-500">
+            <MapPin size={24} className="text-white" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-medium mb-1">
+              {scene.name}
+            </h3>
+            <p className="text-xs text-gray-300 line-clamp-2">
+              {scene.description}
+            </p>
+          </div>
+        </div>
+
+        {/* Initial Message Preview */}
+        {scene.initial_message && (
+          <div className="bg-white/5 rounded-lg p-2 mb-3 border border-white/5">
+            <p className="text-xs text-gray-400 line-clamp-2 italic">
+              "{scene.initial_message}"
+            </p>
+          </div>
+        )}
+
+        {/* Atmosphere Badge */}
+        {scene.atmosphere && (
+          <div className="mb-3">
+            <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
+              {scene.atmosphere}
+            </span>
+          </div>
+        )}
+
+        {/* Stats and Actions */}
+        <div className="flex items-center justify-between text-xs text-gray-400">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <Eye size={12} />
+              <span>{scene.view_count || 0}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Download size={12} />
+              <span>{scene.import_count || 0}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleImportScene(scene);
+            }}
+            disabled={importing === scene.id}
+            className="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
+          >
+            {importing === scene.id ? (
+              <>
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                <span>Importing...</span>
+              </>
+            ) : (
+              <>
+                <Download size={12} />
+                <span>Import</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSceneDetail = () => {
+    if (!selectedScene) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+        <div className="bg-slate-800 rounded-2xl border border-white/10 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-cyan-500">
+                <MapPin size={24} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">{selectedScene.name}</h2>
+                {selectedScene.atmosphere && (
+                  <p className="text-sm text-gray-400">Atmosphere: {selectedScene.atmosphere}</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedScene(null)}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 space-y-4">
+            {/* Description */}
+            <div>
+              <h3 className="text-sm font-medium text-blue-300 mb-2">Description</h3>
+              <p className="text-sm text-gray-300">{selectedScene.description}</p>
+            </div>
+
+            {/* Initial Message */}
+            {selectedScene.initial_message && (
+              <div>
+                <h3 className="text-sm font-medium text-blue-300 mb-2">Initial Message</h3>
+                <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                  <p className="text-sm text-gray-300 italic">"{selectedScene.initial_message}"</p>
+                </div>
+              </div>
+            )}
+
+            {/* Background Image */}
+            {selectedScene.uses_custom_background && selectedScene.background_image_url && (
+              <div>
+                <h3 className="text-sm font-medium text-blue-300 mb-2">Background</h3>
+                <img
+                  src={selectedScene.background_image_url}
+                  alt={`${selectedScene.name} background`}
+                  className="w-full rounded-lg border border-white/10"
+                />
+              </div>
+            )}
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4 p-4 bg-white/5 rounded-lg">
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-1 text-gray-400 mb-1">
+                  <Eye size={14} />
+                </div>
+                <div className="text-lg font-bold text-white">{selectedScene.view_count || 0}</div>
+                <div className="text-xs text-gray-400">Views</div>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-1 text-gray-400 mb-1">
+                  <Download size={14} />
+                </div>
+                <div className="text-lg font-bold text-white">{selectedScene.import_count || 0}</div>
+                <div className="text-xs text-gray-400">Imports</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
+            <button
+              onClick={() => setSelectedScene(null)}
+              className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+            >
+              Close
+            </button>
+            <button
+              onClick={() => handleImportScene(selectedScene)}
+              disabled={importing === selectedScene.id}
+              className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 text-white rounded-lg transition-all"
+            >
+              {importing === selectedScene.id ? 'Importing...' : 'Import Scene'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderCharacterDetail = () => {
     if (!selectedCharacter) return null;
@@ -371,20 +684,46 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-slate-800 rounded-2xl border border-white/10 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <Users className="text-purple-400" size={24} />
-            <div>
-              <h2 className="text-xl font-bold text-white">Community Hub</h2>
-              <p className="text-sm text-gray-400">Browse and import characters shared by the community</p>
+        <div className="border-b border-white/10">
+          <div className="flex items-center justify-between p-6">
+            <div className="flex items-center gap-3">
+              <Users className="text-purple-400" size={24} />
+              <div>
+                <h2 className="text-xl font-bold text-white">Community Hub</h2>
+                <p className="text-sm text-gray-400">Browse and import shared content</p>
+              </div>
             </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            <X size={20} />
-          </button>
+
+          {/* Tabs */}
+          <div className="flex gap-4 px-6">
+            <button
+              onClick={() => setActiveTab('characters')}
+              className={`pb-3 px-2 border-b-2 transition-colors ${
+                activeTab === 'characters'
+                  ? 'border-purple-400 text-purple-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Characters
+            </button>
+            <button
+              onClick={() => setActiveTab('scenes')}
+              className={`pb-3 px-2 border-b-2 transition-colors ${
+                activeTab === 'scenes'
+                  ? 'border-blue-400 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Scenes
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -397,7 +736,7 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search characters..."
+                placeholder={`Search ${activeTab}...`}
                 className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400"
               />
             </div>
@@ -456,46 +795,87 @@ const CommunityHub = ({ onImport, onClose, apiRequest }) => {
           )}
         </div>
 
-        {/* Character Grid */}
+        {/* Content Grid */}
         <div className="flex-1 overflow-y-auto p-6">
-          {loading && characters.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto mb-4"></div>
-                <p className="text-white">Loading community characters...</p>
-              </div>
-            </div>
-          ) : characters.length === 0 ? (
-            <div className="text-center py-12">
-              <Users size={48} className="mx-auto mb-4 text-gray-500" />
-              <p className="text-gray-400 mb-2">No characters found</p>
-              <p className="text-sm text-gray-500">Try adjusting your filters or search query</p>
-            </div>
+          {activeTab === 'characters' ? (
+            <>
+              {loading && characters.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto mb-4"></div>
+                    <p className="text-white">Loading community characters...</p>
+                  </div>
+                </div>
+              ) : characters.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users size={48} className="mx-auto mb-4 text-gray-500" />
+                  <p className="text-gray-400 mb-2">No characters found</p>
+                  <p className="text-sm text-gray-500">Try adjusting your filters or search query</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {characters.map(renderCharacterCard)}
+                  </div>
+
+                  {/* Load More */}
+                  {hasMore && (
+                    <div className="text-center mt-6">
+                      <button
+                        onClick={() => loadCommunityCharacters(false)}
+                        disabled={loading}
+                        className="px-6 py-2 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+                      >
+                        {loading ? 'Loading...' : 'Load More'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {characters.map(renderCharacterCard)}
-              </div>
-
-              {/* Load More */}
-              {hasMore && (
-                <div className="text-center mt-6">
-                  <button
-                    onClick={() => loadCommunityCharacters(false)}
-                    disabled={loading}
-                    className="px-6 py-2 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white rounded-lg transition-colors"
-                  >
-                    {loading ? 'Loading...' : 'Load More'}
-                  </button>
+              {loading && scenes.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
+                    <p className="text-white">Loading community scenes...</p>
+                  </div>
                 </div>
+              ) : scenes.length === 0 ? (
+                <div className="text-center py-12">
+                  <MapPin size={48} className="mx-auto mb-4 text-gray-500" />
+                  <p className="text-gray-400 mb-2">No scenes found</p>
+                  <p className="text-sm text-gray-500">Try adjusting your filters or search query</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {scenes.map(renderSceneCard)}
+                  </div>
+
+                  {/* Load More */}
+                  {hasMore && (
+                    <div className="text-center mt-6">
+                      <button
+                        onClick={() => loadCommunityScenes(false)}
+                        disabled={loading}
+                        className="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+                      >
+                        {loading ? 'Loading...' : 'Load More'}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
         </div>
       </div>
 
-      {/* Character Detail Modal */}
+      {/* Detail Modals */}
       {selectedCharacter && renderCharacterDetail()}
+      {selectedScene && renderSceneDetail()}
     </div>
   );
 };

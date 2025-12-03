@@ -80,6 +80,13 @@ app.use('/api/providers', providerRoutes);
 app.use('/api/chat', groupChatRoutes);
 app.use('/api/chat', requireAuth, chatSessionRoutes);
 app.use('/api/characters', requireAuth, characterRoutes);
+// Community routes - GET requests are public, POST/PUT/DELETE require auth
+app.use('/api/community', (req, res, next) => {
+  if (req.method === 'GET') {
+    return next(); // Public access for browsing
+  }
+  return requireAuth(req, res, next); // Auth required for mutations
+});
 app.use('/api/community', communityRoutes);
 app.use('/api/characters', requireAuth, communityRoutes); // For publish/unpublish
 app.use('/api/user', requireAuth, userRoutes);

@@ -67,13 +67,6 @@ module.exports = (db) => {
      */
     router.put('/:id', async (req, res) => {
         try {
-            const defaultScenarios = ['coffee-shop', 'study-group', 'party'];
-            if (defaultScenarios.includes(req.params.id)) {
-                return res.status(400).json({
-                    error: 'Default scenarios cannot be edited. Create a custom scenario instead.'
-                });
-            }
-
             const { name, description, initial_message, atmosphere, background_image_url, background_image_filename, uses_custom_background } = req.body;
 
             if (!name || !description || !initial_message) {
@@ -116,17 +109,16 @@ module.exports = (db) => {
      */
     router.delete('/:id', async (req, res) => {
         try {
-            const defaultScenarios = ['coffee-shop', 'study-group', 'party'];
-            if (defaultScenarios.includes(req.params.id)) {
-                return res.status(400).json({
-                    error: 'Default scenarios cannot be deleted'
-                });
-            }
-
             const result = await db.deleteScenario(req.userId, req.params.id);
             res.json(result);
         } catch (error) {
             console.error('Error deleting scenario:', error);
+
+            // Return specific error message if it's about published scene
+            if (error.message && error.message.includes('published')) {
+                return res.status(400).json({ error: error.message });
+            }
+
             res.status(500).json({ error: 'Failed to delete scenario' });
         }
     });

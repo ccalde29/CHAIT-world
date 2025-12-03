@@ -7,11 +7,11 @@ class ScenarioService {
     }
 
     /**
-     * Get all scenarios (default + custom) for a user
+     * Get all scenarios for a user
      */
     async getScenarios(userId) {
         try {
-            const { data: customScenarios, error } = await this.supabase
+            const { data: scenarios, error } = await this.supabase
                 .from('scenarios')
                 .select('*')
                 .eq('user_id', userId)
@@ -19,38 +19,9 @@ class ScenarioService {
 
             if (error) throw error;
 
-            const defaultScenarios = [
-                {
-                    id: 'coffee-shop',
-                    name: 'Coffee Shop Hangout',
-                    description: 'Casual afternoon at a cozy coffee shop',
-                    initial_message: 'The group is hanging out at a cozy coffee shop on a relaxed afternoon, sharing drinks and casual conversation.',
-                    atmosphere: 'relaxed and friendly',
-                    is_default: true
-                },
-                {
-                    id: 'study-group',
-                    name: 'Study Session',
-                    description: 'Working on assignments together',
-                    initial_message: 'The group is in a study session, working on assignments together but taking breaks to chat and help each other.',
-                    atmosphere: 'focused but collaborative',
-                    is_default: true
-                },
-                {
-                    id: 'party',
-                    name: 'House Party',
-                    description: 'Weekend party with music and games',
-                    initial_message: 'The group is at a weekend house party with music playing, people socializing, and a fun, energetic atmosphere.',
-                    atmosphere: 'energetic and social',
-                    is_default: true
-                }
-            ];
-
-            const allScenarios = [...defaultScenarios, ...(customScenarios || [])];
-
             return {
-                scenarios: allScenarios,
-                total: allScenarios.length
+                scenarios: scenarios || [],
+                total: scenarios?.length || 0
             };
 
         } catch (error) {
@@ -124,6 +95,20 @@ class ScenarioService {
      */
     async deleteScenario(userId, scenarioId) {
         try {
+            // Check if scenario is published
+            const { data: scenario, error: fetchError } = await this.supabase
+                .from('scenarios')
+                .select('is_public')
+                .eq('id', scenarioId)
+                .eq('user_id', userId)
+                .single();
+
+            if (fetchError) throw fetchError;
+
+            if (scenario?.is_public) {
+                throw new Error('Cannot delete a published scene. Please unpublish it first.');
+            }
+
             const { error } = await this.supabase
                 .from('scenarios')
                 .delete()

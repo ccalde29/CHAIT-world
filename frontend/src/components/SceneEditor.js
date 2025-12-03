@@ -6,10 +6,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, Plus, Edit, Trash2, Image } from 'lucide-react';
+import { X, MapPin, Plus, Edit, Trash2, Image, Upload, Eye } from 'lucide-react';
 import ImageUpload from './ImageUpload';
 
-const SceneEditor = ({ scenarios, onSave, onDelete, onClose, initialEditingScene = null }) => {
+const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onClose, initialEditingScene = null }) => {
   // ============================================================================
   // STATE MANAGEMENT
   // ============================================================================
@@ -229,8 +229,30 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose, initialEditingScene
                     {/* Scene Content */}
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-2">
-                        <h3 className="text-lg font-medium text-white">{scene.name}</h3>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-medium text-white">{scene.name}</h3>
+                            {scene.is_public && (
+                              <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded-full border border-green-500/30">
+                                Published
+                              </span>
+                            )}
+                          </div>
+                        </div>
                         <div className="flex gap-1">
+                          {onPublish && onUnpublish && (
+                            <button
+                              onClick={() => scene.is_public ? onUnpublish(scene.id) : onPublish(scene.id)}
+                              className={`p-1 transition-colors ${
+                                scene.is_public
+                                  ? 'text-green-400 hover:text-green-300'
+                                  : 'text-gray-400 hover:text-green-400'
+                              }`}
+                              title={scene.is_public ? 'Unpublish from community' : 'Publish to community'}
+                            >
+                              {scene.is_public ? <Eye size={14} /> : <Upload size={14} />}
+                            </button>
+                          )}
                           <button
                             onClick={() => startEdit(scene)}
                             className="p-1 text-gray-400 hover:text-white transition-colors"

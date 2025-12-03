@@ -233,6 +233,20 @@ class CharacterService {
         return { message: 'Default character hidden', characterId };
       }
 
+      // Check if character is published
+      const { data: character, error: fetchError } = await this.supabase
+        .from('characters')
+        .select('is_public')
+        .eq('id', characterId)
+        .eq('user_id', userId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (character?.is_public) {
+        throw new Error('Cannot delete a published character. Please unpublish it first from the Community Hub.');
+      }
+
       const { error } = await this.supabase
         .from('characters')
         .delete()

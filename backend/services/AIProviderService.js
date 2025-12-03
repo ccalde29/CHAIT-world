@@ -215,7 +215,7 @@ class AIProviderService {
     }
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -240,13 +240,36 @@ class AIProviderService {
 
     const data = await response.json();
 
-    // Validate response structure
-    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-      console.error('Invalid Gemini response structure:', data);
-      throw new Error('Invalid response from Gemini API');
+    // Check for prompt feedback (blocked content)
+    if (data.promptFeedback && data.promptFeedback.blockReason) {
+      console.error('Gemini blocked the prompt:', data.promptFeedback);
+      throw new Error(`Gemini blocked the request: ${data.promptFeedback.blockReason}`);
     }
 
-    return data.candidates[0].content.parts[0].text.trim();
+    // Validate response structure
+    if (!data.candidates || data.candidates.length === 0) {
+      console.error('Invalid Gemini response structure:', JSON.stringify(data, null, 2));
+      throw new Error('Invalid response from Gemini API - no candidates returned');
+    }
+
+    const candidate = data.candidates[0];
+
+    // Check if content was blocked (only block on actual safety issues)
+    const blockedReasons = ['SAFETY', 'RECITATION', 'OTHER'];
+    if (candidate.finishReason && blockedReasons.includes(candidate.finishReason)) {
+      console.error('Gemini response blocked:', candidate);
+      throw new Error(`Gemini blocked the response: ${candidate.finishReason}`);
+    }
+
+    // MAX_TOKENS and STOP are acceptable finish reasons
+    // MAX_TOKENS just means we hit the limit but still got a response
+
+    if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+      console.error('Invalid Gemini content structure:', JSON.stringify(candidate, null, 2));
+      throw new Error('Invalid response from Gemini API - malformed content');
+    }
+
+    return candidate.content.parts[0].text.trim();
   }
   
   // ==========================================================================
@@ -304,7 +327,7 @@ class AIProviderService {
         ai_provider: provider,
         ai_model: model || this.getDefaultModel(provider),
         temperature: 0.7,
-        max_tokens: 10
+        max_tokens: 100
       };
 
       const response = await this.generateResponse(
@@ -329,7 +352,7 @@ class AIProviderService {
       'openai': 'gpt-4o-mini',
       'anthropic': 'claude-3-5-haiku-20241022',
       'openrouter': 'openai/gpt-4o-mini',
-      'google': 'gemini-1.5-flash-latest',
+      'google': 'gemini-2.5-flash',
       'ollama': 'llama2'
     };
 
@@ -454,11 +477,11 @@ class AIProviderService {
   
   static getGeminiModels() {
     return [
-      { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Experimental)' },
-      { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash (Latest)' },
-      { id: 'gemini-1.5-flash-8b-latest', name: 'Gemini 1.5 Flash-8B (Latest)' },
-      { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Latest)' },
-      { id: 'gemini-pro', name: 'Gemini Pro (Legacy)' }
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+      { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' },
+      { id: 'gemini-2.0-pro', name: 'Gemini 2.0 Pro' }
     ];
   }
   
