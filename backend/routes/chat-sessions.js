@@ -28,6 +28,46 @@ module.exports = (db) => {
     });
 
     /**
+     * Create a new chat session with initial message
+     * POST /api/chat/sessions/create-with-initial-message
+     */
+    router.post('/sessions/create-with-initial-message', async (req, res) => {
+        try {
+            const { scenario_id, active_characters, initial_message, title } = req.body;
+
+            if (!scenario_id || !active_characters) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+
+            // Create the session
+            const session = await db.createChatSession(req.userId, {
+                scenario: scenario_id,
+                activeCharacters: active_characters,
+                title: title || `Chat - ${new Date().toLocaleDateString()}`,
+                groupMode: 'natural'
+            });
+
+            // Add the initial message if provided
+            if (initial_message) {
+                await db.saveChatMessage(session.id, {
+                    type: 'system',
+                    content: initial_message
+                });
+            }
+
+            console.log('✅ Created chat session with initial message:', session.id);
+            res.status(201).json({
+                sessionId: session.id,
+                message: 'Chat session created successfully'
+            });
+
+        } catch (error) {
+            console.error('Error creating chat session:', error);
+            res.status(500).json({ error: 'Failed to create chat session' });
+        }
+    });
+
+    /**
      * Get all chat sessions for user
      * GET /api/chat/sessions
      */

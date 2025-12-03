@@ -28,6 +28,9 @@ const ActiveChatPanel = ({
     );
   }
 
+  // Show empty state if no scene or characters
+  const isEmpty = !currentScene && activeCharacters.length === 0;
+
   return (
     <div className="w-80 bg-gray-800 border-l border-white/10 flex flex-col overflow-hidden">
       {/* Header */}
@@ -46,6 +49,16 @@ const ActiveChatPanel = ({
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {isEmpty ? (
+          <div className="flex items-center justify-center h-full p-8">
+            <div className="text-center text-gray-500">
+              <Users size={48} className="mx-auto mb-4 opacity-30" />
+              <p className="text-lg mb-2">No Active Chat</p>
+              <p className="text-sm">Start a new conversation to begin</p>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Current Scene */}
         {currentScene && (
           <div className="p-4 border-b border-white/10">
@@ -148,6 +161,8 @@ const ActiveChatPanel = ({
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );

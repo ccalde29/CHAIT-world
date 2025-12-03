@@ -8,7 +8,7 @@ export const useCharacters = (apiRequest) => {
   const [characters, setCharacters] = useState([]);
   const [activeCharacters, setActiveCharacters] = useState([]);
   const [scenarios, setScenarios] = useState([]);
-  const [currentScenario, setCurrentScenario] = useState('coffee-shop');
+  const [currentScenario, setCurrentScenario] = useState(null);
   const [characterSort, setCharacterSort] = useState('recent');
   const [characterSearch, setCharacterSearch] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState('');
@@ -23,11 +23,6 @@ export const useCharacters = (apiRequest) => {
     try {
       const data = await apiRequest('/api/characters');
       setCharacters(data.characters || []);
-
-      // Auto-activate first 3 characters if none selected
-      if (data.characters && data.characters.length > 0 && activeCharacters.length === 0) {
-        setActiveCharacters(data.characters.slice(0, 3));
-      }
     } catch (error) {
       console.error('Error loading characters:', error);
     }

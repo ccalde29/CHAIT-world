@@ -29,6 +29,17 @@ const ChatInterface = ({
           </div>
         ) : (
           messages.map((message) => {
+            // Handle system messages (like initial scene message)
+            if (message.type === 'system') {
+              return (
+                <div key={message.id} className="flex justify-center my-6">
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg px-6 py-4 max-w-2xl">
+                    <p className="text-gray-300 text-center italic">{message.content}</p>
+                  </div>
+                </div>
+              );
+            }
+
             const isUser = message.type === 'user';
             const character = !isUser ? findCharacterById(message.character) : null;
             const displayAvatar = isUser

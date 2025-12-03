@@ -24,7 +24,7 @@ class ScenarioService {
                     id: 'coffee-shop',
                     name: 'Coffee Shop Hangout',
                     description: 'Casual afternoon at a cozy coffee shop',
-                    context: 'The group is hanging out at a cozy coffee shop on a relaxed afternoon, sharing drinks and casual conversation.',
+                    initial_message: 'The group is hanging out at a cozy coffee shop on a relaxed afternoon, sharing drinks and casual conversation.',
                     atmosphere: 'relaxed and friendly',
                     is_default: true
                 },
@@ -32,7 +32,7 @@ class ScenarioService {
                     id: 'study-group',
                     name: 'Study Session',
                     description: 'Working on assignments together',
-                    context: 'The group is in a study session, working on assignments together but taking breaks to chat and help each other.',
+                    initial_message: 'The group is in a study session, working on assignments together but taking breaks to chat and help each other.',
                     atmosphere: 'focused but collaborative',
                     is_default: true
                 },
@@ -40,7 +40,7 @@ class ScenarioService {
                     id: 'party',
                     name: 'House Party',
                     description: 'Weekend party with music and games',
-                    context: 'The group is at a weekend house party with music playing, people socializing, and a fun, energetic atmosphere.',
+                    initial_message: 'The group is at a weekend house party with music playing, people socializing, and a fun, energetic atmosphere.',
                     atmosphere: 'energetic and social',
                     is_default: true
                 }
@@ -70,8 +70,11 @@ class ScenarioService {
                     user_id: userId,
                     name: scenarioData.name,
                     description: scenarioData.description,
-                    context: scenarioData.context,
-                    atmosphere: scenarioData.atmosphere || 'neutral'
+                    initial_message: scenarioData.initial_message,
+                    atmosphere: scenarioData.atmosphere || 'neutral',
+                    background_image_url: scenarioData.background_image_url || null,
+                    background_image_filename: scenarioData.background_image_filename || null,
+                    uses_custom_background: scenarioData.uses_custom_background || false
                 })
                 .select()
                 .single();
@@ -95,8 +98,11 @@ class ScenarioService {
                 .update({
                     name: updates.name,
                     description: updates.description,
-                    context: updates.context,
+                    initial_message: updates.initial_message,
                     atmosphere: updates.atmosphere,
+                    background_image_url: updates.background_image_url || null,
+                    background_image_filename: updates.background_image_filename || null,
+                    uses_custom_background: updates.uses_custom_background || false,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', scenarioId)

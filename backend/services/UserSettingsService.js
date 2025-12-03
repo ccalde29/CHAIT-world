@@ -23,25 +23,25 @@ class UserSettingsService {
             }
 
             if (!data) {
-                // Return defaults if no settings
+                // Return defaults if no settings (in camelCase for frontend)
                 return {
-                    user_id: userId,
-                    api_keys: {},
-                    ollama_settings: { baseUrl: 'http://localhost:11434' },
-                    group_dynamics_mode: 'natural',
-                    message_delay: 1200
+                    userId: userId,
+                    apiKeys: {},
+                    ollamaSettings: { baseUrl: 'http://localhost:11434' },
+                    groupDynamicsMode: 'natural',
+                    messageDelay: 1200
                 };
             }
 
-            // Return data as-is (api_keys is already JSONB)
+            // Return data in camelCase for frontend
             return {
-                user_id: data.user_id,
-                api_keys: data.api_keys || {},
-                ollama_settings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
-                group_dynamics_mode: data.group_dynamics_mode || 'natural',
-                message_delay: data.message_delay || 1200,
-                created_at: data.created_at,
-                updated_at: data.updated_at
+                userId: data.user_id,
+                apiKeys: data.api_keys || {},
+                ollamaSettings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
+                groupDynamicsMode: data.group_dynamics_mode || 'natural',
+                messageDelay: data.message_delay || 1200,
+                createdAt: data.created_at,
+                updatedAt: data.updated_at
             };
 
         } catch (error) {
@@ -69,14 +69,15 @@ class UserSettingsService {
 
             if (error) throw error;
 
+            // Return in camelCase for frontend
             return {
-                user_id: data.user_id,
-                api_keys: data.api_keys || {},
-                ollama_settings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
-                group_dynamics_mode: data.group_dynamics_mode || 'natural',
-                message_delay: data.message_delay || 1200,
-                created_at: data.created_at,
-                updated_at: data.updated_at
+                userId: data.user_id,
+                apiKeys: data.api_keys || {},
+                ollamaSettings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
+                groupDynamicsMode: data.group_dynamics_mode || 'natural',
+                messageDelay: data.message_delay || 1200,
+                createdAt: data.created_at,
+                updatedAt: data.updated_at
             };
 
         } catch (error) {
@@ -141,28 +142,53 @@ class UserSettingsService {
 
     async createOrUpdateUserPersona(userId, personaData) {
         try {
-            await this.supabase
+            // Check if user already has an active persona
+            const { data: existingPersona } = await this.supabase
                 .from('user_personas')
-                .update({ is_active: false })
-                .eq('user_id', userId);
+                .select('id')
+                .eq('user_id', userId)
+                .eq('is_active', true)
+                .maybeSingle();
 
-            const { data, error } = await this.supabase
-                .from('user_personas')
-                .insert({
-                    user_id: userId,
-                    name: personaData.name,
-                    personality: personaData.personality,
-                    interests: personaData.interests,
-                    communication_style: personaData.communication_style,
-                    avatar: personaData.avatar,
-                    color: personaData.color,
-                    is_active: true
-                })
-                .select()
-                .single();
+            if (existingPersona) {
+                // Update existing persona
+                const { data, error } = await this.supabase
+                    .from('user_personas')
+                    .update({
+                        name: personaData.name,
+                        personality: personaData.personality,
+                        interests: personaData.interests,
+                        communication_style: personaData.communication_style,
+                        avatar: personaData.avatar,
+                        color: personaData.color,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existingPersona.id)
+                    .select()
+                    .single();
 
-            if (error) throw error;
-            return data;
+                if (error) throw error;
+                return data;
+            } else {
+                // Create new persona
+                const { data, error } = await this.supabase
+                    .from('user_personas')
+                    .insert({
+                        user_id: userId,
+                        name: personaData.name,
+                        personality: personaData.personality,
+                        interests: personaData.interests,
+                        communication_style: personaData.communication_style,
+                        avatar: personaData.avatar,
+                        color: personaData.color,
+                        is_active: true
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                return data;
+            }
 
         } catch (error) {
             console.error('Database error creating/updating user persona:', error);

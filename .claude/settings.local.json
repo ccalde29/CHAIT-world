@@ -4,7 +4,10 @@
       "Bash(node:*)",
       "Bash(timeout 3 node:*)",
       "Bash(curl:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(cat:*)",
+      "Bash(npx supabase db diff --schema public)",
+      "Bash(npx supabase:*)"
     ],
     "deny": [],
     "ask": []

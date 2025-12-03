@@ -9,13 +9,13 @@ import React, { useState, useEffect } from 'react';
 import { X, MapPin, Plus, Edit, Trash2, Image } from 'lucide-react';
 import ImageUpload from './ImageUpload';
 
-const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
+const SceneEditor = ({ scenarios, onSave, onDelete, onClose, initialEditingScene = null }) => {
   // ============================================================================
   // STATE MANAGEMENT
   // ============================================================================
-  
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingScene, setEditingScene] = useState(null);
+
+  const [showCreateForm, setShowCreateForm] = useState(initialEditingScene !== null);
+  const [editingScene, setEditingScene] = useState(initialEditingScene);
  
   const [formData, setFormData] = useState({
     name: '',
@@ -30,6 +30,20 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
+  // Initialize form when editing scene is provided
+  useEffect(() => {
+    if (initialEditingScene) {
+      setFormData({
+        name: initialEditingScene.name || '',
+        description: initialEditingScene.description || '',
+        initial_message: initialEditingScene.initial_message || '',
+        atmosphere: initialEditingScene.atmosphere || '',
+        background_image_url: initialEditingScene.background_image_url || null,
+        background_image_filename: initialEditingScene.background_image_filename || null,
+        uses_custom_background: initialEditingScene.uses_custom_background || false
+      });
+    }
+  }, [initialEditingScene]);
 
   // ============================================================================
   // FORM HANDLING

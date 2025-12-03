@@ -33,12 +33,23 @@ const ChatHistorySidebar = ({
   const [deletingSessionId, setDeletingSessionId] = useState(null);
 
   // Load chat history
-  const loadChatHistory = async () => {
+  const loadChatHistory = async (autoLoadMostRecent = false) => {
     try {
       setLoading(true);
       const response = await apiRequest('/api/chat/sessions');
-      setChatSessions(response.sessions || []);
-      console.log('📚 Loaded chat history:', response.sessions?.length || 0, 'sessions');
+      const sessions = response.sessions || [];
+      setChatSessions(sessions);
+      console.log('📚 Loaded chat history:', sessions.length, 'sessions');
+
+      // Auto-load most recent chat if requested, no current session, and sessions exist
+      if (autoLoadMostRecent && !currentSessionId && sessions.length > 0) {
+        const mostRecent = sessions[0]; // Sessions are ordered by updated_at desc
+        console.log('📂 Auto-loading most recent chat:', mostRecent.id);
+        onSessionSelect(mostRecent);
+      } else if (autoLoadMostRecent && sessions.length === 0) {
+        // No history exists - don't auto-load anything, let user start fresh
+        console.log('📂 No chat history found - waiting for user to start new chat');
+      }
     } catch (error) {
       console.error('Failed to load chat history:', error);
     } finally {
@@ -171,7 +182,7 @@ const ChatHistorySidebar = ({
 
   // Initial load
   useEffect(() => {
-    loadChatHistory();
+    loadChatHistory(true); // Auto-load most recent on initial load
   }, []);
 
   // Reload when current session changes (new chat started)

@@ -66,13 +66,37 @@ const MainApp = () => {
   // HANDLERS
   // ============================================================================
 
-  const handleStartNewChat = (scene, characters) => {
+  const handleStartNewChat = async (scene, characters) => {
     // Set scene and characters
     charactersState.setCurrentScenario(scene.id);
     charactersState.setActiveCharacters(characters);
 
     // Clear current chat
     chat.clearChat();
+
+    // Create a new session in the backend with the initial message
+    try {
+      const response = await apiRequest('/api/chat/sessions/create-with-initial-message', {
+        method: 'POST',
+        body: JSON.stringify({
+          scenario_id: scene.id,
+          active_characters: characters.map(c => c.id),
+          initial_message: scene.initial_message,
+          title: `${scene.name} - ${new Date().toLocaleDateString()}`
+        })
+      });
+
+      // Load the newly created session (which includes the initial message)
+      if (response.sessionId) {
+        await chat.loadChatSession(response.sessionId);
+      }
+    } catch (error) {
+      console.error('Failed to create chat session:', error);
+      // Fallback: add initial message locally if backend fails
+      if (scene.initial_message) {
+        chat.addSystemMessage(scene.initial_message);
+      }
+    }
 
     // Close modal
     setShowNewChatModal(false);
@@ -388,6 +412,7 @@ const MainApp = () => {
       {showSceneEditor && (
         <SceneEditor
           scenarios={charactersState.scenarios}
+          initialEditingScene={editingScene}
           onSave={async (sceneData) => {
             try {
               if (sceneData.id) {
@@ -403,11 +428,16 @@ const MainApp = () => {
               }
               await charactersState.loadScenarios();
               setShowSceneEditor(false);
+              setEditingScene(null);
             } catch (error) {
               console.error('Error saving scene:', error);
             }
           }}
-          onClose={() => setShowSceneEditor(false)}
+          onDelete={handleDeleteScene}
+          onClose={() => {
+            setShowSceneEditor(false);
+            setEditingScene(null);
+          }}
           currentScenario={charactersState.currentScenario}
           onScenarioSelect={charactersState.setCurrentScenario}
         />

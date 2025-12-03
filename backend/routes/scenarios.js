@@ -25,19 +25,22 @@ module.exports = (db) => {
      */
     router.post('/', async (req, res) => {
         try {
-            const { name, description, context, atmosphere } = req.body;
+            const { name, description, initial_message, atmosphere, background_image_url, background_image_filename, uses_custom_background } = req.body;
 
-            if (!name || !description || !context) {
+            if (!name || !description || !initial_message) {
                 return res.status(400).json({
-                    error: 'Name, description, and context are required fields'
+                    error: 'Name, description, and initial message are required fields'
                 });
             }
 
             const scenario = await db.createScenario(req.userId, {
                 name: name.trim(),
                 description: description.trim(),
-                context: context.trim(),
-                atmosphere: atmosphere?.trim() || 'neutral'
+                initial_message: initial_message.trim(),
+                atmosphere: atmosphere?.trim() || 'neutral',
+                background_image_url,
+                background_image_filename,
+                uses_custom_background
             });
 
             res.status(201).json({
@@ -71,19 +74,22 @@ module.exports = (db) => {
                 });
             }
 
-            const { name, description, context, atmosphere } = req.body;
+            const { name, description, initial_message, atmosphere, background_image_url, background_image_filename, uses_custom_background } = req.body;
 
-            if (!name || !description || !context) {
+            if (!name || !description || !initial_message) {
                 return res.status(400).json({
-                    error: 'Name, description, and context are required fields'
+                    error: 'Name, description, and initial message are required fields'
                 });
             }
 
             const scenario = await db.updateScenario(req.userId, req.params.id, {
                 name: name.trim(),
                 description: description.trim(),
-                context: context.trim(),
-                atmosphere: atmosphere?.trim()
+                initial_message: initial_message.trim(),
+                atmosphere: atmosphere?.trim(),
+                background_image_url,
+                background_image_filename,
+                uses_custom_background
             });
 
             res.json({

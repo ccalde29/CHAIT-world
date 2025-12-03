@@ -81,6 +81,21 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         content: userMessage
       });
 
+    // Update message count
+    const { data: session } = await supabase
+      .from('chat_sessions')
+      .select('message_count')
+      .eq('id', activeSessionId)
+      .single();
+
+    await supabase
+      .from('chat_sessions')
+      .update({
+        message_count: (session?.message_count || 0) + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', activeSessionId);
+
     console.log(`[Session] Saved user message to session ${activeSessionId}`);
 
     // ========================================================================
@@ -261,7 +276,12 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         })
         .select()
         .single();
-      
+
+      // Update message count for character response
+      await supabase.rpc('increment_message_count', {
+        p_session_id: activeSessionId
+      });
+
       responses.push({
         character: primaryChar.id,
         characterName: primaryChar.name,
@@ -372,7 +392,12 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
               mood_intensity: state.mood_intensity,
               is_primary_response: false
             });
-          
+
+          // Update message count for secondary response
+          await supabase.rpc('increment_message_count', {
+            p_session_id: activeSessionId
+          });
+
           // Update session state
           await SpeakingQueue.updateSessionState(char.id, activeSessionId, userId, supabase);
           await SpeakingQueue.updateTopicEngagement(char.id, userId, userMessage, supabase);

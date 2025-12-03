@@ -99,6 +99,16 @@ export const useChat = (apiRequest) => {
     setError(null);
   };
 
+  const addSystemMessage = (content) => {
+    const systemMessage = {
+      id: Date.now(),
+      type: 'system',
+      content: content,
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, systemMessage]);
+  };
+
   const loadChatSession = async (sessionId) => {
     try {
       const session = await apiRequest(`/api/chat/sessions/${sessionId}`);
@@ -124,6 +134,7 @@ export const useChat = (apiRequest) => {
     setError,
     sendMessage,
     clearChat,
+    addSystemMessage,
     loadChatSession
   };
 };

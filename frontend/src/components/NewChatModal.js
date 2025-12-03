@@ -104,9 +104,9 @@ const NewChatModal = ({
                       <p className="text-sm text-gray-400 mt-1">{scene.description}</p>
                     </div>
                   </div>
-                  {scene.context && (
+                  {scene.initial_message && (
                     <div className="text-xs text-gray-500 bg-white/5 rounded p-2 mt-2">
-                      {scene.context}
+                      {scene.initial_message}
                     </div>
                   )}
                   {scene.atmosphere && (
