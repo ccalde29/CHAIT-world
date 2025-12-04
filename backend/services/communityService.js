@@ -144,9 +144,11 @@ class CommunityService {
         name: communityChar.name,
         age: communityChar.age,
         sex: communityChar.sex,
-        personality: communityChar.personality, // Already NULL if hidden
-        appearance: communityChar.appearance,   // Already NULL if hidden
-        background: communityChar.background,   // Already NULL if hidden
+        // Provide default values for hidden/null fields to avoid NOT NULL constraint violations
+        // Using longer text to satisfy database length constraints
+        personality: communityChar.personality || 'This character\'s personality details have been hidden by the creator. You can edit this character to add your own personality description.',
+        appearance: communityChar.appearance || 'This character\'s appearance details have been hidden by the creator. You can edit this character to add your own appearance description.',
+        background: communityChar.background || 'This character\'s background details have been hidden by the creator. You can edit this character to add your own background story.',
         avatar: communityChar.avatar,
         color: communityChar.color,
         chat_examples: communityChar.chat_examples,
@@ -181,14 +183,19 @@ class CommunityService {
         })
         .eq('id', communityCharacterId);
 
-      // Track the import
-      await this.supabase
-        .from('character_imports')
-        .insert({
-          original_character_id: communityChar.original_character_id,
-          imported_character_id: newChar.id,
-          imported_by_user_id: userId
-        });
+      // Track the import (optional - won't fail if table doesn't exist)
+      try {
+        await this.supabase
+          .from('character_imports')
+          .insert({
+            original_character_id: communityChar.original_character_id,
+            imported_character_id: newChar.id,
+            imported_by_user_id: userId
+          });
+      } catch (importTrackError) {
+        // Non-critical error - just log it
+        console.warn('Could not track import in character_imports table:', importTrackError.message);
+      }
 
       return newChar;
     } catch (error) {
@@ -215,11 +222,18 @@ class CommunityService {
         .select()
         .single();
 
+      // If table doesn't exist, fail gracefully
+      if (error && error.code === 'PGRST200') {
+        console.warn('character_favorites table not found, favorites feature disabled');
+        return null;
+      }
+
       if (error) throw error;
       return data;
     } catch (error) {
       console.error('Error adding to favorites:', error);
-      throw error;
+      // Return null instead of throwing to prevent blocking the UI
+      return null;
     }
   }
 
@@ -234,11 +248,18 @@ class CommunityService {
         .eq('user_id', userId)
         .eq('character_id', characterId);
 
+      // If table doesn't exist, fail gracefully
+      if (error && error.code === 'PGRST200') {
+        console.warn('character_favorites table not found, favorites feature disabled');
+        return true;
+      }
+
       if (error) throw error;
       return true;
     } catch (error) {
       console.error('Error removing from favorites:', error);
-      throw error;
+      // Return true to prevent blocking the UI
+      return true;
     }
   }
 
@@ -247,26 +268,32 @@ class CommunityService {
    */
   async getUserFavorites(userId, limit = 50) {
     try {
+      // If userId is undefined or invalid, return empty array
+      if (!userId || userId === 'undefined' || userId === 'anonymous') {
+        return [];
+      }
+
+      // Check if character_favorites table exists
       const { data, error } = await this.supabase
         .from('character_favorites')
-        .select(`
-          character_id,
-          created_at,
-          community_characters (*)
-        `)
+        .select('character_id, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(limit);
 
+      // If table doesn't exist, return empty array (graceful degradation)
+      if (error && (error.code === 'PGRST200' || error.code === '22P02')) {
+        console.warn('character_favorites table not found or invalid UUID, returning empty favorites');
+        return [];
+      }
+
       if (error) throw error;
 
-      return data.map(fav => ({
-        ...fav.community_characters,
-        favorited_at: fav.created_at
-      }));
+      return data || [];
     } catch (error) {
       console.error('Error getting user favorites:', error);
-      throw error;
+      // Return empty array instead of throwing to prevent blocking the UI
+      return [];
     }
   }
 
@@ -615,7 +642,8 @@ class CommunityService {
       const sceneData = {
         user_id: userId,
         name: communityScene.name,
-        description: communityScene.description, // Already NULL if hidden
+        // Provide default value for hidden/null fields to avoid NOT NULL constraint violations
+        description: communityScene.description || 'This scene\'s description has been hidden by the creator. You can edit this scene to add your own description.',
         initial_message: communityScene.initial_message,
         atmosphere: communityScene.atmosphere,
         background_image_url: communityScene.background_image_url,

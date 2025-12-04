@@ -12,10 +12,27 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// ============================================================================
+// SUPABASE INITIALIZATION
+// ============================================================================
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+// Initialize services
+const CommunityService = require('./services/communityService');
+const CharacterService = require('./services/characterService');
+
+const communityService = new CommunityService(supabase);
+const characterService = new CharacterService(supabase);
 
 // ============================================================================
 // MIDDLEWARE CONFIGURATION
@@ -31,6 +48,12 @@ app.use(express.json({ limit: '10mb' }));
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
+// Authentication middleware - extract userId from headers
+app.use((req, res, next) => {
+  req.userId = req.headers['user-id'] || 'anonymous';
   next();
 });
 
@@ -988,6 +1011,13 @@ app.delete('/api/scenarios/:id', (req, res) => {
     res.status(500).json({ error: 'Failed to delete scenario' });
   }
 });
+
+// ============================================================================
+// COMMUNITY HUB ROUTES
+// ============================================================================
+
+const communityRoutes = require('./routes/community')(communityService, characterService);
+app.use('/api/community', communityRoutes);
 
 // ============================================================================
 // HEALTH & UTILITY ROUTES
