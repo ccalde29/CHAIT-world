@@ -74,6 +74,9 @@ const userRoutes = require('./routes/user')(db);
 const scenarioRoutes = require('./routes/scenarios')(db);
 const memoryRoutes = require('./routes/memory')(db);
 const imageRoutes = require('./routes/images')(db);
+const characterLearningRoutes = require('./routes/characterLearning')(db.supabase);
+const characterCommentRoutes = require('./routes/characterComments')(db.supabase);
+const sceneCommentRoutes = require('./routes/sceneComments')(db.supabase);
 
 // Mount routes
 app.use('/api/providers', providerRoutes);
@@ -92,6 +95,9 @@ app.use('/api/characters', requireAuth, communityRoutes); // For publish/unpubli
 app.use('/api/user', requireAuth, userRoutes);
 app.use('/api/scenarios', requireAuth, scenarioRoutes);
 app.use('/api/character', requireAuth, memoryRoutes);
+app.use('/api/learning', requireAuth, characterLearningRoutes);
+app.use('/api/character-comments', requireAuth, characterCommentRoutes);
+app.use('/api/scene-comments', requireAuth, sceneCommentRoutes);
 app.use('/api', requireAuth, imageRoutes);
 
 // ============================================================================

@@ -146,13 +146,20 @@ const MainApp = () => {
       charactersState.setActiveCharacters(prev => prev.filter(c => c.id !== characterId));
     } catch (error) {
       console.error('Error deleting character:', error);
+      // Show user-friendly error message
+      if (error.message && error.message.includes('published')) {
+        window.alert('Cannot delete a published character. Please unpublish it first from the Community Hub.');
+      } else {
+        window.alert('Failed to delete character: ' + (error.message || 'Unknown error'));
+      }
     }
   };
 
-  const handlePublishCharacter = async (characterId) => {
+  const handlePublishCharacter = async (characterId, options = {}) => {
     try {
       const data = await apiRequest(`/api/characters/${characterId}/publish`, {
-        method: 'POST'
+        method: 'POST',
+        body: JSON.stringify(options)
       });
 
       // Update local character state with returned published data if present
@@ -163,9 +170,11 @@ const MainApp = () => {
       }
 
       window.alert(data?.message || 'Character published to community');
+      return true;
     } catch (error) {
       console.error('Error publishing character:', error);
       window.alert('Failed to publish character: ' + (error.message || 'Unknown error'));
+      return false;
     }
   };
 
@@ -217,6 +226,12 @@ const MainApp = () => {
       await charactersState.loadScenarios();
     } catch (error) {
       console.error('Error deleting scene:', error);
+      // Show user-friendly error message
+      if (error.message && error.message.includes('published')) {
+        window.alert('Cannot delete a published scene. Please unpublish it first from the Community Hub.');
+      } else {
+        window.alert('Failed to delete scene: ' + (error.message || 'Unknown error'));
+      }
     }
   };
 
@@ -294,16 +309,19 @@ const MainApp = () => {
             setShowSceneEditor(true);
           }}
           onDeleteScene={handleDeleteScene}
-          onPublishScene={async (sceneId) => {
+          onPublishScene={async (sceneId, options = {}) => {
             try {
               await apiRequest(`/api/community/scenes/${sceneId}/publish`, {
-                method: 'POST'
+                method: 'POST',
+                body: JSON.stringify(options)
               });
               await charactersState.loadScenarios();
               alert('Scene published to community!');
+              return true;
             } catch (error) {
               console.error('Error publishing scene:', error);
               alert('Failed to publish scene');
+              return false;
             }
           }}
           onUnpublishScene={async (sceneId) => {

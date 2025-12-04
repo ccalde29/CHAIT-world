@@ -120,10 +120,14 @@ module.exports = (communityService, characterService) => {
                 });
             }
 
+            // Get locking options from request body
+            const { isLocked = false, hiddenFields = [] } = req.body;
+
             // Publish
             const published = await communityService.publishCharacter(
                 req.userId,
-                req.params.id
+                req.params.id,
+                { isLocked, hiddenFields }
             );
 
             res.json({
@@ -164,9 +168,13 @@ module.exports = (communityService, characterService) => {
                 });
             }
 
+            // Get locking options from request body
+            const { isLocked = false, hiddenFields = [] } = req.body;
+
             const published = await communityService.publishCharacter(
                 req.userId,
-                req.params.id
+                req.params.id,
+                { isLocked, hiddenFields }
             );
 
             res.json({
@@ -339,9 +347,13 @@ module.exports = (communityService, characterService) => {
                 return res.status(401).json({ error: 'Authentication required' });
             }
 
+            // Get locking options from request body
+            const { isLocked = false, hiddenFields = [] } = req.body;
+
             const published = await communityService.publishScene(
                 req.userId,
-                req.params.id
+                req.params.id,
+                { isLocked, hiddenFields }
             );
 
             res.json({

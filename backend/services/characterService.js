@@ -233,19 +233,8 @@ class CharacterService {
         return { message: 'Default character hidden', characterId };
       }
 
-      // Check if character is published
-      const { data: character, error: fetchError } = await this.supabase
-        .from('characters')
-        .select('is_public')
-        .eq('id', characterId)
-        .eq('user_id', userId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Users can now delete their own copy even if published to community
-      // The community version will persist independently
-
+      // Users can delete their own characters freely
+      // Published community copies exist separately in community_characters table
       const { error } = await this.supabase
         .from('characters')
         .delete()

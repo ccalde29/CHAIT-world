@@ -92,13 +92,23 @@ class CommunityService {
   /**
    * Increment view count when character is viewed
    */
-  async incrementViewCount(characterId) {
+  async incrementViewCount(communityCharacterId) {
     try {
-      const { error } = await this.supabase
-        .rpc('increment_character_views', { character_id: characterId });
+      // Update view count on community_characters table
+      const { data: character } = await this.supabase
+        .from('community_characters')
+        .select('view_count')
+        .eq('id', communityCharacterId)
+        .single();
 
-      if (error) throw error;
-      return true;
+      if (character) {
+        await this.supabase
+          .from('community_characters')
+          .update({ view_count: (character.view_count || 0) + 1 })
+          .eq('id', communityCharacterId);
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error('Error incrementing view count:', error);
       return false;
@@ -112,54 +122,70 @@ class CommunityService {
   /**
    * Import a community character to user's collection
    */
-  async importCharacter(userId, originalCharacterId) {
+  async importCharacter(userId, communityCharacterId) {
     try {
-      // Get the original character
-      const { data: originalChar, error: fetchError } = await this.supabase
-        .from('characters')
+      // Get the community character
+      const { data: communityChar, error: fetchError } = await this.supabase
+        .from('community_characters')
         .select('*')
-        .eq('id', originalCharacterId)
-        .eq('is_public', true)
+        .eq('id', communityCharacterId)
         .single();
 
       if (fetchError) throw fetchError;
-      if (!originalChar) throw new Error('Character not found or not public');
+      if (!communityChar) throw new Error('Community character not found');
+
+      // Handle locked content - hidden fields are already NULL in community table
+      const hiddenFields = communityChar.is_locked && communityChar.hidden_fields
+        ? communityChar.hidden_fields
+        : [];
+
+      const characterData = {
+        user_id: userId,
+        name: communityChar.name,
+        age: communityChar.age,
+        sex: communityChar.sex,
+        personality: communityChar.personality, // Already NULL if hidden
+        appearance: communityChar.appearance,   // Already NULL if hidden
+        background: communityChar.background,   // Already NULL if hidden
+        avatar: communityChar.avatar,
+        color: communityChar.color,
+        chat_examples: communityChar.chat_examples,
+        relationships: [], // Don't copy relationships
+        tags: communityChar.tags,
+        temperature: communityChar.temperature,
+        max_tokens: communityChar.max_tokens,
+        context_window: communityChar.context_window,
+        memory_enabled: communityChar.memory_enabled,
+        avatar_image_url: communityChar.avatar_image_url,
+        avatar_image_filename: communityChar.avatar_image_filename,
+        uses_custom_image: communityChar.uses_custom_image,
+        is_public: false, // Imported characters are private by default
+        is_locked: communityChar.is_locked || false, // Mark as locked if source was locked
+        hidden_fields: hiddenFields // Store which fields were hidden
+      };
 
       // Create a copy for the user
       const { data: newChar, error: createError } = await this.supabase
         .from('characters')
-        .insert({
-          user_id: userId,
-          name: originalChar.name,
-          age: originalChar.age,
-          sex: originalChar.sex,
-          personality: originalChar.personality,
-          appearance: originalChar.appearance,
-          background: originalChar.background,
-          avatar: originalChar.avatar,
-          color: originalChar.color,
-          chat_examples: originalChar.chat_examples,
-          relationships: [], // Don't copy relationships
-          tags: originalChar.tags,
-          temperature: originalChar.temperature,
-          max_tokens: originalChar.max_tokens,
-          context_window: originalChar.context_window,
-          memory_enabled: originalChar.memory_enabled,
-          avatar_image_url: originalChar.avatar_image_url,
-          avatar_image_filename: originalChar.avatar_image_filename,
-          uses_custom_image: originalChar.uses_custom_image,
-          is_public: false // Imported characters are private by default
-        })
+        .insert(characterData)
         .select()
         .single();
 
       if (createError) throw createError;
 
+      // Increment import count on community character
+      await this.supabase
+        .from('community_characters')
+        .update({
+          import_count: (communityChar.import_count || 0) + 1
+        })
+        .eq('id', communityCharacterId);
+
       // Track the import
       await this.supabase
         .from('character_imports')
         .insert({
-          original_character_id: originalCharacterId,
+          original_character_id: communityChar.original_character_id,
           imported_character_id: newChar.id,
           imported_by_user_id: userId
         });
@@ -226,7 +252,7 @@ class CommunityService {
         .select(`
           character_id,
           created_at,
-          characters (*)
+          community_characters (*)
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
@@ -235,7 +261,7 @@ class CommunityService {
       if (error) throw error;
 
       return data.map(fav => ({
-        ...fav.characters,
+        ...fav.community_characters,
         favorited_at: fav.created_at
       }));
     } catch (error) {
@@ -271,51 +297,62 @@ class CommunityService {
   /**
    * Publish a character to the community
    */
-  async publishCharacter(userId, characterId) {
+  async publishCharacter(userId, characterId, options = {}) {
     try {
-      // Validate character before publishing
-      const { data: validation, error: validationError } = await this.supabase
-        .rpc('validate_character_for_publish', { char_id: characterId });
-
-      if (validationError) throw validationError;
-
-      // RPC may return a single object or an array; handle both shapes
-      const validationResult = Array.isArray(validation) ? validation[0] : validation;
-
-      if (!validationResult) {
-        console.error('Publish validation returned no result for', characterId);
-        throw new Error('Publish validation returned no result');
-      }
-
-      console.log('Publish validation result for', characterId, validationResult);
-
-      if (!validationResult.is_valid) {
-        console.error('Publish validation failed for', characterId, validationResult);
-        throw new Error(validationResult.error_message || 'Character failed validation');
-      }
-
-      // Update character to public
-      const { data, error } = await this.supabase
+      // Get the character from user's characters table
+      const { data: character, error: fetchError } = await this.supabase
         .from('characters')
-        .update({
-          is_public: true,
-          moderation_status: 'approved', // Auto-approve for now
-          published_at: new Date().toISOString()
-        })
+        .select('*')
         .eq('id', characterId)
         .eq('user_id', userId)
+        .single();
+
+      if (fetchError || !character) {
+        throw new Error('Character not found or you are not the owner');
+      }
+
+      // Handle content locking options
+      const { isLocked = false, hiddenFields = [] } = options;
+
+      // Create community copy with hidden fields set to NULL
+      const communityData = {
+        original_character_id: characterId,
+        creator_user_id: userId,
+        name: character.name,
+        age: character.age,
+        sex: character.sex,
+        personality: hiddenFields.includes('personality') ? null : character.personality,
+        appearance: hiddenFields.includes('appearance') ? null : character.appearance,
+        background: hiddenFields.includes('background') ? null : character.background,
+        avatar: character.avatar,
+        color: character.color,
+        chat_examples: character.chat_examples,
+        tags: character.tags,
+        temperature: character.temperature,
+        max_tokens: character.max_tokens,
+        context_window: character.context_window,
+        memory_enabled: character.memory_enabled,
+        avatar_image_url: character.avatar_image_url,
+        avatar_image_filename: character.avatar_image_filename,
+        uses_custom_image: character.uses_custom_image,
+        is_locked: isLocked,
+        hidden_fields: hiddenFields,
+        moderation_status: 'approved'
+      };
+
+      // Insert into community_characters table
+      const { data, error } = await this.supabase
+        .from('community_characters')
+        .insert(communityData)
         .select()
         .single();
 
       if (error) {
-        console.error('Error updating character publish state:', error);
+        console.error('Error inserting into community_characters:', error);
         throw error;
       }
-      console.log('Publish update result for', characterId, data);
-      if (!data) {
-        console.error('Publish update returned no data for', characterId);
-        throw new Error('Character not found or you are not the owner');
-      }
+
+      console.log('Character published to community:', data.id);
       return data;
     } catch (error) {
       console.error('Error publishing character:', error);
@@ -328,22 +365,16 @@ class CommunityService {
    */
   async unpublishCharacter(userId, characterId) {
     try {
-      const { data, error } = await this.supabase
-        .from('characters')
-        .update({
-          is_public: false,
-          moderation_status: 'pending'
-        })
-        .eq('id', characterId)
-        .eq('user_id', userId)
-        .select()
-        .single();
+      // Delete the community copy
+      const { error } = await this.supabase
+        .from('community_characters')
+        .delete()
+        .eq('original_character_id', characterId)
+        .eq('creator_user_id', userId);
 
       if (error) throw error;
-      if (!data) {
-        throw new Error('Character not found or you are not the owner');
-      }
-      return data;
+
+      return { message: 'Character unpublished from community', characterId };
     } catch (error) {
       console.error('Error unpublishing character:', error);
       throw error;
@@ -487,9 +518,9 @@ class CommunityService {
   /**
    * Publish scene to community
    */
-  async publishScene(userId, sceneId) {
+  async publishScene(userId, sceneId, options = {}) {
     try {
-      // Verify ownership
+      // Get the scene from user's scenarios table
       const { data: scene, error: fetchError } = await this.supabase
         .from('scenarios')
         .select('*')
@@ -498,29 +529,40 @@ class CommunityService {
         .single();
 
       if (fetchError || !scene) {
-        console.error('Scene not found for publishing:', fetchError);
-        throw new Error('Scene not found or access denied');
+        throw new Error('Scene not found or you are not the owner');
       }
 
-      console.log(`Publishing scene: ${scene.name} (${sceneId})`);
+      // Handle content locking options
+      const { isLocked = false, hiddenFields = [] } = options;
 
-      // Update to public
+      // Create community copy with hidden fields set to NULL
+      const communityData = {
+        original_scenario_id: sceneId,
+        creator_user_id: userId,
+        name: scene.name,
+        description: hiddenFields.includes('description') ? null : scene.description,
+        initial_message: scene.initial_message,
+        atmosphere: scene.atmosphere,
+        background_image_url: scene.background_image_url,
+        background_image_filename: scene.background_image_filename,
+        uses_custom_background: scene.uses_custom_background,
+        is_locked: isLocked,
+        hidden_fields: hiddenFields
+      };
+
+      // Insert into community_scenes table
       const { data, error } = await this.supabase
-        .from('scenarios')
-        .update({
-          is_public: true,
-          published_at: new Date().toISOString()
-        })
-        .eq('id', sceneId)
+        .from('community_scenes')
+        .insert(communityData)
         .select()
         .single();
 
       if (error) {
-        console.error('Error updating scene to public:', error);
+        console.error('Error inserting into community_scenes:', error);
         throw error;
       }
 
-      console.log(`Scene published successfully: ${data.name}`);
+      console.log('Scene published to community:', data.id);
       return data;
     } catch (error) {
       console.error('Error publishing scene:', error);
@@ -533,19 +575,16 @@ class CommunityService {
    */
   async unpublishScene(userId, sceneId) {
     try {
-      const { data, error } = await this.supabase
-        .from('scenarios')
-        .update({
-          is_public: false,
-          published_at: null
-        })
-        .eq('id', sceneId)
-        .eq('user_id', userId)
-        .select()
-        .single();
+      // Delete the community copy
+      const { error } = await this.supabase
+        .from('community_scenes')
+        .delete()
+        .eq('original_scenario_id', sceneId)
+        .eq('creator_user_id', userId);
 
       if (error) throw error;
-      return data;
+
+      return { message: 'Scene unpublished from community', sceneId };
     } catch (error) {
       console.error('Error unpublishing scene:', error);
       throw error;
@@ -555,46 +594,54 @@ class CommunityService {
   /**
    * Import a community scene
    */
-  async importScene(userId, sceneId) {
+  async importScene(userId, communitySceneId) {
     try {
-      // Get the published scene
-      const { data: sourceScene, error: fetchError } = await this.supabase
-        .from('scenarios')
+      // Get the community scene
+      const { data: communityScene, error: fetchError } = await this.supabase
+        .from('community_scenes')
         .select('*')
-        .eq('id', sceneId)
-        .eq('is_public', true)
+        .eq('id', communitySceneId)
         .single();
 
-      if (fetchError || !sourceScene) {
-        throw new Error('Scene not found or not public');
+      if (fetchError || !communityScene) {
+        throw new Error('Community scene not found');
       }
+
+      // Handle locked content - hidden fields are already NULL in community table
+      const hiddenFields = communityScene.is_locked && communityScene.hidden_fields
+        ? communityScene.hidden_fields
+        : [];
+
+      const sceneData = {
+        user_id: userId,
+        name: communityScene.name,
+        description: communityScene.description, // Already NULL if hidden
+        initial_message: communityScene.initial_message,
+        atmosphere: communityScene.atmosphere,
+        background_image_url: communityScene.background_image_url,
+        background_image_filename: communityScene.background_image_filename,
+        uses_custom_background: communityScene.uses_custom_background,
+        is_public: false,
+        is_locked: communityScene.is_locked || false, // Mark as locked if source was locked
+        hidden_fields: hiddenFields // Store which fields were hidden
+      };
 
       // Create a copy for the user
       const { data: newScene, error: insertError } = await this.supabase
         .from('scenarios')
-        .insert({
-          user_id: userId,
-          name: sourceScene.name,
-          description: sourceScene.description,
-          initial_message: sourceScene.initial_message,
-          atmosphere: sourceScene.atmosphere,
-          background_image_url: sourceScene.background_image_url,
-          background_image_filename: sourceScene.background_image_filename,
-          uses_custom_background: sourceScene.uses_custom_background,
-          is_public: false
-        })
+        .insert(sceneData)
         .select()
         .single();
 
       if (insertError) throw insertError;
 
-      // Increment import count
+      // Increment import count on community scene
       await this.supabase
-        .from('scenarios')
+        .from('community_scenes')
         .update({
-          import_count: (sourceScene.import_count || 0) + 1
+          import_count: (communityScene.import_count || 0) + 1
         })
-        .eq('id', sceneId);
+        .eq('id', communitySceneId);
 
       return newScene;
     } catch (error) {
@@ -606,25 +653,23 @@ class CommunityService {
   /**
    * Increment scene view count
    */
-  async incrementSceneViewCount(sceneId) {
+  async incrementSceneViewCount(communitySceneId) {
     try {
-      await this.supabase.rpc('increment_scenario_views', {
-        scenario_id: sceneId
-      });
-    } catch (error) {
-      // If RPC doesn't exist, use manual update
+      // Update view count on community_scenes table
       const { data: scene } = await this.supabase
-        .from('scenarios')
+        .from('community_scenes')
         .select('view_count')
-        .eq('id', sceneId)
+        .eq('id', communitySceneId)
         .single();
 
       if (scene) {
         await this.supabase
-          .from('scenarios')
+          .from('community_scenes')
           .update({ view_count: (scene.view_count || 0) + 1 })
-          .eq('id', sceneId);
+          .eq('id', communitySceneId);
       }
+    } catch (error) {
+      console.error('Error incrementing scene view count:', error);
     }
   }
 }

@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Users, MapPin, Plus, Edit, Trash2, Eye, Search, X, Upload } from 'lucide-react';
+import PublishModal from './PublishModal';
 
 const CharacterSceneHub = ({
   characters,
@@ -21,6 +22,9 @@ const CharacterSceneHub = ({
 }) => {
   const [activeTab, setActiveTab] = useState('characters'); // 'characters' or 'scenes'
   const [searchQuery, setSearchQuery] = useState('');
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const [publishItem, setPublishItem] = useState(null);
+  const [publishType, setPublishType] = useState('character');
 
   const filteredCharacters = characters.filter(char =>
     char.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -188,9 +192,9 @@ const CharacterSceneHub = ({
                         ) : (
                           <button
                             onClick={() => {
-                              if (window.confirm(`Publish "${character.name}" to the Community?`)) {
-                                onPublishCharacter && onPublishCharacter(character.id);
-                              }
+                              setPublishItem(character);
+                              setPublishType('character');
+                              setPublishModalOpen(true);
                             }}
                             className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
                           >
@@ -274,9 +278,9 @@ const CharacterSceneHub = ({
                     ) : (
                       <button
                         onClick={() => {
-                          if (window.confirm(`Publish "${scene.name}" to the Community?`)) {
-                            onPublishScene && onPublishScene(scene.id);
-                          }
+                          setPublishItem(scene);
+                          setPublishType('scene');
+                          setPublishModalOpen(true);
                         }}
                         className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
                       >
@@ -302,6 +306,26 @@ const CharacterSceneHub = ({
           </div>
         )}
       </div>
+
+      {/* Publish Modal */}
+      <PublishModal
+        isOpen={publishModalOpen}
+        onClose={() => {
+          setPublishModalOpen(false);
+          setPublishItem(null);
+        }}
+        onPublish={async (options) => {
+          if (publishType === 'character') {
+            const success = await onPublishCharacter(publishItem.id, options);
+            return success;
+          } else {
+            const success = await onPublishScene(publishItem.id, options);
+            return success;
+          }
+        }}
+        type={publishType}
+        name={publishItem?.name}
+      />
     </div>
   );
 };

@@ -269,13 +269,18 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Your Name *
+              <span className={`ml-2 text-xs ${
+                formData.name.length > 100 ? 'text-red-400' : 'text-gray-500'
+              }`}>
+                ({formData.name.length} / 100 characters)
+              </span>
             </label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
               placeholder="How would you like to be addressed?"
-              maxLength={50}
+              maxLength={100}
               className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
                 getFieldError('name') ? 'border-red-400' : 'border-white/10 focus:border-blue-400'
               }`}
@@ -283,7 +288,6 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
             {getFieldError('name') && (
               <p className="text-red-400 text-xs mt-1">{getFieldError('name')}</p>
             )}
-            <p className="text-xs text-gray-500 mt-1">{formData.name.length}/50 characters</p>
           </div>
 
           {/* Avatar Selection */}
@@ -363,6 +367,11 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Personality Description *
+              <span className={`ml-2 text-xs ${
+                formData.personality.length > 500 ? 'text-red-400' : 'text-gray-500'
+              }`}>
+                ({formData.personality.length} / 500 characters)
+              </span>
             </label>
             <textarea
               value={formData.personality}
@@ -377,10 +386,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
             {getFieldError('personality') && (
               <p className="text-red-400 text-xs mt-1">{getFieldError('personality')}</p>
             )}
-            <div className="flex justify-between items-center mt-1">
-              <p className="text-xs text-gray-500">This helps AI characters understand and respond to you better</p>
-              <p className="text-xs text-gray-500">{formData.personality.length}/500 characters</p>
-            </div>
+            <p className="text-xs text-gray-500 mt-1">This helps AI characters understand and respond to you better</p>
           </div>
 
           {/* Interests */}

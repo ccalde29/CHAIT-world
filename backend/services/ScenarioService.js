@@ -95,19 +95,8 @@ class ScenarioService {
      */
     async deleteScenario(userId, scenarioId) {
         try {
-            // Check if scenario is published
-            const { data: scenario, error: fetchError } = await this.supabase
-                .from('scenarios')
-                .select('is_public')
-                .eq('id', scenarioId)
-                .eq('user_id', userId)
-                .single();
-
-            if (fetchError) throw fetchError;
-
-            // Users can now delete their own copy even if published to community
-            // The community version will persist independently
-
+            // Users can delete their own scenarios freely
+            // Published community copies exist separately in community_scenes table
             const { error } = await this.supabase
                 .from('scenarios')
                 .delete()

@@ -15,8 +15,10 @@ import {
   Users,
   Heart,
   MapPin,
-  Trash2
+  Trash2,
+  Lock
 } from 'lucide-react';
+import CommentsSection from './CommentsSection';
 
 const CommunityHub = ({
   onImport,
@@ -602,10 +604,32 @@ const CommunityHub = ({
 
           {/* Content */}
           <div className="p-6 space-y-4">
+            {/* Locked Content Warning */}
+            {selectedScene.is_locked && selectedScene.hidden_fields?.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-2">
+                <Lock size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-amber-300 font-medium">Privacy Protected</p>
+                  <p className="text-xs text-amber-400/80 mt-1">
+                    Some fields are hidden by the creator: {selectedScene.hidden_fields.join(', ')}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Description */}
             <div>
               <h3 className="text-sm font-medium text-blue-300 mb-2">Description</h3>
-              <p className="text-sm text-gray-300">{selectedScene.description}</p>
+              {selectedScene.description ? (
+                <p className="text-sm text-gray-300">{selectedScene.description}</p>
+              ) : selectedScene.hidden_fields?.includes('description') ? (
+                <p className="text-sm text-gray-500 italic flex items-center gap-2">
+                  <Lock size={14} />
+                  Hidden by creator
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 italic">Not specified</p>
+              )}
             </div>
 
             {/* Initial Message */}
@@ -647,6 +671,13 @@ const CommunityHub = ({
                 <div className="text-xs text-gray-400">Imports</div>
               </div>
             </div>
+
+            {/* Comments Section */}
+            <CommentsSection
+              itemId={selectedScene.id}
+              itemType="scene"
+              apiRequest={apiRequest}
+            />
           </div>
 
           {/* Footer */}
@@ -716,19 +747,48 @@ const CommunityHub = ({
 
           {/* Content */}
           <div className="p-6 space-y-4">
+            {/* Locked Content Warning */}
+            {selectedCharacter.is_locked && selectedCharacter.hidden_fields?.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-2">
+                <Lock size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-amber-300 font-medium">Privacy Protected</p>
+                  <p className="text-xs text-amber-400/80 mt-1">
+                    Some fields are hidden by the creator: {selectedCharacter.hidden_fields.join(', ')}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Personality */}
             <div>
               <h3 className="text-sm font-medium text-purple-300 mb-2">Personality</h3>
-              <p className="text-sm text-gray-300">{selectedCharacter.personality}</p>
+              {selectedCharacter.personality ? (
+                <p className="text-sm text-gray-300">{selectedCharacter.personality}</p>
+              ) : selectedCharacter.hidden_fields?.includes('personality') ? (
+                <p className="text-sm text-gray-500 italic flex items-center gap-2">
+                  <Lock size={14} />
+                  Hidden by creator
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 italic">Not specified</p>
+              )}
             </div>
 
             {/* Appearance */}
-            {selectedCharacter.appearance && (
-              <div>
-                <h3 className="text-sm font-medium text-purple-300 mb-2">Appearance</h3>
+            <div>
+              <h3 className="text-sm font-medium text-purple-300 mb-2">Appearance</h3>
+              {selectedCharacter.appearance ? (
                 <p className="text-sm text-gray-300">{selectedCharacter.appearance}</p>
-              </div>
-            )}
+              ) : selectedCharacter.hidden_fields?.includes('appearance') ? (
+                <p className="text-sm text-gray-500 italic flex items-center gap-2">
+                  <Lock size={14} />
+                  Hidden by creator
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 italic">Not specified</p>
+              )}
+            </div>
 
             {/* Tags */}
             {selectedCharacter.tags && selectedCharacter.tags.length > 0 && (
@@ -771,6 +831,13 @@ const CommunityHub = ({
                 <div className="text-xs text-gray-400">Favorites</div>
               </div>
             </div>
+
+            {/* Comments Section */}
+            <CommentsSection
+              itemId={selectedCharacter.id}
+              itemType="character"
+              apiRequest={apiRequest}
+            />
           </div>
 
           {/* Footer */}
@@ -865,15 +932,12 @@ const CommunityHub = ({
               className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
             >
               <option value="recent" className="bg-gray-800">
-                <Clock size={16} className="inline mr-2" />
                 Recent
               </option>
               <option value="popular" className="bg-gray-800">
-                <Star size={16} className="inline mr-2" />
                 Popular
               </option>
               <option value="trending" className="bg-gray-800">
-                <TrendingUp size={16} className="inline mr-2" />
                 Trending
               </option>
             </select>
