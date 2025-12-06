@@ -10,7 +10,8 @@
       "Bash(npx supabase:*)",
       "Bash(npm start)",
       "Bash(grep:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

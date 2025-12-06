@@ -77,6 +77,8 @@ const imageRoutes = require('./routes/images')(db);
 const characterLearningRoutes = require('./routes/characterLearning')(db.supabase);
 const characterCommentRoutes = require('./routes/characterComments')(db.supabase);
 const sceneCommentRoutes = require('./routes/sceneComments')(db.supabase);
+const personasRoutes = require('./routes/personas');
+const relationshipsRoutes = require('./routes/relationships');
 
 // Mount routes
 app.use('/api/providers', providerRoutes);
@@ -99,6 +101,8 @@ app.use('/api/learning', requireAuth, characterLearningRoutes);
 app.use('/api/character-comments', requireAuth, characterCommentRoutes);
 app.use('/api/scene-comments', requireAuth, sceneCommentRoutes);
 app.use('/api', requireAuth, imageRoutes);
+app.use('/api/personas', requireAuth, personasRoutes);
+app.use('/api/characters', requireAuth, relationshipsRoutes);
 
 // ============================================================================
 // HEALTH & UTILITY ROUTES

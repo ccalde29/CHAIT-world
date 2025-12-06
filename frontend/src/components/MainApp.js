@@ -20,7 +20,7 @@ import CharacterSceneHub from './CharacterSceneHub';
 import SettingsModal from './SettingsModal';
 import CharacterEditor from './CharacterEditor';
 import SceneEditor from './SceneEditor';
-import UserPersonaEditor from './UserPersonaEditor';
+import PersonaManager from './PersonaManager';
 import CharacterMemoryViewer from './CharacterMemoryViewer';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import CommunityHub from './CommunityHub';
@@ -650,13 +650,10 @@ const MainApp = () => {
       )}
 
       {showPersonaEditor && (
-        <UserPersonaEditor
-          currentPersona={settings.userPersona}
-          onSave={async (personaData) => {
-            await settings.saveUserPersona(personaData);
-            setShowPersonaEditor(false);
-          }}
+        <PersonaManager
+          personasState={personasState}
           onClose={() => setShowPersonaEditor(false)}
+          user={user}
         />
       )}
     </div>

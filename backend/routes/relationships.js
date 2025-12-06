@@ -42,28 +42,46 @@ router.get('/:characterId/relationships', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch relationships' });
     }
 
-    // If fetching character relationships, enrich with target character details
-    if (target_type === 'character' || !target_type) {
-      const characterRelationships = relationships.filter(r => r.target_type === 'character');
+    // Enrich relationships with target details
+    const characterRelationships = relationships.filter(r => r.target_type === 'character');
+    const userRelationships = relationships.filter(r => r.target_type === 'user');
 
-      if (characterRelationships.length > 0) {
-        const targetCharacterIds = characterRelationships.map(r => r.target_id);
+    // Fetch character details
+    if (characterRelationships.length > 0) {
+      const targetCharacterIds = characterRelationships.map(r => r.target_id);
 
-        const { data: characters } = await supabase
-          .from('characters')
-          .select('id, name, avatar, color, uses_custom_image, avatar_image_url')
-          .in('id', targetCharacterIds);
+      const { data: characters } = await supabase
+        .from('characters')
+        .select('id, name, avatar, color, uses_custom_image, avatar_image_url')
+        .in('id', targetCharacterIds);
 
-        // Enrich relationships with character data
-        relationships.forEach(rel => {
-          if (rel.target_type === 'character') {
-            const targetChar = characters?.find(c => c.id === rel.target_id);
-            if (targetChar) {
-              rel.target_character = targetChar;
-            }
+      relationships.forEach(rel => {
+        if (rel.target_type === 'character') {
+          const targetChar = characters?.find(c => c.id === rel.target_id);
+          if (targetChar) {
+            rel.target_character = targetChar;
           }
-        });
-      }
+        }
+      });
+    }
+
+    // Fetch persona details
+    if (userRelationships.length > 0) {
+      const targetPersonaIds = userRelationships.map(r => parseInt(r.target_id));
+
+      const { data: personas } = await supabase
+        .from('user_personas')
+        .select('id, name, avatar, color, uses_custom_image, avatar_image_url')
+        .in('id', targetPersonaIds);
+
+      relationships.forEach(rel => {
+        if (rel.target_type === 'user') {
+          const targetPersona = personas?.find(p => p.id === parseInt(rel.target_id));
+          if (targetPersona) {
+            rel.target_persona = targetPersona;
+          }
+        }
+      });
     }
 
     res.json({ relationships });
@@ -76,7 +94,7 @@ router.get('/:characterId/relationships', async (req, res) => {
 
 /**
  * POST /api/characters/:characterId/relationships
- * Create or update a bot-to-bot relationship
+ * Create or update a relationship (bot-to-bot or bot-to-user)
  */
 router.post('/:characterId/relationships', async (req, res) => {
   try {
@@ -84,6 +102,7 @@ router.post('/:characterId/relationships', async (req, res) => {
     const { characterId } = req.params;
     const {
       target_character_id,
+      target_persona_id,
       relationship_type,
       trust_level,
       familiarity_level,
@@ -95,9 +114,9 @@ router.post('/:characterId/relationships', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (!target_character_id || !relationship_type) {
+    if ((!target_character_id && !target_persona_id) || !relationship_type) {
       return res.status(400).json({
-        error: 'target_character_id and relationship_type are required'
+        error: 'Either target_character_id or target_persona_id, and relationship_type are required'
       });
     }
 
@@ -113,42 +132,74 @@ router.post('/:characterId/relationships', async (req, res) => {
       return res.status(404).json({ error: 'Source character not found or unauthorized' });
     }
 
-    // Verify the target character exists and belongs to the user
-    const { data: targetChar } = await supabase
-      .from('characters')
-      .select('id, name')
-      .eq('id', target_character_id)
-      .eq('user_id', userId)
-      .single();
+    let targetType, targetId, targetName;
 
-    if (!targetChar) {
-      return res.status(404).json({ error: 'Target character not found or unauthorized' });
+    if (target_character_id) {
+      // Bot-to-bot relationship
+      const { data: targetChar } = await supabase
+        .from('characters')
+        .select('id, name')
+        .eq('id', target_character_id)
+        .eq('user_id', userId)
+        .single();
+
+      if (!targetChar) {
+        return res.status(404).json({ error: 'Target character not found or unauthorized' });
+      }
+
+      targetType = 'character';
+      targetId = target_character_id;
+      targetName = targetChar.name;
+    } else {
+      // Bot-to-user relationship
+      const { data: targetPersona } = await supabase
+        .from('user_personas')
+        .select('id, name')
+        .eq('id', target_persona_id)
+        .eq('user_id', userId)
+        .single();
+
+      if (!targetPersona) {
+        return res.status(404).json({ error: 'Target persona not found or unauthorized' });
+      }
+
+      targetType = 'user';
+      targetId = String(target_persona_id);
+      targetName = targetPersona.name;
     }
 
-    // Use the database function to upsert
+    // Insert or update relationship
     const { data: relationship, error } = await supabase
-      .rpc('upsert_bot_relationship', {
-        p_character_id: characterId,
-        p_user_id: userId,
-        p_target_character_id: target_character_id,
-        p_relationship_type: relationship_type,
-        p_trust_level: trust_level !== undefined ? trust_level : 0.5,
-        p_familiarity_level: familiarity_level !== undefined ? familiarity_level : 0.5,
-        p_emotional_bond: emotional_bond !== undefined ? emotional_bond : 0.0,
-        p_custom_context: custom_context || null
-      });
+      .from('character_relationships')
+      .upsert({
+        character_id: characterId,
+        user_id: userId,
+        target_type: targetType,
+        target_id: targetId,
+        relationship_type: relationship_type,
+        trust_level: trust_level !== undefined ? trust_level : 0.5,
+        familiarity_level: familiarity_level !== undefined ? familiarity_level : 0.5,
+        emotional_bond: emotional_bond !== undefined ? emotional_bond : 0.0,
+        custom_context: custom_context || null,
+        interaction_count: 1,
+        last_interaction: new Date().toISOString()
+      }, {
+        onConflict: 'character_id,user_id,target_type,target_id'
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error('[Relationships] Error creating relationship:', error);
       return res.status(500).json({ error: 'Failed to create relationship' });
     }
 
-    console.log(`[Relationships] Created relationship: ${sourceChar.name} → ${targetChar.name} (${relationship_type})`);
+    console.log(`[Relationships] Created relationship: ${sourceChar.name} → ${targetName} (${relationship_type})`);
 
     res.json({
       success: true,
       relationship,
-      message: `Relationship created: ${sourceChar.name} → ${targetChar.name}`
+      message: `Relationship created: ${sourceChar.name} → ${targetName}`
     });
 
   } catch (error) {
@@ -195,7 +246,7 @@ router.delete('/:characterId/relationships/:targetCharacterId', async (req, res)
 
 /**
  * GET /api/characters/:characterId/relationships/available
- * Get list of characters that can have relationships (excluding already related ones)
+ * Get list of characters and personas that can have relationships (excluding already related ones)
  */
 router.get('/:characterId/relationships/available', async (req, res) => {
   try {
@@ -213,20 +264,33 @@ router.get('/:characterId/relationships/available', async (req, res) => {
       .eq('user_id', userId)
       .neq('id', characterId);
 
+    // Get all user's personas
+    const { data: allPersonas } = await supabase
+      .from('user_personas')
+      .select('id, name, avatar, color, personality, uses_custom_image, avatar_image_url')
+      .eq('user_id', userId);
+
     // Get existing relationships for this character
     const { data: existingRelationships } = await supabase
       .from('character_relationships')
-      .select('target_id')
+      .select('target_id, target_type')
       .eq('character_id', characterId)
-      .eq('user_id', userId)
-      .eq('target_type', 'character');
+      .eq('user_id', userId);
 
-    const relatedIds = existingRelationships?.map(r => r.target_id) || [];
+    const relatedCharacterIds = existingRelationships?.filter(r => r.target_type === 'character').map(r => r.target_id) || [];
+    const relatedPersonaIds = existingRelationships?.filter(r => r.target_type === 'user').map(r => r.target_id) || [];
 
-    // Filter out characters that already have relationships
-    const availableCharacters = allCharacters?.filter(c => !relatedIds.includes(c.id)) || [];
+    // Filter out characters and personas that already have relationships
+    const availableCharacters = allCharacters?.filter(c => !relatedCharacterIds.includes(c.id)) || [];
+    const availablePersonas = (allPersonas?.filter(p => !relatedPersonaIds.includes(String(p.id))) || []).map(p => ({
+      ...p,
+      type: 'persona'
+    }));
 
-    res.json({ characters: availableCharacters });
+    res.json({
+      characters: availableCharacters,
+      personas: availablePersonas
+    });
 
   } catch (error) {
     console.error('[Relationships] Error:', error);

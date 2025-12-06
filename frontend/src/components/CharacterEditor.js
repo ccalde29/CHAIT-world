@@ -274,7 +274,12 @@ const CharacterEditorV15 = ({
 
       if (response.ok) {
         const data = await response.json();
-        setAvailableCharacters(data.characters || []);
+        // Combine characters and personas into a single list
+        const allTargets = [
+          ...(data.characters || []).map(c => ({ ...c, type: 'character' })),
+          ...(data.personas || []).map(p => ({ ...p, type: 'persona' }))
+        ];
+        setAvailableCharacters(allTargets);
       }
     } catch (error) {
       console.error('Error loading available characters:', error);
@@ -288,7 +293,7 @@ const CharacterEditorV15 = ({
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/characters/${character.id}/relationships?target_type=character`,
+        `${API_BASE_URL}/api/characters/${character.id}/relationships`,
         {
           headers: {
             'user-id': user.id
@@ -305,8 +310,19 @@ const CharacterEditorV15 = ({
     }
   };
 
-  const handleAddRelationship = async (targetCharacterId, relationshipData) => {
+  const handleAddRelationship = async (targetId, targetType, relationshipData) => {
     try {
+      const payload = {
+        ...relationshipData
+      };
+
+      // Add appropriate target field based on type
+      if (targetType === 'character') {
+        payload.target_character_id = targetId;
+      } else if (targetType === 'persona') {
+        payload.target_persona_id = targetId;
+      }
+
       const response = await fetch(
         `${API_BASE_URL}/api/characters/${character.id}/relationships`,
         {
@@ -315,10 +331,7 @@ const CharacterEditorV15 = ({
             'Content-Type': 'application/json',
             'user-id': user.id
           },
-          body: JSON.stringify({
-            target_character_id: targetCharacterId,
-            ...relationshipData
-          })
+          body: JSON.stringify(payload)
         }
       );
 
@@ -657,67 +670,73 @@ const CharacterEditorV15 = ({
                 {/* Existing Relationships */}
                 {characterRelationships.length > 0 && (
                   <div className="space-y-2 mb-3">
-                    {characterRelationships.map(rel => (
-                      <div
-                        key={rel.id}
-                        className="bg-white/5 border border-white/10 rounded-lg p-3"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start gap-3 flex-1">
-                            {rel.target_character && (
-                              <>
-                                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${rel.target_character.color} flex items-center justify-center flex-shrink-0`}>
-                                  {rel.target_character.uses_custom_image && rel.target_character.avatar_image_url ? (
-                                    <img
-                                      src={rel.target_character.avatar_image_url}
-                                      alt={rel.target_character.name}
-                                      className="w-10 h-10 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <span className="text-xl">{rel.target_character.avatar}</span>
+                    {characterRelationships.map(rel => {
+                      const target = rel.target_character || rel.target_persona;
+                      if (!target) return null;
+
+                      return (
+                        <div
+                          key={rel.id}
+                          className="bg-white/5 border border-white/10 rounded-lg p-3"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3 flex-1">
+                              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${target.color} flex items-center justify-center flex-shrink-0`}>
+                                {target.uses_custom_image && target.avatar_image_url ? (
+                                  <img
+                                    src={target.avatar_image_url}
+                                    alt={target.name}
+                                    className="w-10 h-10 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-xl">{target.avatar}</span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="text-sm font-medium text-white">{target.name}</p>
+                                  <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">
+                                    {rel.relationship_type}
+                                  </span>
+                                  {rel.target_persona && (
+                                    <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
+                                      User Persona
+                                    </span>
                                   )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <p className="text-sm font-medium text-white">{rel.target_character.name}</p>
-                                    <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">
-                                      {rel.relationship_type}
+                                {rel.custom_context && (
+                                  <p className="text-xs text-gray-400 mb-2">{rel.custom_context}</p>
+                                )}
+                                <div className="flex gap-3 text-xs">
+                                  <div>
+                                    <span className="text-gray-500">Trust:</span>
+                                    <span className="ml-1 text-white">{Math.round(rel.trust_level * 100)}%</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Familiarity:</span>
+                                    <span className="ml-1 text-white">{Math.round(rel.familiarity_level * 100)}%</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Bond:</span>
+                                    <span className={`ml-1 ${rel.emotional_bond > 0 ? 'text-green-400' : rel.emotional_bond < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                                      {rel.emotional_bond > 0 ? '+' : ''}{Math.round(rel.emotional_bond * 100)}%
                                     </span>
                                   </div>
-                                  {rel.custom_context && (
-                                    <p className="text-xs text-gray-400 mb-2">{rel.custom_context}</p>
-                                  )}
-                                  <div className="flex gap-3 text-xs">
-                                    <div>
-                                      <span className="text-gray-500">Trust:</span>
-                                      <span className="ml-1 text-white">{Math.round(rel.trust_level * 100)}%</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-gray-500">Familiarity:</span>
-                                      <span className="ml-1 text-white">{Math.round(rel.familiarity_level * 100)}%</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-gray-500">Bond:</span>
-                                      <span className={`ml-1 ${rel.emotional_bond > 0 ? 'text-green-400' : rel.emotional_bond < 0 ? 'text-red-400' : 'text-gray-400'}`}>
-                                        {rel.emotional_bond > 0 ? '+' : ''}{Math.round(rel.emotional_bond * 100)}%
-                                      </span>
-                                    </div>
-                                  </div>
                                 </div>
-                              </>
-                            )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRelationship(rel.target_id)}
+                              className="text-red-400 hover:text-red-300 p-1"
+                              title="Remove Relationship"
+                            >
+                              <X size={16} />
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRelationship(rel.target_id)}
-                            className="text-red-400 hover:text-red-300 p-1"
-                            title="Remove Relationship"
-                          >
-                            <X size={16} />
-                          </button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
@@ -953,7 +972,7 @@ const CharacterEditorV15 = ({
 // ============================================================================
 
 const AddRelationshipForm = ({ availableCharacters, onAdd, onCancel }) => {
-  const [selectedCharacter, setSelectedCharacter] = useState('');
+  const [selectedTarget, setSelectedTarget] = useState('');
   const [relationshipType, setRelationshipType] = useState('friend');
   const [trustLevel, setTrustLevel] = useState(0.5);
   const [familiarityLevel, setFamiliarityLevel] = useState(0.5);
@@ -971,12 +990,15 @@ const AddRelationshipForm = ({ availableCharacters, onAdd, onCancel }) => {
   ];
 
   const handleSubmit = () => {
-    if (!selectedCharacter) {
-      alert('Please select a character');
+    if (!selectedTarget) {
+      alert('Please select a target');
       return;
     }
 
-    onAdd(selectedCharacter, {
+    // Parse the selectedTarget which is in format "type:id"
+    const [targetType, targetId] = selectedTarget.split(':');
+
+    onAdd(targetId, targetType, {
       relationship_type: relationshipType,
       trust_level: trustLevel,
       familiarity_level: familiarityLevel,
@@ -989,18 +1011,22 @@ const AddRelationshipForm = ({ availableCharacters, onAdd, onCancel }) => {
     <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
       <h4 className="text-sm font-medium text-white mb-2">Add New Relationship</h4>
 
-      {/* Character Selection */}
+      {/* Target Selection */}
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Select Character</label>
+        <label className="block text-xs text-gray-400 mb-1">Select Target</label>
         <select
-          value={selectedCharacter}
-          onChange={(e) => setSelectedCharacter(e.target.value)}
+          value={selectedTarget}
+          onChange={(e) => setSelectedTarget(e.target.value)}
           className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white"
         >
-          <option value="" className="bg-gray-800">-- Select a character --</option>
-          {availableCharacters.map(char => (
-            <option key={char.id} value={char.id} className="bg-gray-800">
-              {char.avatar} {char.name}
+          <option value="" className="bg-gray-800">-- Select a target --</option>
+          {availableCharacters.map(target => (
+            <option
+              key={`${target.type}:${target.id}`}
+              value={`${target.type}:${target.id}`}
+              className="bg-gray-800"
+            >
+              {target.avatar} {target.name} {target.type === 'persona' ? '(User Persona)' : '(Character)'}
             </option>
           ))}
         </select>

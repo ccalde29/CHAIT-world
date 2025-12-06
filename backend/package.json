@@ -2,11 +2,10 @@
     "name": "ai-group-chat-backend",
     "version": "1.0.0",
     "description": "Backend API for AI Group Chat application",
-    "main": "server.js",
+    "main": "server-supabase.js",
     "scripts": {
         "start": "node server-supabase.js",
-        "dev": "nodemon server-supabase.js",
-        "dev-old": "nodemon server.js"
+        "dev": "nodemon server-supabase.js"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.57.4",
