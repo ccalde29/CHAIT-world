@@ -1020,6 +1020,20 @@ const communityRoutes = require('./routes/community')(communityService, characte
 app.use('/api/community', communityRoutes);
 
 // ============================================================================
+// PERSONA MANAGEMENT ROUTES
+// ============================================================================
+
+const personasRoutes = require('./routes/personas');
+app.use('/api/personas', personasRoutes);
+
+// ============================================================================
+// CHARACTER RELATIONSHIP ROUTES (Bot-to-Bot)
+// ============================================================================
+
+const relationshipsRoutes = require('./routes/relationships');
+app.use('/api/characters', relationshipsRoutes);
+
+// ============================================================================
 // HEALTH & UTILITY ROUTES
 // ============================================================================
 /**

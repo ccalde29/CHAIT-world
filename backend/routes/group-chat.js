@@ -1,14 +1,12 @@
 // ============================================================================
-// CHAIT World - Enhanced Group Chat Endpoint (v1.5)
-// Multi-pass response generation with mood system and speaking queue
+// CHAIT World - Simplified Group Chat Endpoint (v2.0)
+// Streamlined response generation with core decision logic
 // ============================================================================
 
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const AIProviderService = require('../services/AIProviderService');
-const MoodEngine = require('../services/MoodEngine');
-const SpeakingQueue = require('../services/SpeakingQueue');
 const { aiCallLimiter } = require('../middleware/rateLimiter');
 
 const supabase = createClient(
@@ -19,8 +17,8 @@ const MemoryService = require('../services/MemoryService');
 const memoryService = new MemoryService(supabase);
 
 /**
- * POST /api/chat/group-response-v15
- * Enhanced group chat with mood system and multi-pass generation
+ * POST /api/chat/group-response
+ * Simplified group chat with core decision logic
  */
 router.post('/group-response', aiCallLimiter, async (req, res) => {
   try {
@@ -32,14 +30,14 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       userPersona,
       currentScene
     } = req.body;
-    
+
     const userId = req.headers['user-id'];
 
     if (!userId || !userMessage || !activeCharacters || activeCharacters.length === 0) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    console.log(`[Group Chat v1.5] Processing for ${activeCharacters.length} characters`);
+    console.log(`[Group Chat v2.0] Processing for ${activeCharacters.length} characters`);
 
     // ========================================================================
     // STEP 0: CREATE OR USE EXISTING SESSION
@@ -141,342 +139,201 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         // NEVER LOG: console.log('[Settings] API Keys:', apiKeys); // DANGEROUS!
       }
     // ========================================================================
-    // STEP 3: LOAD SESSION STATES AND CONTEXT
+    // STEP 3: DETERMINE WHO SHOULD RESPOND (SIMPLIFIED LOGIC)
     // ========================================================================
 
-    const results = await Promise.allSettled([
-      SpeakingQueue.getSessionStates(activeCharacters, activeSessionId, userId, supabase),
-      SpeakingQueue.getTopicEngagements(activeCharacters, userId, supabase),
-      SpeakingQueue.getRelationships(activeCharacters, userId, supabase)
-    ]);
+    // Get recent speaker history (last 3 messages)
+    const recentSpeakers = conversationHistory
+      .slice(-3)
+      .filter(m => m.type === 'character')
+      .map(m => m.character_id || m.character);
 
-    // Handle results with fallbacks
-    const sessionStates = results[0].status === 'fulfilled' ? results[0].value : [];
-    const topicEngagements = results[1].status === 'fulfilled' ? results[1].value : [];
-    const relationships = results[2].status === 'fulfilled' ? results[2].value : [];
+    // 1. Check if user mentioned any character by name
+    const directlyMentioned = characters.filter(char =>
+      userMessage.toLowerCase().includes(char.name.toLowerCase())
+    );
 
-    // Log any failures (but don't block the request)
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        const labels = ['session states', 'topic engagements', 'relationships'];
-        console.error(`Failed to load ${labels[index]}:`, result.reason);
-      }
-    });
-    
-    // ========================================================================
-    // STEP 4: UPDATE CHARACTER MOODS BASED ON USER MESSAGE
-    // ========================================================================
-    
-    const triggers = MoodEngine.analyzeTriggers(userMessage);
-    console.log(`[Mood Engine] Detected triggers:`, triggers.map(t => t.type));
-    
-    // Update moods for all characters
-    for (const character of characters) {
-      const sessionState = sessionStates.find(s => s.character_id === character.id);
-      const currentMood = sessionState?.current_mood || 'neutral';
-      const currentIntensity = sessionState?.mood_intensity || 0.5;
-      
-      // Calculate new mood
-      const newMoodState = MoodEngine.calculateNewMood(
-        currentMood,
-        currentIntensity,
-        triggers,
-        character.temperature || 0.8
+    let respondingCharacters = [];
+
+    if (directlyMentioned.length > 0) {
+      // All mentioned characters will respond
+      respondingCharacters = directlyMentioned;
+      console.log(`[Decision] ${directlyMentioned.length} character(s) directly mentioned`);
+    } else {
+      // 2. Select 1-2 characters who haven't spoken recently
+      const availableCharacters = characters.filter(char =>
+        !recentSpeakers.includes(char.id)
       );
-      
-      console.log(`[Mood Engine] ${character.name}: ${currentMood}(${currentIntensity.toFixed(2)}) → ${newMoodState.mood}(${newMoodState.intensity.toFixed(2)})`);
-      
-      // Save to database
-      await supabase.rpc('upsert_character_mood', {
-        p_character_id: character.id,
-        p_session_id: activeSessionId,
-        p_user_id: userId,
-        p_mood: newMoodState.mood,
-        p_intensity: newMoodState.intensity
-      });
-      
-      // Update session state in memory
-      const stateIndex = sessionStates.findIndex(s => s.character_id === character.id);
-      if (stateIndex >= 0) {
-        sessionStates[stateIndex].current_mood = newMoodState.mood;
-        sessionStates[stateIndex].mood_intensity = newMoodState.intensity;
+
+      if (availableCharacters.length > 0) {
+        // Randomly pick 1-2 from those who haven't spoken recently
+        const numResponders = Math.random() > 0.5 ? 2 : 1;
+        respondingCharacters = availableCharacters
+          .sort(() => Math.random() - 0.5)
+          .slice(0, Math.min(numResponders, availableCharacters.length));
       } else {
-        sessionStates.push({
-          character_id: character.id,
-          session_id: activeSessionId,
-          user_id: userId,
-          current_mood: newMoodState.mood,
-          mood_intensity: newMoodState.intensity,
-          messages_this_session: 0,
-          last_spoke_at: null
-        });
+        // Everyone spoke recently, just pick the oldest speaker
+        respondingCharacters = [characters[0]];
       }
+
+      console.log(`[Decision] ${respondingCharacters.length} character(s) selected to respond`);
     }
     
     // ========================================================================
-    // STEP 5: BUILD SPEAKING QUEUE
+    // STEP 4: LOAD BOT-TO-BOT RELATIONSHIPS
     // ========================================================================
-    
-    const context = {
-      userMessage,
-      totalMessages: conversationHistory.length,
-      lastSpeaker: conversationHistory.length > 0 
-        ? conversationHistory[conversationHistory.length - 1].character 
-        : null,
-      topicEngagements,
-      relationships
-    };
-    
-    const queue = SpeakingQueue.buildQueue(characters, sessionStates, context);
-    
-    console.log(`[Speaking Queue] Primary: ${queue.primary.character.name} (${queue.primary.score.toFixed(2)})`);
-    console.log(`[Speaking Queue] Secondary (${queue.secondary.length}):`, queue.secondary.map(s => `${s.character.name}(${s.score.toFixed(2)})`));
-    console.log(`[Speaking Queue] Silent (${queue.silent.length}):`, queue.silent.map(s => s.character.name));
-    
-    // ========================================================================
-    // STEP 6: GENERATE PRIMARY RESPONSE
-    // ========================================================================
-    
-    const responses = [];
-    
-    const primaryChar = queue.primary.character;
-    const primaryState = queue.primary.sessionState;
-    
-    try {
-      // Build context with mood
-      const moodPrompt = MoodEngine.buildMoodPrompt(
-        primaryState.current_mood,
-        primaryState.mood_intensity,
-        primaryChar
-      );
-      
-      const systemPrompt = buildSystemPrompt(primaryChar, userPersona, currentScene, moodPrompt);
-      const messages = buildConversationMessages(systemPrompt, conversationHistory, userMessage);
-      
-      console.log(`[Primary] Generating response for ${primaryChar.name}...`);
-      
-      const response = await AIProviderService.generateResponse(
-        primaryChar,
-        messages,
-        apiKeys,
-        ollamaSettings
-      );
-      
-      // Save primary response to database immediately
-      const { data: savedMessage } = await supabase
-        .from('messages')
-        .insert({
-          session_id: activeSessionId,
-          type: 'character',
-          character_id: primaryChar.id,
-          content: response,
-          mood_at_time: primaryState.current_mood,
-          mood_intensity: primaryState.mood_intensity,
-          is_primary_response: true
-        })
-        .select()
-        .single();
 
-      // Update message count for character response
-      await supabase.rpc('increment_message_count', {
-        p_session_id: activeSessionId
-      });
+    // Load relationships for all responding characters
+    const characterRelationshipsMap = new Map();
 
-      responses.push({
-        character: primaryChar.id,
-        characterName: primaryChar.name,
-        response: response,
-        timestamp: new Date().toISOString(),
-        delay: 0,
-        isPrimary: true,
-        mood: primaryState.current_mood,
-        moodIntensity: primaryState.mood_intensity
-      });
-      
-      // Update session state
-      await SpeakingQueue.updateSessionState(primaryChar.id, activeSessionId, userId, supabase);
-      await SpeakingQueue.updateTopicEngagement(primaryChar.id, userId, userMessage, supabase);
-
-      // Persist memories and relationships for primary response
+    for (const char of respondingCharacters) {
       try {
-        const newMemories = memoryService.analyzeConversationForMemories(
-          userMessage,
-          response,
-          userPersona,
-          userId
-        );
+        const { data: relationships } = await supabase
+          .from('character_relationships')
+          .select('*')
+          .eq('character_id', char.id)
+          .eq('user_id', userId)
+          .eq('target_type', 'character');
 
-        for (const mem of newMemories) {
-          await memoryService.addCharacterMemory(primaryChar.id, userId, mem);
+        if (relationships) {
+          characterRelationshipsMap.set(char.id, relationships);
+        }
+      } catch (error) {
+        console.error(`[Relationships] Error loading for ${char.name}:`, error);
+        characterRelationshipsMap.set(char.id, []);
+      }
+    }
+
+    // ========================================================================
+    // STEP 5: GENERATE RESPONSES FOR SELECTED CHARACTERS
+    // ========================================================================
+
+    const responses = [];
+
+    // Generate responses sequentially with staggered delays
+    for (let index = 0; index < respondingCharacters.length; index++) {
+      const char = respondingCharacters[index];
+      const isPrimary = index === 0;
+
+      try {
+        // Build conversation history that includes previous responses in this turn
+        let updatedHistory = conversationHistory;
+        if (index > 0) {
+          // Include previous character responses from this turn
+          updatedHistory = [
+            ...conversationHistory,
+            { role: 'user', content: userMessage }
+          ];
+
+          // Add previous responses from this turn
+          for (let i = 0; i < index; i++) {
+            updatedHistory.push({
+              role: 'assistant',
+              content: `[${respondingCharacters[i].name}]: ${responses[i].response}`
+            });
+          }
         }
 
-        const currentRelationship = await memoryService.getCharacterRelationship(primaryChar.id, userId);
-        const relationshipUpdate = memoryService.calculateRelationshipUpdate(
-          currentRelationship,
-          userMessage,
-          response
+        // Get other characters in the chat (excluding current character)
+        const otherCharacters = characters.filter(c => c.id !== char.id);
+
+        // Get this character's relationships
+        const characterRelationships = characterRelationshipsMap.get(char.id) || [];
+
+        const systemPrompt = buildSystemPrompt(char, userPersona, currentScene, otherCharacters, characterRelationships);
+        const messages = buildConversationMessages(systemPrompt, updatedHistory, isPrimary ? userMessage : null);
+
+        console.log(`[Response] Generating for ${char.name}...`);
+
+        const response = await AIProviderService.generateResponse(
+          char,
+          messages,
+          apiKeys,
+          ollamaSettings
         );
 
-        await memoryService.updateCharacterRelationship(primaryChar.id, userId, relationshipUpdate);
-      } catch (memErr) {
-        console.error('[Memory] Error processing primary character memories:', memErr);
-      }
-      
-      console.log(`[Primary] ${primaryChar.name}: "${response}"`);
-      
-    } catch (error) {
-      console.error(`[Primary] Error for ${primaryChar.name}:`, error);
-      responses.push({
-        character: primaryChar.id,
-        characterName: primaryChar.name,
-        response: "Sorry, I'm having trouble responding right now...",
-        timestamp: new Date().toISOString(),
-        delay: 0,
-        error: true
-      });
-    }
-    
-    // ========================================================================
-    // STEP 7: GENERATE SECONDARY RESPONSES
-    // (Characters react to primary response + user message)
-    // ========================================================================
-    
-    if (queue.secondary.length > 0) {
-      // Generate secondary responses in parallel
-      const secondaryPromises = queue.secondary.map(async (scored, index) => {
-        const char = scored.character;
-        const state = scored.sessionState;
-        
-        try {
-          // Build context including primary response
-          const moodPrompt = MoodEngine.buildMoodPrompt(
-            state.current_mood,
-            state.mood_intensity,
-            char
-          );
-          
-          // Add primary response to conversation history
-          const updatedHistory = [
-            ...conversationHistory,
-            {
-              role: 'user',
-              content: userMessage
-            },
-            {
-              role: 'assistant',
-              content: `[${primaryChar.name}]: ${responses[0].response}`
-            }
-          ];
-          
-          const systemPrompt = buildSystemPrompt(char, userPersona, currentScene, moodPrompt);
-          const messages = buildConversationMessages(systemPrompt, updatedHistory, null);
-          
-          console.log(`[Secondary] Generating response for ${char.name}...`);
-          
-          const response = await AIProviderService.generateResponse(
-            char,
-            messages,
-            apiKeys,
-            ollamaSettings
-          );
-          
-          // Save to database
-          await supabase
-            .from('messages')
-            .insert({
-              session_id: activeSessionId,
-              type: 'character',
-              character_id: char.id,
-              content: response,
-              mood_at_time: state.current_mood,
-              mood_intensity: state.mood_intensity,
-              is_primary_response: false
-            });
-
-          // Update message count for secondary response
-          await supabase.rpc('increment_message_count', {
-            p_session_id: activeSessionId
+        // Save to database
+        await supabase
+          .from('messages')
+          .insert({
+            session_id: activeSessionId,
+            type: 'character',
+            character_id: char.id,
+            content: response,
+            is_primary_response: isPrimary
           });
 
-          // Update session state
-          await SpeakingQueue.updateSessionState(char.id, activeSessionId, userId, supabase);
-          await SpeakingQueue.updateTopicEngagement(char.id, userId, userMessage, supabase);
+        // Update message count
+        await supabase.rpc('increment_message_count', {
+          p_session_id: activeSessionId
+        });
 
-          // Persist memories and relationships for secondary response
-          try {
-            const newMemories = memoryService.analyzeConversationForMemories(
-              userMessage,
-              response,
-              userPersona,
-              userId
-            );
+        responses.push({
+          character: char.id,
+          characterName: char.name,
+          response: response,
+          timestamp: new Date().toISOString(),
+          delay: index * 1200, // Stagger by 1.2s
+          isPrimary: isPrimary
+        });
 
-            for (const mem of newMemories) {
-              await memoryService.addCharacterMemory(char.id, userId, mem);
-            }
+        // Persist memories and relationships
+        try {
+          const newMemories = memoryService.analyzeConversationForMemories(
+            userMessage,
+            response,
+            userPersona,
+            userId
+          );
 
-            const currentRelationship = await memoryService.getCharacterRelationship(char.id, userId);
-            const relationshipUpdate = memoryService.calculateRelationshipUpdate(
-              currentRelationship,
-              userMessage,
-              response
-            );
-
-            await memoryService.updateCharacterRelationship(char.id, userId, relationshipUpdate);
-          } catch (memErr) {
-            console.error(`[Memory] Error processing secondary memories for ${char.name}:`, memErr);
+          for (const mem of newMemories) {
+            await memoryService.addCharacterMemory(char.id, userId, mem);
           }
-          
-          console.log(`[Secondary] ${char.name}: "${response}"`);
-          
-          return {
+
+          const currentRelationship = await memoryService.getCharacterRelationship(char.id, userId);
+          const relationshipUpdate = memoryService.calculateRelationshipUpdate(
+            currentRelationship,
+            userMessage,
+            response
+          );
+
+          await memoryService.updateCharacterRelationship(char.id, userId, relationshipUpdate);
+        } catch (memErr) {
+          console.error(`[Memory] Error processing memories for ${char.name}:`, memErr);
+        }
+
+        console.log(`[Response] ${char.name}: "${response}"`);
+
+      } catch (error) {
+        console.error(`[Response] Error for ${char.name}:`, error);
+        if (isPrimary) {
+          // If primary fails, still add error response
+          responses.push({
             character: char.id,
             characterName: char.name,
-            response: response,
+            response: "Sorry, I'm having trouble responding right now...",
             timestamp: new Date().toISOString(),
-            delay: (index + 1) * 1200, // Stagger by 1.2s
-            isPrimary: false,
-            mood: state.current_mood,
-            moodIntensity: state.mood_intensity
-          };
-          
-        } catch (error) {
-          console.error(`[Secondary] Error for ${char.name}:`, error);
-          return null; // Silent failure for secondary
+            delay: index * 1200,
+            error: true
+          });
         }
-      });
-      
-      const secondaryResponses = await Promise.all(secondaryPromises);
-      
-      // Add successful secondary responses
-      secondaryResponses
-        .filter(r => r !== null)
-        .forEach(r => responses.push(r));
+        // Secondary failures are silent
+      }
     }
     
     // ========================================================================
-    // STEP 8: RETURN ALL RESPONSES
+    // STEP 6: RETURN ALL RESPONSES
     // ========================================================================
-    
-    console.log(`[Group Chat v1.5] Generated ${responses.length} responses`);
+
+    console.log(`[Group Chat v2.0] Generated ${responses.length} responses`);
 
     res.json({
       sessionId: activeSessionId,
-      responses,
-      queue: {
-        primary: queue.primary.character.name,
-        secondary: queue.secondary.map(s => s.character.name),
-        silent: queue.silent.map(s => s.character.name)
-      },
-      moods: sessionStates.map(s => ({
-        character: characters.find(c => c.id === s.character_id)?.name,
-        mood: s.current_mood,
-        intensity: s.mood_intensity
-      }))
+      responses
     });
     
   } catch (error) {
-    console.error('[Group Chat v1.5] Error:', error);
+    console.error('[Group Chat v2.0] Error:', error);
     res.status(500).json({
       error: 'Failed to generate group response',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -488,7 +345,7 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-function buildSystemPrompt(character, userPersona, currentScene, moodPrompt) {
+function buildSystemPrompt(character, userPersona, currentScene, otherCharacters, characterRelationships) {
   let prompt = `You are ${character.name}.\n\n`;
   prompt += `PERSONALITY & BACKGROUND:\n${character.personality}\n\n`;
 
@@ -497,11 +354,41 @@ function buildSystemPrompt(character, userPersona, currentScene, moodPrompt) {
     const personaName = userPersona.name || 'the user';
     prompt += `USER PERSONA:\nYou are talking to ${personaName}. ${personaDescription}\n\n`;
   }
-  
+
   if (currentScene) {
     prompt += `CURRENT SCENE:\n${currentScene.description}\n\n`;
   }
-  
+
+  // Add bot-to-bot relationship context
+  if (otherCharacters && otherCharacters.length > 0 && characterRelationships && characterRelationships.length > 0) {
+    prompt += `YOUR RELATIONSHIPS WITH OTHERS IN THIS CHAT:\n`;
+
+    for (const otherChar of otherCharacters) {
+      const relationship = characterRelationships.find(rel =>
+        rel.target_type === 'character' && rel.target_id === otherChar.id
+      );
+
+      if (relationship) {
+        prompt += `- ${otherChar.name}: ${relationship.relationship_type}`;
+
+        if (relationship.custom_context) {
+          prompt += ` (${relationship.custom_context})`;
+        }
+
+        // Add emotional context based on bond strength
+        if (relationship.emotional_bond > 0.5) {
+          prompt += ` - You have a strong positive bond with them`;
+        } else if (relationship.emotional_bond < -0.3) {
+          prompt += ` - You have tension or conflict with them`;
+        }
+
+        prompt += `\n`;
+      }
+    }
+
+    prompt += `\n`;
+  }
+
   prompt += `IMPORTANT INSTRUCTIONS:
 - Stay in character at all times
 - Respond naturally and conversationally
@@ -509,11 +396,7 @@ function buildSystemPrompt(character, userPersona, currentScene, moodPrompt) {
 - Use actions in *asterisks* to show body language or emotions
 - Don't break the fourth wall or mention being an AI
 - React authentically to what others say`;
-  
-  if (moodPrompt) {
-    prompt += moodPrompt;
-  }
-  
+
   return prompt;
 }
 

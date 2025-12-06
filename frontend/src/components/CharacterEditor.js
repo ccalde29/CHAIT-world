@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Save, User, MessageCircle, Sparkles, Sliders,
-  Brain, Zap, Tag, Globe, RefreshCw, AlertCircle
+  Brain, Zap, Tag, Globe, RefreshCw, AlertCircle, Users, Heart
 } from 'lucide-react';
 import ImageUpload from './ImageUpload';
 
@@ -55,6 +55,12 @@ const CharacterEditorV15 = ({
   const [loadingModels, setLoadingModels] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  // Relationships state
+  const [availableCharacters, setAvailableCharacters] = useState([]);
+  const [loadingCharacters, setLoadingCharacters] = useState(false);
+  const [characterRelationships, setCharacterRelationships] = useState([]);
+  const [showAddRelationship, setShowAddRelationship] = useState(false);
   
   // ============================================================================
   // INITIALIZE
@@ -247,7 +253,118 @@ const CharacterEditorV15 = ({
 
     return true;
   };
-  
+
+  // ============================================================================
+  // RELATIONSHIP HANDLERS
+  // ============================================================================
+
+  const loadAvailableCharactersForRelationships = async () => {
+    if (!character?.id) return; // Only for editing existing characters
+
+    setLoadingCharacters(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/characters/${character.id}/relationships/available`,
+        {
+          headers: {
+            'user-id': user.id
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableCharacters(data.characters || []);
+      }
+    } catch (error) {
+      console.error('Error loading available characters:', error);
+    } finally {
+      setLoadingCharacters(false);
+    }
+  };
+
+  const loadCharacterRelationships = async () => {
+    if (!character?.id) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/characters/${character.id}/relationships?target_type=character`,
+        {
+          headers: {
+            'user-id': user.id
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setCharacterRelationships(data.relationships || []);
+      }
+    } catch (error) {
+      console.error('Error loading relationships:', error);
+    }
+  };
+
+  const handleAddRelationship = async (targetCharacterId, relationshipData) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/characters/${character.id}/relationships`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'user-id': user.id
+          },
+          body: JSON.stringify({
+            target_character_id: targetCharacterId,
+            ...relationshipData
+          })
+        }
+      );
+
+      if (response.ok) {
+        await loadCharacterRelationships();
+        await loadAvailableCharactersForRelationships();
+        setShowAddRelationship(false);
+      }
+    } catch (error) {
+      console.error('Error adding relationship:', error);
+      alert('Failed to add relationship');
+    }
+  };
+
+  const handleDeleteRelationship = async (targetCharacterId) => {
+    if (!window.confirm('Are you sure you want to remove this relationship?')) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/characters/${character.id}/relationships/${targetCharacterId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'user-id': user.id
+          }
+        }
+      );
+
+      if (response.ok) {
+        await loadCharacterRelationships();
+        await loadAvailableCharactersForRelationships();
+      }
+    } catch (error) {
+      console.error('Error deleting relationship:', error);
+      alert('Failed to delete relationship');
+    }
+  };
+
+  // Load relationships when editing an existing character
+  useEffect(() => {
+    if (character?.id) {
+      loadCharacterRelationships();
+      loadAvailableCharactersForRelationships();
+    }
+  }, [character?.id]);
+
   const handleSave = async () => {
     if (!validateForm()) return;
     
@@ -525,8 +642,114 @@ const CharacterEditorV15 = ({
                 </div>
               )}
             </div>
+
+            {/* Bot-to-Bot Relationships */}
+            {character?.id && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <Users size={14} className="inline mr-1" />
+                  Relationships with Other Characters
+                </label>
+                <p className="text-xs text-gray-400 mb-3">
+                  Define how this character knows other characters in your world. This helps create more natural conversations.
+                </p>
+
+                {/* Existing Relationships */}
+                {characterRelationships.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {characterRelationships.map(rel => (
+                      <div
+                        key={rel.id}
+                        className="bg-white/5 border border-white/10 rounded-lg p-3"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3 flex-1">
+                            {rel.target_character && (
+                              <>
+                                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${rel.target_character.color} flex items-center justify-center flex-shrink-0`}>
+                                  {rel.target_character.uses_custom_image && rel.target_character.avatar_image_url ? (
+                                    <img
+                                      src={rel.target_character.avatar_image_url}
+                                      alt={rel.target_character.name}
+                                      className="w-10 h-10 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-xl">{rel.target_character.avatar}</span>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <p className="text-sm font-medium text-white">{rel.target_character.name}</p>
+                                    <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">
+                                      {rel.relationship_type}
+                                    </span>
+                                  </div>
+                                  {rel.custom_context && (
+                                    <p className="text-xs text-gray-400 mb-2">{rel.custom_context}</p>
+                                  )}
+                                  <div className="flex gap-3 text-xs">
+                                    <div>
+                                      <span className="text-gray-500">Trust:</span>
+                                      <span className="ml-1 text-white">{Math.round(rel.trust_level * 100)}%</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-500">Familiarity:</span>
+                                      <span className="ml-1 text-white">{Math.round(rel.familiarity_level * 100)}%</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-500">Bond:</span>
+                                      <span className={`ml-1 ${rel.emotional_bond > 0 ? 'text-green-400' : rel.emotional_bond < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                                        {rel.emotional_bond > 0 ? '+' : ''}{Math.round(rel.emotional_bond * 100)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRelationship(rel.target_id)}
+                            className="text-red-400 hover:text-red-300 p-1"
+                            title="Remove Relationship"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add New Relationship */}
+                {!showAddRelationship && availableCharacters.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRelationship(true)}
+                    className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-sm transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Heart size={14} />
+                    Add Relationship
+                  </button>
+                )}
+
+                {showAddRelationship && (
+                  <AddRelationshipForm
+                    availableCharacters={availableCharacters}
+                    onAdd={handleAddRelationship}
+                    onCancel={() => setShowAddRelationship(false)}
+                  />
+                )}
+
+                {character?.id && characterRelationships.length === 0 && availableCharacters.length === 0 && !loadingCharacters && (
+                  <p className="text-xs text-gray-500 text-center py-4">
+                    Create more characters to add relationships
+                  </p>
+                )}
+              </div>
+            )}
           </div>
-          
+
           {/* AI Model Selection */}
           <div className="pt-6 border-t border-white/10 space-y-4">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -720,6 +943,164 @@ const CharacterEditorV15 = ({
           </button>
         </div>
         
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// ADD RELATIONSHIP FORM COMPONENT
+// ============================================================================
+
+const AddRelationshipForm = ({ availableCharacters, onAdd, onCancel }) => {
+  const [selectedCharacter, setSelectedCharacter] = useState('');
+  const [relationshipType, setRelationshipType] = useState('friend');
+  const [trustLevel, setTrustLevel] = useState(0.5);
+  const [familiarityLevel, setFamiliarityLevel] = useState(0.5);
+  const [emotionalBond, setEmotionalBond] = useState(0);
+  const [customContext, setCustomContext] = useState('');
+
+  const relationshipTypes = [
+    'stranger', 'acquaintance', 'friend', 'close_friend', 'best_friend',
+    'family', 'sibling', 'parent', 'child',
+    'romantic_partner', 'ex_partner',
+    'rival', 'enemy',
+    'coworker', 'boss', 'employee',
+    'mentor', 'student',
+    'custom'
+  ];
+
+  const handleSubmit = () => {
+    if (!selectedCharacter) {
+      alert('Please select a character');
+      return;
+    }
+
+    onAdd(selectedCharacter, {
+      relationship_type: relationshipType,
+      trust_level: trustLevel,
+      familiarity_level: familiarityLevel,
+      emotional_bond: emotionalBond,
+      custom_context: customContext.trim() || null
+    });
+  };
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
+      <h4 className="text-sm font-medium text-white mb-2">Add New Relationship</h4>
+
+      {/* Character Selection */}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Select Character</label>
+        <select
+          value={selectedCharacter}
+          onChange={(e) => setSelectedCharacter(e.target.value)}
+          className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white"
+        >
+          <option value="" className="bg-gray-800">-- Select a character --</option>
+          {availableCharacters.map(char => (
+            <option key={char.id} value={char.id} className="bg-gray-800">
+              {char.avatar} {char.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Relationship Type */}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Relationship Type</label>
+        <select
+          value={relationshipType}
+          onChange={(e) => setRelationshipType(e.target.value)}
+          className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white"
+        >
+          {relationshipTypes.map(type => (
+            <option key={type} value={type} className="bg-gray-800">
+              {type.replace(/_/g, ' ')}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Custom Context */}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">Context (Optional)</label>
+        <input
+          type="text"
+          value={customContext}
+          onChange={(e) => setCustomContext(e.target.value)}
+          placeholder="e.g., We grew up together, Met in college..."
+          className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white placeholder-gray-500"
+        />
+      </div>
+
+      {/* Trust Level */}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">
+          Trust Level: {Math.round(trustLevel * 100)}%
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value={trustLevel}
+          onChange={(e) => setTrustLevel(parseFloat(e.target.value))}
+          className="w-full accent-blue-500"
+        />
+      </div>
+
+      {/* Familiarity Level */}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">
+          Familiarity Level: {Math.round(familiarityLevel * 100)}%
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value={familiarityLevel}
+          onChange={(e) => setFamiliarityLevel(parseFloat(e.target.value))}
+          className="w-full accent-green-500"
+        />
+      </div>
+
+      {/* Emotional Bond */}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1">
+          Emotional Bond: {emotionalBond > 0 ? '+' : ''}{Math.round(emotionalBond * 100)}%
+          <span className="ml-2 text-xs">
+            ({emotionalBond > 0 ? 'Positive' : emotionalBond < 0 ? 'Negative' : 'Neutral'})
+          </span>
+        </label>
+        <input
+          type="range"
+          min="-1"
+          max="1"
+          step="0.1"
+          value={emotionalBond}
+          onChange={(e) => setEmotionalBond(parseFloat(e.target.value))}
+          className="w-full accent-purple-500"
+        />
+      </div>
+
+      {/* Buttons */}
+      <div className="flex gap-2 pt-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white text-sm transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          className="flex-1 px-3 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white text-sm transition-colors"
+        >
+          Add Relationship
+        </button>
       </div>
     </div>
   );

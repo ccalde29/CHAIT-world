@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../hooks/useChat';
 import { useCharacters } from '../hooks/useCharacters';
 import { useSettings } from '../hooks/useSettings';
+import { usePersonas } from '../hooks/usePersonas';
 import { createApiClient } from '../utils/apiClient';
 
 // Components
@@ -40,6 +41,7 @@ const MainApp = () => {
   const chat = useChat(apiRequest);
   const charactersState = useCharacters(apiRequest);
   const settings = useSettings(apiRequest);
+  const personasState = usePersonas(apiRequest);
 
   // ============================================================================
   // UI STATE
@@ -52,6 +54,7 @@ const MainApp = () => {
   const [showMemoryViewer, setShowMemoryViewer] = useState(false);
   const [showPersonaEditor, setShowPersonaEditor] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showPersonaMenu, setShowPersonaMenu] = useState(false);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [showManagementHub, setShowManagementHub] = useState(true); // Show by default
   const [chatHistoryCollapsed, setChatHistoryCollapsed] = useState(true); // Collapsed by default
@@ -61,6 +64,7 @@ const MainApp = () => {
   const [selectedCharacterForMemory, setSelectedCharacterForMemory] = useState(null);
 
   const userMenuRef = useRef(null);
+  const personaMenuRef = useRef(null);
 
   // ============================================================================
   // HANDLERS
@@ -108,6 +112,18 @@ const MainApp = () => {
       charactersState.currentScenario,
       settings.userPersona
     );
+  };
+
+  const handlePersonaSwitch = async (personaId) => {
+    try {
+      await personasState.activatePersona(personaId);
+      setShowPersonaMenu(false);
+      // Refresh to load the newly activated persona
+      await personasState.fetchActivePersona();
+    } catch (error) {
+      console.error('Failed to switch persona:', error);
+      window.alert('Failed to switch persona');
+    }
   };
 
   const handleSaveCharacter = async (characterData) => {
@@ -352,8 +368,65 @@ const MainApp = () => {
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold">CHAIT World</h1>
             <div className="text-sm text-gray-400">
-              {charactersState.findScenarioById(charactersState.currentScenario)?.name || 'Coffee Shop'}
+              {charactersState.findScenarioById(charactersState.currentScenario)?.name || 'General Chat'}
             </div>
+
+            {/* Persona Switcher */}
+            {personasState.activePersona && (
+              <div className="relative" ref={personaMenuRef}>
+                <button
+                  onClick={() => setShowPersonaMenu(!showPersonaMenu)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-sm"
+                  title="Switch Persona"
+                >
+                  <span className="text-lg">{personasState.activePersona.avatar || '👤'}</span>
+                  <span className="text-white font-medium">{personasState.activePersona.name}</span>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showPersonaMenu && personasState.personas.length > 0 && (
+                  <div className="absolute left-0 mt-2 w-64 bg-gray-800 border border-white/10 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+                    <div className="p-2 border-b border-white/10">
+                      <p className="text-xs text-gray-400 px-2 py-1">Switch Persona</p>
+                    </div>
+                    {personasState.personas.map(persona => (
+                      <button
+                        key={persona.id}
+                        onClick={() => handlePersonaSwitch(persona.id)}
+                        className={`w-full px-3 py-2 text-left hover:bg-white/10 flex items-center gap-3 transition-colors ${
+                          persona.id === personasState.activePersona?.id ? 'bg-white/5' : ''
+                        }`}
+                      >
+                        <span className="text-2xl">{persona.avatar || '👤'}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-white truncate">{persona.name}</p>
+                            {persona.id === personasState.activePersona?.id && (
+                              <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Active</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400 line-clamp-1">{persona.personality}</p>
+                        </div>
+                      </button>
+                    ))}
+                    <div className="border-t border-white/10 p-2">
+                      <button
+                        onClick={() => {
+                          setShowPersonaEditor(true);
+                          setShowPersonaMenu(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-white/10 flex items-center gap-2 text-sm text-purple-400 transition-colors"
+                      >
+                        <Plus size={16} />
+                        Manage Personas
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

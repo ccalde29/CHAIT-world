@@ -9,7 +9,8 @@
       "Bash(npx supabase db diff --schema public)",
       "Bash(npx supabase:*)",
       "Bash(npm start)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(lsof:*)"
     ],
     "deny": [],
     "ask": []

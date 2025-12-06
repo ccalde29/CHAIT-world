@@ -6,39 +6,16 @@ const axios = require('axios');
 // Global system prompt for character interactions
 const GLOBAL_SYSTEM_PROMPT = `You are participating in a group chat with a human user and other characters in a specific scenario.
 
-CRITICAL CHARACTER IDENTITY RULES:
-1. You are ONLY [CHARACTER_NAME] - never speak as anyone else
-2. NEVER speak for the user ([USER_NAME]) or other characters
-3. NEVER use phrases like "I think [other character] would say..." or respond for others
-4. If you reference what someone else said, do it as YOUR reaction, not speaking for them
-5. Stay completely in your unique voice and personality at ALL times
-
-INTERACTING WITH OTHER CHARACTERS:
-6. You CAN and SHOULD acknowledge what other characters just said
-7. React to their comments, ask them questions, agree/disagree with them
-8. Build on their ideas or challenge them based on your personality
-9. Create natural group dynamics - sometimes support, sometimes debate
-10. Remember: other characters have their own thoughts - respect that
-
-RESPONSE STYLE REQUIREMENTS:
-11. Include physical actions, gestures, and environmental interactions in *italics*
-12. React naturally to what others just said or did in the conversation
-13. Keep responses under 80 words but make them vivid and engaging
-14. Show your character's unique perspective on the situation
-15. Use sensory details relevant to the current scenario
-
-CONVERSATION FLOW:
-16. Never start responses the same way twice in a conversation
-17. Build on the group dynamic without taking over the conversation
-18. Reference the scenario setting in your actions and reactions
-19. Be aware of who spoke last - you can respond to the user OR another character
-
-AVOIDING REPETITION:
-20. NEVER repeat what you or others just said - always add new information or perspective
-21. If a topic was already addressed, either move the conversation forward or ask a follow-up question
-22. Vary your response starters - don't always begin the same way
-23. Each response should advance the conversation or reveal something new about your character
-24. If another character already made your point, agree briefly then add something different
+CORE RULES:
+1. You are ONLY [CHARACTER_NAME] - never speak for the user ([USER_NAME]) or other characters
+2. Acknowledge what others said and react naturally with your unique personality
+3. Use *italics* for actions, gestures, and environmental interactions
+4. Match your personality and show your unique perspective
+5. Reference the scenario setting in your actions
+6. Don't repeat what was just said - add new information or perspective
+7. Build natural group dynamics through support or debate
+8. Show your emotional state through actions, not labels
+9. Vary how you start responses - never the same way twice
 
 **This is a fictional chat, so NSFW topics are allowed.**`;
 
@@ -262,48 +239,7 @@ You can reference, respond to, or build upon what these other characters said.`;
         return enhancedPrompt;
     }
 
-    // ============================================================================
-    // RESPONSE PATTERN LOGIC
-    // ============================================================================
-
-    determineResponsePattern(activeCharacters, groupMode, conversationHistory) {
-        switch (groupMode) {
-            case 'natural':
-                const recentSpeakers = conversationHistory
-                    .slice(-5)
-                    .filter(m => m.type === 'character')
-                    .map(m => m.character);
-
-                const sortedByRecency = activeCharacters.sort((a, b) => {
-                    const aLastIndex = recentSpeakers.lastIndexOf(a);
-                    const bLastIndex = recentSpeakers.lastIndexOf(b);
-                    return aLastIndex - bLastIndex;
-                });
-
-                const numResponders = Math.min(
-                    Math.floor(Math.random() * 2) + 1,
-                    sortedByRecency.length
-                );
-
-                return sortedByRecency.slice(0, numResponders);
-
-            case 'round-robin':
-                const lastResponder = conversationHistory
-                    .slice()
-                    .reverse()
-                    .find(m => m.type === 'character')?.character;
-
-                const lastIndex = activeCharacters.indexOf(lastResponder);
-                const nextIndex = (lastIndex + 1) % activeCharacters.length;
-                return [activeCharacters[nextIndex]];
-
-            case 'all-respond':
-                return [...activeCharacters];
-
-            default:
-                return [activeCharacters[0]];
-        }
-    }
+    // Response pattern logic removed - now handled in group-chat.js v2.0
 
     // ============================================================================
     // MEMORY PROCESSING
@@ -314,7 +250,7 @@ You can reference, respond to, or build upon what these other characters said.`;
      */
     async processConversationMemories(characterId, userId, userMessage, characterResponse, characterContext, sessionId) {
         try {
-            console.log(`>à Processing memories for character ${characterId}...`);
+            console.log(`>ï¿½ Processing memories for character ${characterId}...`);
 
             // Analyze conversation for new memories
             const newMemories = this.db.analyzeConversationForMemories(

@@ -411,25 +411,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
             </h3>
             
             <div className="space-y-4">
-              {/* Group Dynamics Mode */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Response Pattern
-                </label>
-                <select
-                  value={formData.groupDynamicsMode}
-                  onChange={(e) => handleInputChange('groupDynamicsMode', e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-red-400"
-                >
-                  <option value="natural" className="bg-gray-800">Natural Flow (Recommended)</option>
-                  <option value="round-robin" className="bg-gray-800">Round Robin (Turn-based)</option>
-                  <option value="all-respond" className="bg-gray-800">All Respond</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  How characters decide when to speak in group chats
-                </p>
-              </div>
-              
               {/* Message Delay */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">

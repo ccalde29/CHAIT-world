@@ -92,18 +92,42 @@ class UserSettingsService {
 
     async getUserPersona(userId) {
         try {
-            const { data, error } = await this.supabase
-                .from('user_personas')
-                .select('*')
+            // First, check if there's an active_persona_id in user_settings
+            const { data: settings } = await this.supabase
+                .from('user_settings')
+                .select('active_persona_id')
                 .eq('user_id', userId)
-                .eq('is_active', true)
                 .single();
 
-            if (error && error.code !== 'PGRST116') {
-                throw error;
+            let personaData = null;
+
+            // If active_persona_id is set, fetch that persona
+            if (settings?.active_persona_id) {
+                const { data } = await this.supabase
+                    .from('user_personas')
+                    .select('*')
+                    .eq('id', settings.active_persona_id)
+                    .eq('user_id', userId)
+                    .single();
+
+                personaData = data;
             }
 
-            if (!data) {
+            // Fallback: Get first is_active persona if no active_persona_id
+            if (!personaData) {
+                const { data } = await this.supabase
+                    .from('user_personas')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: true })
+                    .limit(1)
+                    .single();
+
+                personaData = data;
+            }
+
+            if (!personaData) {
                 return {
                     hasPersona: false,
                     persona: {
@@ -120,17 +144,17 @@ class UserSettingsService {
             return {
                 hasPersona: true,
                 persona: {
-                    id: data.id,
-                    name: data.name,
-                    personality: data.personality,
-                    interests: data.interests || [],
-                    communication_style: data.communication_style || '',
-                    avatar: data.avatar,
-                    color: data.color,
-                    avatar_image_url: data.avatar_image_url,
-                    avatar_image_filename: data.avatar_image_filename,
-                    uses_custom_image: data.uses_custom_image,
-                    created_at: data.created_at
+                    id: personaData.id,
+                    name: personaData.name,
+                    personality: personaData.personality,
+                    interests: personaData.interests || [],
+                    communication_style: personaData.communication_style || '',
+                    avatar: personaData.avatar,
+                    color: personaData.color,
+                    avatar_image_url: personaData.avatar_image_url,
+                    avatar_image_filename: personaData.avatar_image_filename,
+                    uses_custom_image: personaData.uses_custom_image,
+                    created_at: personaData.created_at
                 }
             };
 

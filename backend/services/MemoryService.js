@@ -310,7 +310,7 @@ class MemoryService {
      * Calculate relationship update
      */
     calculateRelationshipUpdate(currentRelationship, userMessage, characterResponse) {
-        let familiarityIncrease = 0.02;
+        let familiarityIncrease = 0.05; // Base increase (was 0.02)
         let emotionalChange = 0.0;
         let trustChange = 0.0;
 
@@ -318,32 +318,32 @@ class MemoryService {
 
         console.log('💞 Calculating relationship update...');
 
-        // Positive interactions
+        // Positive interactions (2-3x stronger)
         if (userText.match(/(?:thank you|thanks|appreciate|love|like|great|wonderful|amazing)/)) {
-            emotionalChange += 0.05;
-            trustChange += 0.02;
+            emotionalChange += 0.15; // was 0.05
+            trustChange += 0.08; // was 0.02
         }
 
-        // Negative interactions
+        // Negative interactions (2-3x stronger)
         if (userText.match(/(?:hate|dislike|terrible|awful|stupid|wrong|bad)/)) {
-            emotionalChange -= 0.03;
-            trustChange -= 0.01;
+            emotionalChange -= 0.09; // was -0.03
+            trustChange -= 0.03; // was -0.01
         }
 
-        // Personal sharing increases trust and familiarity
+        // Personal sharing increases trust and familiarity (3-4x stronger)
         if (userText.match(/(?:my|i'm|i am|personal|private|secret|feel|think)/)) {
-            trustChange += 0.03;
-            familiarityIncrease += 0.02;
+            trustChange += 0.10; // was 0.03
+            familiarityIncrease += 0.08; // was 0.02
         }
 
-        // Long conversations
+        // Long conversations (5x stronger)
         if (userMessage.length > 100) {
-            familiarityIncrease += 0.01;
+            familiarityIncrease += 0.05; // was 0.01
         }
 
-        // Character engagement
+        // Character engagement (3x stronger)
         if (characterResponse.length > 50 && /\?/.test(characterResponse)) {
-            emotionalChange += 0.02;
+            emotionalChange += 0.06; // was 0.02
         }
 
         // Calculate new values with bounds
