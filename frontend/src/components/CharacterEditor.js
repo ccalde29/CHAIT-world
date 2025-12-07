@@ -3,7 +3,7 @@
 // Includes per-character AI provider and model selection
 // ============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Save, User, MessageCircle, Sparkles, Sliders,
   Brain, Zap, Tag, Globe, RefreshCw, AlertCircle, Users, Heart
@@ -258,7 +258,7 @@ const CharacterEditorV15 = ({
   // RELATIONSHIP HANDLERS
   // ============================================================================
 
-  const loadAvailableCharactersForRelationships = async () => {
+  const loadAvailableCharactersForRelationships = useCallback(async () => {
     if (!character?.id) return; // Only for editing existing characters
 
     setLoadingCharacters(true);
@@ -286,9 +286,9 @@ const CharacterEditorV15 = ({
     } finally {
       setLoadingCharacters(false);
     }
-  };
+  }, [character?.id, user.id]);
 
-  const loadCharacterRelationships = async () => {
+  const loadCharacterRelationships = useCallback(async () => {
     if (!character?.id) return;
 
     try {
@@ -303,12 +303,13 @@ const CharacterEditorV15 = ({
 
       if (response.ok) {
         const data = await response.json();
+        console.log('[CharacterEditor] Loaded relationships:', data.relationships);
         setCharacterRelationships(data.relationships || []);
       }
     } catch (error) {
       console.error('Error loading relationships:', error);
     }
-  };
+  }, [character?.id, user.id]);
 
   const handleAddRelationship = async (targetId, targetType, relationshipData) => {
     try {
@@ -373,10 +374,11 @@ const CharacterEditorV15 = ({
   // Load relationships when editing an existing character
   useEffect(() => {
     if (character?.id) {
+      console.log('[CharacterEditor] Loading relationships for character:', character.id);
       loadCharacterRelationships();
       loadAvailableCharactersForRelationships();
     }
-  }, [character?.id]);
+  }, [character?.id, loadCharacterRelationships, loadAvailableCharactersForRelationships]);
 
   const handleSave = async () => {
     if (!validateForm()) return;
@@ -667,8 +669,11 @@ const CharacterEditorV15 = ({
                   Define how this character knows other characters in your world. This helps create more natural conversations.
                 </p>
 
+                {/* Debug info */}
+                {console.log('[CharacterEditor] Relationships state:', characterRelationships)}
+
                 {/* Existing Relationships */}
-                {characterRelationships.length > 0 && (
+                {characterRelationships.length > 0 ? (
                   <div className="space-y-2 mb-3">
                     {characterRelationships.map(rel => {
                       const target = rel.target_character || rel.target_persona;
@@ -737,6 +742,10 @@ const CharacterEditorV15 = ({
                         </div>
                       );
                     })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-400 text-sm bg-white/5 rounded-lg border border-white/10">
+                    No relationships defined yet
                   </div>
                 )}
 

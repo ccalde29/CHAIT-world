@@ -10,7 +10,9 @@ export const usePersonas = (apiRequest) => {
   const fetchPersonas = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('[usePersonas] Fetching personas...');
       const data = await apiRequest('/api/personas');
+      console.log('[usePersonas] Received personas:', data);
       setPersonas(data.personas || []);
       setError(null);
     } catch (err) {
@@ -24,7 +26,9 @@ export const usePersonas = (apiRequest) => {
   // Fetch active persona
   const fetchActivePersona = useCallback(async () => {
     try {
+      console.log('[usePersonas] Fetching active persona...');
       const data = await apiRequest('/api/personas/active');
+      console.log('[usePersonas] Active persona:', data);
       setActivePersona(data.persona);
       setError(null);
     } catch (err) {

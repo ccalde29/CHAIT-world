@@ -10,6 +10,9 @@ import ImageUpload from './ImageUpload';
 const PersonaManager = ({ personasState, onClose, user }) => {
   const { personas, activePersona, createPersona, updatePersona, deletePersona, activatePersona } = personasState;
 
+  console.log('[PersonaManager] Rendering with personas:', personas);
+  console.log('[PersonaManager] Active persona:', activePersona);
+
   const [view, setView] = useState('list'); // 'list' or 'edit'
   const [editingPersona, setEditingPersona] = useState(null);
   const [formData, setFormData] = useState({

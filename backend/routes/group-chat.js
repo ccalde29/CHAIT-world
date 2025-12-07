@@ -14,7 +14,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 const MemoryService = require('../services/MemoryService');
+const CharacterLearningService = require('../services/CharacterLearningService');
 const memoryService = new MemoryService(supabase);
+const learningService = new CharacterLearningService(supabase);
 
 /**
  * POST /api/chat/group-response
@@ -302,6 +304,22 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           console.error(`[Memory] Error processing memories for ${char.name}:`, memErr);
         }
 
+        // Track learning/interaction
+        try {
+          // Record interaction count
+          await learningService.recordInteraction(userId, char.id);
+
+          // Extract and record topics (simple keyword extraction)
+          const topicKeywords = extractTopicsFromText(userMessage + ' ' + response);
+          for (const topic of topicKeywords) {
+            await learningService.addTopicDiscussed(userId, char.id, topic);
+          }
+
+          console.log(`[Learning] Recorded interaction and ${topicKeywords.length} topics for ${char.name}`);
+        } catch (learnErr) {
+          console.error(`[Learning] Error processing for ${char.name}:`, learnErr);
+        }
+
         console.log(`[Response] ${char.name}: "${response}"`);
 
       } catch (error) {
@@ -424,6 +442,48 @@ function buildConversationMessages(systemPrompt, history, newUserMessage) {
   }
   
   return messages;
+}
+
+/**
+ * Extract topics from conversation text
+ * Simple keyword extraction for tracking discussed topics
+ */
+function extractTopicsFromText(text) {
+  // Remove common words and extract meaningful keywords
+  const commonWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during',
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'am', 'is', 'are', 'was',
+    'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+    'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can',
+    'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where',
+    'why', 'how', 'my', 'your', 'his', 'her', 'its', 'our', 'their'
+  ]);
+
+  // Extract words
+  const words = text.toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word =>
+      word.length > 3 &&
+      !commonWords.has(word) &&
+      !/^\d+$/.test(word)
+    );
+
+  // Count frequency
+  const frequency = {};
+  words.forEach(word => {
+    frequency[word] = (frequency[word] || 0) + 1;
+  });
+
+  // Get top topics (words mentioned at least twice)
+  const topics = Object.entries(frequency)
+    .filter(([_, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([word]) => word);
+
+  return topics;
 }
 
 module.exports = router;

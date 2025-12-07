@@ -11,7 +11,9 @@
       "Bash(npm start)",
       "Bash(grep:*)",
       "Bash(lsof:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(sqlite3:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []
