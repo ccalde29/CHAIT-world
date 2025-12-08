@@ -40,6 +40,9 @@ class UserSettingsService {
                 ollamaSettings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
                 groupDynamicsMode: data.group_dynamics_mode || 'natural',
                 messageDelay: data.message_delay || 1200,
+                isAdmin: data.is_admin || false,
+                adminSystemPrompt: data.admin_system_prompt || null,
+                autoApproveCharacters: data.auto_approve_characters || false,
                 createdAt: data.created_at,
                 updatedAt: data.updated_at
             };
@@ -52,16 +55,28 @@ class UserSettingsService {
 
     async updateUserSettings(userId, updates) {
         try {
+            const updateData = {
+                user_id: userId,
+                api_keys: updates.api_keys || updates.apiKeys,
+                ollama_settings: updates.ollama_settings ||updates.ollamaSettings,
+                group_dynamics_mode: updates.group_dynamics_mode ||updates.groupDynamicsMode,
+                message_delay: updates.message_delay || updates.messageDelay,
+                updated_at: new Date().toISOString()
+            };
+
+            // Only include admin fields if they're provided (to prevent non-admins from setting them)
+            if (updates.admin_system_prompt !== undefined || updates.adminSystemPrompt !== undefined) {
+                updateData.admin_system_prompt = updates.admin_system_prompt || updates.adminSystemPrompt;
+            }
+            if (updates.auto_approve_characters !== undefined || updates.autoApproveCharacters !== undefined) {
+                updateData.auto_approve_characters = updates.auto_approve_characters !== undefined
+                    ? updates.auto_approve_characters
+                    : updates.autoApproveCharacters;
+            }
+
             const { data, error } = await this.supabase
                 .from('user_settings')
-                .upsert({
-                    user_id: userId,
-                    api_keys: updates.api_keys || updates.apiKeys,
-                    ollama_settings: updates.ollama_settings ||updates.ollamaSettings,
-                    group_dynamics_mode: updates.group_dynamics_mode ||updates.groupDynamicsMode,
-                    message_delay: updates.message_delay || updates.messageDelay,
-                    updated_at: new Date().toISOString()
-                }, {
+                .upsert(updateData, {
                     onConflict: 'user_id'
                 })
                 .select()
@@ -76,12 +91,112 @@ class UserSettingsService {
                 ollamaSettings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
                 groupDynamicsMode: data.group_dynamics_mode || 'natural',
                 messageDelay: data.message_delay || 1200,
+                isAdmin: data.is_admin || false,
+                adminSystemPrompt: data.admin_system_prompt || null,
+                autoApproveCharacters: data.auto_approve_characters || false,
                 createdAt: data.created_at,
                 updatedAt: data.updated_at
             };
 
         } catch (error) {
             console.error('Database error updating user settings:', error);
+            throw error;
+        }
+    }
+
+    // ============================================================================
+    // ADMIN METHODS
+    // ============================================================================
+
+    /**
+     * Check if a user has admin privileges
+     * @param {string} userId - The user's ID
+     * @returns {Promise<boolean>} - True if user is admin
+     */
+    async isAdmin(userId) {
+        try {
+            const { data, error } = await this.supabase
+                .from('user_settings')
+                .select('is_admin')
+                .eq('user_id', userId)
+                .single();
+
+            if (error || !data) return false;
+            return data.is_admin || false;
+
+        } catch (error) {
+            console.error('Database error checking admin status:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Get admin-specific settings
+     * @param {string} userId - The user's ID
+     * @returns {Promise<Object>} - Admin settings (systemPrompt, autoApprove)
+     */
+    async getAdminSettings(userId) {
+        try {
+            const { data, error } = await this.supabase
+                .from('user_settings')
+                .select('is_admin, admin_system_prompt, auto_approve_characters')
+                .eq('user_id', userId)
+                .single();
+
+            if (error) throw error;
+
+            return {
+                isAdmin: data.is_admin || false,
+                adminSystemPrompt: data.admin_system_prompt || null,
+                autoApproveCharacters: data.auto_approve_characters || false
+            };
+
+        } catch (error) {
+            console.error('Database error getting admin settings:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Update admin-specific settings (admin_system_prompt, auto_approve_characters)
+     * Note: is_admin flag must be set manually in Supabase
+     * @param {string} userId - The user's ID
+     * @param {Object} adminUpdates - Admin settings to update
+     * @returns {Promise<Object>} - Updated admin settings
+     */
+    async updateAdminSettings(userId, adminUpdates) {
+        try {
+            const updateData = {
+                updated_at: new Date().toISOString()
+            };
+
+            // Only update fields that are provided
+            if (adminUpdates.adminSystemPrompt !== undefined || adminUpdates.admin_system_prompt !== undefined) {
+                updateData.admin_system_prompt = adminUpdates.admin_system_prompt || adminUpdates.adminSystemPrompt;
+            }
+            if (adminUpdates.autoApproveCharacters !== undefined || adminUpdates.auto_approve_characters !== undefined) {
+                updateData.auto_approve_characters = adminUpdates.auto_approve_characters !== undefined
+                    ? adminUpdates.auto_approve_characters
+                    : adminUpdates.autoApproveCharacters;
+            }
+
+            const { data, error } = await this.supabase
+                .from('user_settings')
+                .update(updateData)
+                .eq('user_id', userId)
+                .select('is_admin, admin_system_prompt, auto_approve_characters')
+                .single();
+
+            if (error) throw error;
+
+            return {
+                isAdmin: data.is_admin || false,
+                adminSystemPrompt: data.admin_system_prompt || null,
+                autoApproveCharacters: data.auto_approve_characters || false
+            };
+
+        } catch (error) {
+            console.error('Database error updating admin settings:', error);
             throw error;
         }
     }
