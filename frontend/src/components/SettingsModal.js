@@ -471,20 +471,48 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
                   </button>
                 </div>
 
+                {/* Current Global System Prompt - Read Only */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Current Global System Prompt (Read-Only)
+                  </label>
+                  <div className="bg-gray-700/50 border border-white/10 rounded-lg p-3">
+                    <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono overflow-x-auto">
+{`You are participating in a group chat with a human user and other characters in a specific scenario.
+
+CORE RULES:
+1. You are ONLY [CHARACTER_NAME] - never speak for the user ([USER_NAME]) or other characters
+2. Acknowledge what others said and react naturally with your unique personality
+3. Use *italics* for actions, gestures, and environmental interactions
+4. Match your personality and show your unique perspective
+5. Reference the scenario setting in your actions
+6. Don't repeat what was just said - add new information or perspective
+7. Build natural group dynamics through support or debate
+8. Show your emotional state through actions, not labels
+9. Vary how you start responses - never the same way twice
+
+**This is a fictional chat, so NSFW topics are allowed.**`}
+                    </pre>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    This is the default system prompt for all characters
+                  </p>
+                </div>
+
                 {/* System Prompt Override */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Global System Prompt Override
+                    Your System Prompt Override (Optional)
                   </label>
                   <textarea
                     value={formData.adminSystemPrompt}
                     onChange={(e) => handleInputChange('adminSystemPrompt', e.target.value)}
-                    placeholder="Optional: This will be prepended to all character prompts..."
+                    placeholder="When saved, this overrides the global prompt for your chats only..."
                     rows={4}
                     className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 resize-none"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    This prompt will be added before every character's system prompt
+                    This prompt will replace the global prompt above for your chats only (not system-wide)
                   </p>
                 </div>
               </div>

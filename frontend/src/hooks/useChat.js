@@ -8,6 +8,7 @@ export const useChat = (apiRequest) => {
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingPersonaResponse, setGeneratingPersonaResponse] = useState(false);
   const [error, setError] = useState(null);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [responseTimeouts, setResponseTimeouts] = useState([]);
@@ -132,11 +133,51 @@ export const useChat = (apiRequest) => {
     }
   };
 
+  const generatePersonaResponse = async (userPersona, currentScenario) => {
+    if (!userPersona?.persona || generatingPersonaResponse) {
+      return;
+    }
+
+    setGeneratingPersonaResponse(true);
+    setError(null);
+
+    try {
+      // Convert messages to the format expected by the API
+      const recentMessages = messages.slice(-10).map(msg => ({
+        role: msg.type === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+
+      const response = await apiRequest(`/api/personas/${userPersona.persona.id}/generate`, {
+        method: 'POST',
+        body: JSON.stringify({
+          messages: recentMessages,
+          sessionContext: {
+            scenario: currentScenario
+          }
+        })
+      });
+
+      if (response.success && response.response) {
+        // Populate the input with the generated response
+        setUserInput(response.response);
+      } else {
+        setError('Failed to generate persona response');
+      }
+    } catch (error) {
+      console.error('Error generating persona response:', error);
+      setError(error.message || 'Failed to generate persona response. Please try again.');
+    } finally {
+      setGeneratingPersonaResponse(false);
+    }
+  };
+
   return {
     // State
     messages,
     userInput,
     isGenerating,
+    generatingPersonaResponse,
     error,
     currentSessionId,
     messagesEndRef,
@@ -147,6 +188,7 @@ export const useChat = (apiRequest) => {
     sendMessage,
     clearChat,
     addSystemMessage,
-    loadChatSession
+    loadChatSession,
+    generatePersonaResponse
   };
 };

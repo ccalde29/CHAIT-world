@@ -5,7 +5,8 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, TrendingUp, Sparkles, DollarSign } from 'lucide-react';
+import CustomModelsPanel from './CustomModelsPanel';
 
 const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   const [activeTab, setActiveTab] = useState('pending');
@@ -19,6 +20,8 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   });
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(null);
+  const [pricing, setPricing] = useState({});
+  const [loadingPricing, setLoadingPricing] = useState(false);
 
   // Fetch moderation queue
   const fetchQueue = async () => {
@@ -49,6 +52,26 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
       console.error('Failed to fetch stats:', error);
     }
   };
+
+  // Fetch pricing
+  const fetchPricing = async () => {
+    setLoadingPricing(true);
+    try {
+      const response = await apiRequest('/api/pricing');
+      setPricing(response.pricing || {});
+    } catch (error) {
+      console.error('Failed to fetch pricing:', error);
+    } finally {
+      setLoadingPricing(false);
+    }
+  };
+
+  // Load pricing when pricing tab is selected
+  useEffect(() => {
+    if (activeTab === 'pricing' && Object.keys(pricing).length === 0) {
+      fetchPricing();
+    }
+  }, [activeTab]);
 
   // Load initial data
   useEffect(() => {
@@ -190,6 +213,28 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
           >
             <TrendingUp size={18} />
             Stats
+          </button>
+          <button
+            onClick={() => setActiveTab('custom-models')}
+            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'custom-models'
+                ? 'text-purple-400 border-b-2 border-purple-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Sparkles size={18} />
+            Custom Models
+          </button>
+          <button
+            onClick={() => setActiveTab('pricing')}
+            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'pricing'
+                ? 'text-purple-400 border-b-2 border-purple-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <DollarSign size={18} />
+            Pricing
           </button>
         </div>
       </div>
@@ -358,6 +403,66 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                   <p className="text-3xl font-bold text-white">{stats.unresolvedReports}</p>
                 </div>
               </div>
+            )}
+
+            {/* Custom Models Tab */}
+            {activeTab === 'custom-models' && (
+              <CustomModelsPanel apiRequest={apiRequest} />
+            )}
+
+            {/* Pricing Tab */}
+            {activeTab === 'pricing' && (
+              loadingPricing ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-gray-400">Loading pricing data...</div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-2">AI Model Pricing</h3>
+                    <p className="text-sm text-gray-400">
+                      Cost per 1M tokens for all supported AI providers. Updated regularly from provider APIs.
+                    </p>
+                  </div>
+
+                  {Object.entries(pricing).map(([provider, models]) => (
+                    <div key={provider} className="bg-gray-800 border border-white/10 rounded-lg p-4">
+                      <h4 className="text-lg font-semibold text-white mb-3 capitalize">
+                        {provider === 'openrouter' ? 'OpenRouter' : provider === 'ollama' ? 'Ollama (Local)' : provider === 'lmstudio' ? 'LM Studio (Local)' : provider}
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-white/10">
+                              <th className="text-left py-2 px-3 text-sm font-medium text-gray-400">Model</th>
+                              <th className="text-right py-2 px-3 text-sm font-medium text-gray-400">Input</th>
+                              <th className="text-right py-2 px-3 text-sm font-medium text-gray-400">Output</th>
+                              <th className="text-right py-2 px-3 text-sm font-medium text-gray-400">Per</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Array.isArray(models) && models.map((model, idx) => (
+                              <tr key={idx} className="border-b border-white/5 hover:bg-white/5">
+                                <td className="py-2 px-3 text-sm text-white">{model.name}</td>
+                                <td className="text-right py-2 px-3 text-sm text-gray-300">
+                                  {model.input === 0 ? 'FREE' : `$${model.input < 0.01 ? model.input.toFixed(4) : model.input.toFixed(2)}`}
+                                </td>
+                                <td className="text-right py-2 px-3 text-sm text-gray-300">
+                                  {model.output === 0 ? 'FREE' : `$${model.output < 0.01 ? model.output.toFixed(4) : model.output.toFixed(2)}`}
+                                </td>
+                                <td className="text-right py-2 px-3 text-sm text-gray-400">{model.per}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {provider === 'ollama' || provider === 'lmstudio' ? (
+                        <p className="text-xs text-gray-500 mt-2">Runs locally on your machine - no API costs</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </>
         )}

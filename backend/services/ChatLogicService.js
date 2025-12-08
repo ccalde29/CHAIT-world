@@ -142,12 +142,13 @@ class ChatLogicService {
      */
     async callAIProviderWithMemory(messages, characterPrompt, provider, userId, ollamaSettings, characterContext) {
         try {
-            // Get user settings which includes api_keys JSONB
+            // Get user settings which includes api_keys JSONB AND admin_system_prompt
             const userSettings = await this.db.getUserSettings(userId);
             const apiKeys = userSettings.api_keys || {};
+            const adminSystemPrompt = userSettings.admin_system_prompt || null;
 
-            // Build enhanced system prompt with memory and persona
-            const enhancedPrompt = this.buildEnhancedCharacterPrompt(characterPrompt, characterContext);
+            // Build enhanced system prompt with memory, persona, AND admin override
+            const enhancedPrompt = this.buildEnhancedCharacterPrompt(characterPrompt, { ...characterContext, adminSystemPrompt });
 
             switch (provider.toLowerCase()) {
                 case 'openai':
@@ -183,9 +184,14 @@ class ChatLogicService {
      * Build enhanced character prompt with memory, persona, and other character context
      */
     buildEnhancedCharacterPrompt(basePersonality, characterContext) {
-        const { userPersona, memories, relationship, otherCharacterMessages } = characterContext;
+        const { userPersona, memories, relationship, otherCharacterMessages, adminSystemPrompt } = characterContext;
 
-        let enhancedPrompt = `${basePersonality}
+        // Use admin override if present, otherwise use global
+        const systemPrompt = adminSystemPrompt || GLOBAL_SYSTEM_PROMPT;
+
+        let enhancedPrompt = `${systemPrompt}
+
+${basePersonality}
 
 USER INFORMATION:
 Name: ${userPersona.name}

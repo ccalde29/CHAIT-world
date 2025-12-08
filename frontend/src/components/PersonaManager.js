@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { X, User, Palette, Smile, Sparkles, MessageCircle, Plus, Edit2, Trash2 } from 'lucide-react';
 import ImageUpload from './ImageUpload';
 
-const PersonaManager = ({ personasState, onClose, user }) => {
+const PersonaManager = ({ personasState, onClose, user, apiRequest }) => {
   const { personas, activePersona, createPersona, updatePersona, deletePersona, activatePersona } = personasState;
 
   console.log('[PersonaManager] Rendering with personas:', personas);
@@ -24,13 +24,19 @@ const PersonaManager = ({ personasState, onClose, user }) => {
     color: 'from-blue-500 to-indigo-500',
     avatar_image_url: null,
     avatar_image_filename: null,
-    uses_custom_image: false
+    uses_custom_image: false,
+    ai_provider: 'openai',
+    ai_model: 'gpt-4o-mini',
+    temperature: 0.8,
+    max_tokens: 150
   });
 
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentInterest, setCurrentInterest] = useState('');
+  const [availableModels, setAvailableModels] = useState([]);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   const colorOptions = [
     { name: 'Blue Indigo', value: 'from-blue-500 to-indigo-500' },
@@ -68,7 +74,11 @@ const PersonaManager = ({ personasState, onClose, user }) => {
       color: 'from-blue-500 to-indigo-500',
       avatar_image_url: null,
       avatar_image_filename: null,
-      uses_custom_image: false
+      uses_custom_image: false,
+      ai_provider: 'openai',
+      ai_model: 'gpt-4o-mini',
+      temperature: 0.8,
+      max_tokens: 150
     });
     setValidationErrors({});
     setView('edit');
@@ -85,7 +95,11 @@ const PersonaManager = ({ personasState, onClose, user }) => {
       color: persona.color || 'from-blue-500 to-indigo-500',
       avatar_image_url: persona.avatar_image_url || null,
       avatar_image_filename: persona.avatar_image_filename || null,
-      uses_custom_image: persona.uses_custom_image || false
+      uses_custom_image: persona.uses_custom_image || false,
+      ai_provider: persona.ai_provider || 'openai',
+      ai_model: persona.ai_model || 'gpt-4o-mini',
+      temperature: persona.temperature !== undefined ? persona.temperature : 0.8,
+      max_tokens: persona.max_tokens !== undefined ? persona.max_tokens : 150
     });
     setValidationErrors({});
     setView('edit');
@@ -133,7 +147,11 @@ const PersonaManager = ({ personasState, onClose, user }) => {
         color: formData.color,
         avatar_image_url: formData.avatar_image_url,
         avatar_image_filename: formData.avatar_image_filename,
-        uses_custom_image: formData.uses_custom_image
+        uses_custom_image: formData.uses_custom_image,
+        ai_provider: formData.ai_provider,
+        ai_model: formData.ai_model,
+        temperature: formData.temperature,
+        max_tokens: formData.max_tokens
       };
 
       if (editingPersona) {
@@ -197,6 +215,30 @@ const PersonaManager = ({ personasState, onClose, user }) => {
       }));
     }
   };
+
+  // Load available models when provider changes
+  useEffect(() => {
+    const loadModels = async () => {
+      if (!formData.ai_provider || !apiRequest) return;
+
+      setLoadingModels(true);
+      try {
+        const data = await apiRequest('/api/providers/models', {
+          method: 'POST',
+          body: JSON.stringify({ provider: formData.ai_provider })
+        });
+
+        setAvailableModels(data.models || []);
+      } catch (error) {
+        console.error('Error loading models:', error);
+        setAvailableModels([]);
+      } finally {
+        setLoadingModels(false);
+      }
+    };
+
+    loadModels();
+  }, [formData.ai_provider, apiRequest]);
 
   if (view === 'list') {
     return (
@@ -548,6 +590,105 @@ const PersonaManager = ({ personasState, onClose, user }) => {
               className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400"
             />
             <p className="text-xs text-gray-500 mt-1">{formData.communication_style.length}/100</p>
+          </div>
+
+          {/* AI Model Configuration */}
+          <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+            <label className="block text-sm font-medium text-gray-300 mb-3">
+              <Sparkles size={16} className="inline mr-2" />
+              AI Model Configuration (For Auto-Response)
+            </label>
+            <p className="text-xs text-gray-400 mb-4">
+              Configure which AI model to use when generating auto-responses for this persona
+            </p>
+
+            <div className="space-y-4">
+              {/* Provider Selection */}
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2">
+                  AI Provider
+                </label>
+                <select
+                  value={formData.ai_provider}
+                  onChange={(e) => handleInputChange('ai_provider', e.target.value)}
+                  className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-blue-400"
+                  style={{ colorScheme: 'dark' }}
+                >
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="openrouter">OpenRouter</option>
+                  <option value="google">Google</option>
+                  <option value="ollama">Ollama (Local)</option>
+                  <option value="lmstudio">LM Studio (Local)</option>
+                  <option value="custom">Custom Model</option>
+                </select>
+              </div>
+
+              {/* Model Selection */}
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2">
+                  Model
+                </label>
+                <select
+                  value={formData.ai_model}
+                  onChange={(e) => handleInputChange('ai_model', e.target.value)}
+                  disabled={loadingModels}
+                  className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-blue-400 disabled:opacity-50"
+                  style={{ colorScheme: 'dark' }}
+                >
+                  {loadingModels ? (
+                    <option>Loading models...</option>
+                  ) : availableModels.length > 0 ? (
+                    availableModels.map(model => (
+                      <option key={model.id} value={model.id}>
+                        {model.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={formData.ai_model}>{formData.ai_model}</option>
+                  )}
+                </select>
+              </div>
+
+              {/* Temperature */}
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2">
+                  Temperature: {formData.temperature}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2.0"
+                  step="0.1"
+                  value={formData.temperature}
+                  onChange={(e) => handleInputChange('temperature', parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>More focused</span>
+                  <span>More creative</span>
+                </div>
+              </div>
+
+              {/* Max Tokens */}
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-2">
+                  Max Tokens: {formData.max_tokens}
+                </label>
+                <input
+                  type="range"
+                  min="50"
+                  max="500"
+                  step="10"
+                  value={formData.max_tokens}
+                  onChange={(e) => handleInputChange('max_tokens', parseInt(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Controls response length (50-500 tokens)
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

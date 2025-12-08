@@ -2,19 +2,21 @@
 // Chat UI component - messages display and input
 
 import React from 'react';
-import { Send, AlertCircle } from 'lucide-react';
+import { Send, AlertCircle, Sparkles } from 'lucide-react';
 
 const ChatInterface = ({
   messages,
   userInput,
   isGenerating,
+  generatingPersonaResponse,
   error,
   messagesEndRef,
   userPersona,
   findCharacterById,
   onInputChange,
   onSendMessage,
-  onKeyPress
+  onKeyPress,
+  onGeneratePersonaResponse
 }) => {
   return (
     <div className="flex-1 flex flex-col bg-gray-900 min-h-0">
@@ -139,10 +141,21 @@ const ChatInterface = ({
             value={userInput}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyPress={onKeyPress}
-            placeholder={isGenerating ? "AI is responding..." : "Type your message..."}
-            disabled={isGenerating}
+            placeholder={isGenerating ? "AI is responding..." : generatingPersonaResponse ? "Generating response..." : "Type your message..."}
+            disabled={isGenerating || generatingPersonaResponse}
             className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 disabled:opacity-50"
           />
+          {userPersona?.persona && (
+            <button
+              onClick={onGeneratePersonaResponse}
+              disabled={isGenerating || generatingPersonaResponse}
+              className="px-4 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              title="Generate auto-response for your persona"
+            >
+              <Sparkles size={18} />
+              {generatingPersonaResponse ? 'Generating...' : 'Auto'}
+            </button>
+          )}
           <button
             onClick={onSendMessage}
             disabled={isGenerating || !userInput.trim()}

@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { X, MapPin, Plus, Edit, Trash2, Image, Upload, Eye } from 'lucide-react';
 import ImageUpload from './ImageUpload';
 
-const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onClose, initialEditingScene = null }) => {
+const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onClose, initialEditingScene = null, apiRequest, user }) => {
   // ============================================================================
   // STATE MANAGEMENT
   // ============================================================================
@@ -24,11 +24,21 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
     atmosphere: '',
     background_image_url: null,
     background_image_filename: null,
-    uses_custom_background: false
+    uses_custom_background: false,
+    narrator_enabled: false,
+    narrator_ai_provider: 'openai',
+    narrator_ai_model: 'gpt-4o-mini',
+    narrator_temperature: 0.7,
+    narrator_max_tokens: 100,
+    narrator_trigger_mode: 'auto_interval',
+    narrator_interval: 5,
+    narrator_personality: ''
   });
   const [validationErrors, setValidationErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [narratorModels, setNarratorModels] = useState([]);
+  const [loadingNarratorModels, setLoadingNarratorModels] = useState(false);
 
   // Initialize form when editing scene is provided
   useEffect(() => {
@@ -40,10 +50,42 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
         atmosphere: initialEditingScene.atmosphere || '',
         background_image_url: initialEditingScene.background_image_url || null,
         background_image_filename: initialEditingScene.background_image_filename || null,
-        uses_custom_background: initialEditingScene.uses_custom_background || false
+        uses_custom_background: initialEditingScene.uses_custom_background || false,
+        narrator_enabled: initialEditingScene.narrator_enabled || false,
+        narrator_ai_provider: initialEditingScene.narrator_ai_provider || 'openai',
+        narrator_ai_model: initialEditingScene.narrator_ai_model || 'gpt-4o-mini',
+        narrator_temperature: initialEditingScene.narrator_temperature !== undefined ? initialEditingScene.narrator_temperature : 0.7,
+        narrator_max_tokens: initialEditingScene.narrator_max_tokens !== undefined ? initialEditingScene.narrator_max_tokens : 100,
+        narrator_trigger_mode: initialEditingScene.narrator_trigger_mode || 'auto_interval',
+        narrator_interval: initialEditingScene.narrator_interval !== undefined ? initialEditingScene.narrator_interval : 5,
+        narrator_personality: initialEditingScene.narrator_personality || ''
       });
     }
   }, [initialEditingScene]);
+
+  // Load available models when narrator provider changes
+  useEffect(() => {
+    const loadModels = async () => {
+      if (!formData.narrator_ai_provider || !apiRequest) return;
+
+      setLoadingNarratorModels(true);
+      try {
+        const data = await apiRequest('/api/providers/models', {
+          method: 'POST',
+          body: JSON.stringify({ provider: formData.narrator_ai_provider })
+        });
+
+        setNarratorModels(data.models || []);
+      } catch (error) {
+        console.error('Error loading narrator models:', error);
+        setNarratorModels([]);
+      } finally {
+        setLoadingNarratorModels(false);
+      }
+    };
+
+    loadModels();
+  }, [formData.narrator_ai_provider, apiRequest]);
 
   // ============================================================================
   // FORM HANDLING
@@ -57,7 +99,15 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
       atmosphere: '',
       background_image_url: null,
       background_image_filename: null,
-      uses_custom_background: false
+      uses_custom_background: false,
+      narrator_enabled: false,
+      narrator_ai_provider: 'openai',
+      narrator_ai_model: 'gpt-4o-mini',
+      narrator_temperature: 0.7,
+      narrator_max_tokens: 100,
+      narrator_trigger_mode: 'auto_interval',
+      narrator_interval: 5,
+      narrator_personality: ''
     });
     setValidationErrors({});
   };
@@ -482,6 +532,171 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                 <p className="text-xs text-gray-500 mt-1">{formData.atmosphere.length}/100 characters</p>
               </div>
 
+              {/* Narrator Configuration */}
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-300">
+                    AI Narrator (Optional)
+                  </label>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.narrator_enabled}
+                      onChange={(e) => handleInputChange('narrator_enabled', e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                  </label>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">
+                  Enable automatic narration to describe environmental changes, set mood, and provide context during conversations
+                </p>
+
+                {formData.narrator_enabled && (
+                  <div className="space-y-4">
+                    {/* Trigger Mode */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-2">
+                        Trigger Mode
+                      </label>
+                      <select
+                        value={formData.narrator_trigger_mode}
+                        onChange={(e) => handleInputChange('narrator_trigger_mode', e.target.value)}
+                        className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-purple-400"
+                        style={{ colorScheme: 'dark' }}
+                      >
+                        <option value="manual">Manual (on request only)</option>
+                        <option value="auto_interval">Auto Interval (every N messages)</option>
+                        <option value="action_based">Action Based (when *actions* detected)</option>
+                        <option value="scene_change">Scene Change (on movement keywords)</option>
+                      </select>
+                    </div>
+
+                    {/* Interval (only for auto_interval mode) */}
+                    {formData.narrator_trigger_mode === 'auto_interval' && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-2">
+                          Message Interval: {formData.narrator_interval}
+                        </label>
+                        <input
+                          type="range"
+                          min="3"
+                          max="15"
+                          step="1"
+                          value={formData.narrator_interval}
+                          onChange={(e) => handleInputChange('narrator_interval', parseInt(e.target.value))}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Narrator will respond every {formData.narrator_interval} messages
+                        </p>
+                      </div>
+                    )}
+
+                    {/* AI Provider */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-2">
+                        AI Provider
+                      </label>
+                      <select
+                        value={formData.narrator_ai_provider}
+                        onChange={(e) => handleInputChange('narrator_ai_provider', e.target.value)}
+                        className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-purple-400"
+                        style={{ colorScheme: 'dark' }}
+                      >
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="google">Google</option>
+                        <option value="ollama">Ollama (Local)</option>
+                        <option value="lmstudio">LM Studio (Local)</option>
+                        <option value="custom">Custom Model</option>
+                      </select>
+                    </div>
+
+                    {/* Model */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-2">
+                        Model
+                      </label>
+                      <select
+                        value={formData.narrator_ai_model}
+                        onChange={(e) => handleInputChange('narrator_ai_model', e.target.value)}
+                        disabled={loadingNarratorModels}
+                        className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-purple-400 disabled:opacity-50"
+                        style={{ colorScheme: 'dark' }}
+                      >
+                        {loadingNarratorModels ? (
+                          <option>Loading models...</option>
+                        ) : narratorModels.length > 0 ? (
+                          narratorModels.map(model => (
+                            <option key={model.id} value={model.id}>
+                              {model.name}
+                            </option>
+                          ))
+                        ) : (
+                          <option value={formData.narrator_ai_model}>{formData.narrator_ai_model}</option>
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Temperature */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-2">
+                        Temperature: {formData.narrator_temperature}
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="2.0"
+                        step="0.1"
+                        value={formData.narrator_temperature}
+                        onChange={(e) => handleInputChange('narrator_temperature', parseFloat(e.target.value))}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>More focused</span>
+                        <span>More creative</span>
+                      </div>
+                    </div>
+
+                    {/* Max Tokens */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-2">
+                        Max Tokens: {formData.narrator_max_tokens}
+                      </label>
+                      <input
+                        type="range"
+                        min="50"
+                        max="200"
+                        step="10"
+                        value={formData.narrator_max_tokens}
+                        onChange={(e) => handleInputChange('narrator_max_tokens', parseInt(e.target.value))}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Controls narration length (50-200 tokens)
+                      </p>
+                    </div>
+
+                    {/* Narrator Personality */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-400 mb-2">
+                        Narrator Style/Personality (Optional)
+                      </label>
+                      <textarea
+                        value={formData.narrator_personality}
+                        onChange={(e) => handleInputChange('narrator_personality', e.target.value)}
+                        placeholder="e.g., poetic and descriptive, matter-of-fact, dramatic and cinematic"
+                        rows={2}
+                        maxLength={200}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 resize-none"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{formData.narrator_personality.length}/200 characters</p>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Form Actions */}
               <div className="flex justify-end gap-3">

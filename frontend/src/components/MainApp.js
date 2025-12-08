@@ -522,12 +522,17 @@ const MainApp = () => {
             messages={chat.messages}
             userInput={chat.userInput}
             isGenerating={chat.isGenerating}
+            generatingPersonaResponse={chat.generatingPersonaResponse}
             error={chat.error}
             messagesEndRef={chat.messagesEndRef}
             userPersona={settings.userPersona}
             findCharacterById={charactersState.findCharacterById}
             onInputChange={chat.setUserInput}
             onSendMessage={handleSendMessage}
+            onGeneratePersonaResponse={() => chat.generatePersonaResponse(
+              settings.userPersona,
+              charactersState.findScenarioById(charactersState.currentScenario)
+            )}
             onKeyPress={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !chat.isGenerating) {
                 e.preventDefault();
@@ -691,6 +696,8 @@ const MainApp = () => {
         <SceneEditor
           scenarios={charactersState.scenarios}
           initialEditingScene={editingScene}
+          apiRequest={apiRequest}
+          user={user}
           onSave={async (sceneData) => {
             try {
               if (sceneData.id) {
@@ -761,6 +768,7 @@ const MainApp = () => {
           personasState={personasState}
           onClose={() => setShowPersonaEditor(false)}
           user={user}
+          apiRequest={apiRequest}
         />
       )}
     </div>

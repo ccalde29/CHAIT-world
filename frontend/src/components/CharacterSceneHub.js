@@ -46,13 +46,13 @@ const CharacterSceneHub = ({
         <h2 className="text-lg font-bold text-white mb-3">Management Hub</h2>
 
         {/* Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-4">
           <button
             onClick={() => setActiveTab('characters')}
-            className={`flex-1 px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+            className={`pb-3 px-2 border-b-2 transition-colors flex items-center gap-2 ${
               activeTab === 'characters'
-                ? 'bg-purple-500 text-white'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                ? 'border-purple-400 text-purple-400'
+                : 'border-transparent text-gray-400 hover:text-gray-300'
             }`}
           >
             <Users size={16} />
@@ -60,10 +60,10 @@ const CharacterSceneHub = ({
           </button>
           <button
             onClick={() => setActiveTab('scenes')}
-            className={`flex-1 px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+            className={`pb-3 px-2 border-b-2 transition-colors flex items-center gap-2 ${
               activeTab === 'scenes'
-                ? 'bg-purple-500 text-white'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                ? 'border-blue-400 text-blue-400'
+                : 'border-transparent text-gray-400 hover:text-gray-300'
             }`}
           >
             <MapPin size={16} />

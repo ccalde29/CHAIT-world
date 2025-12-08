@@ -30,22 +30,25 @@ class AIProviderService {
       switch (provider.toLowerCase()) {
         case 'openai':
           return await this.callOpenAI(model, messages, apiKeys.openai, character);
-        
+
         case 'anthropic':
           return await this.callAnthropic(model, messages, apiKeys.anthropic, character);
-        
+
         case 'openrouter':
           return await this.callOpenRouter(model, messages, apiKeys.openrouter, character);
-        
+
         case 'google':
         case 'gemini':
           return await this.callGemini(model, messages, apiKeys.google, character);
-        
+
         case 'ollama':
           return await this.callOllama(model, messages, ollamaSettings, character);
 
         case 'lmstudio':
           return await this.callLMStudio(model, messages, ollamaSettings, character);
+
+        case 'custom':
+          return await this.callCustomModel(model, messages, apiKeys.openrouter, character);
 
         default:
           throw new Error(`Unsupported AI provider: ${provider}`);
@@ -416,6 +419,9 @@ class AIProviderService {
         case 'lmstudio':
           return await this.getLMStudioModels(lmStudioSettings);
 
+        case 'custom':
+          return await this.getCustomModels();
+
         default:
           return [];
       }
@@ -590,6 +596,83 @@ class AIProviderService {
       }));
     } catch (error) {
       console.error('Error fetching LM Studio models:', error);
+      return [];
+    }
+  }
+
+  // ==========================================================================
+  // CUSTOM MODELS
+  // ==========================================================================
+
+  static async callCustomModel(customModelId, messages, openRouterApiKey, character) {
+    if (!openRouterApiKey) {
+      throw new Error('OpenRouter API key required for custom models');
+    }
+
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    const { data: customModel, error } = await supabase
+      .from('custom_models')
+      .select('*')
+      .eq('id', customModelId)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !customModel) {
+      throw new Error('Custom model not found or inactive');
+    }
+
+    const enhancedMessages = [...messages];
+    if (customModel.custom_system_prompt) {
+      const systemIndex = enhancedMessages.findIndex(m => m.role === 'system');
+      if (systemIndex >= 0) {
+        enhancedMessages[systemIndex].content =
+          `${customModel.custom_system_prompt}\n\n${enhancedMessages[systemIndex].content}`;
+      } else {
+        enhancedMessages.unshift({
+          role: 'system',
+          content: customModel.custom_system_prompt
+        });
+      }
+    }
+
+    return await this.callOpenRouter(
+      customModel.openrouter_model_id,
+      enhancedMessages,
+      openRouterApiKey,
+      {
+        ...character,
+        temperature: customModel.temperature,
+        max_tokens: customModel.max_tokens
+      }
+    );
+  }
+
+  static async getCustomModels() {
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+      );
+
+      const { data: models } = await supabase
+        .from('custom_models')
+        .select('id, name, display_name, description, tags')
+        .eq('is_active', true)
+        .order('display_name');
+
+      return (models || []).map(m => ({
+        id: m.id,
+        name: `${m.display_name}${m.tags?.length ? ' (' + m.tags.join(', ') + ')' : ''}`,
+        description: m.description
+      }));
+    } catch (error) {
+      console.error('Error fetching custom models:', error);
       return [];
     }
   }

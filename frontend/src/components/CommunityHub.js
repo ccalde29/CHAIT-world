@@ -385,45 +385,42 @@ const CommunityHub = ({
   const renderCharacterCard = (character) => (
     <div
       key={character.id}
-      className="bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 transition-all cursor-pointer"
+      className="relative bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 hover:border-purple-400/30 transition-all cursor-pointer group"
       onClick={() => setSelectedCharacter(character)}
     >
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex items-start gap-3 mb-3">
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-            character.uses_custom_image && character.avatar_image_url
-              ? ''
-              : `bg-gradient-to-r ${character.color}`
-          }`}>
-            {character.uses_custom_image && character.avatar_image_url ? (
-              <img
-                src={character.avatar_image_url}
-                alt={`${character.name} avatar`}
-                className="w-12 h-12 rounded-full object-cover"
-              />
-            ) : (
-              <span className="text-2xl">{character.avatar}</span>
-            )}
+      {/* Character Image / Avatar Header */}
+      <div className="relative h-32 flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
+        {character.uses_custom_image && character.avatar_image_url ? (
+          <img
+            src={character.avatar_image_url}
+            alt={character.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div
+            className={`w-16 h-16 rounded-full bg-gradient-to-br ${
+              character.color || 'from-gray-500 to-slate-500'
+            } flex items-center justify-center text-3xl`}
+          >
+            <span>{character.avatar || '🤖'}</span>
           </div>
-          
-          <div className="flex-1 min-w-0">
-            <h3 className="text-white font-medium mb-1 flex items-center gap-2">
-              {character.name}
-              {character.age && (
-                <span className="text-xs text-gray-400">({character.age})</span>
-              )}
-            </h3>
-            <p className="text-xs text-gray-300 line-clamp-2">
-              {character.personality}
-            </p>
-          </div>
-        </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="p-3">
+        <p className="font-bold text-white truncate text-center mb-1">{character.name}</p>
+        {character.age && (
+          <p className="text-xs text-gray-500 text-center mb-2">{character.age} years old</p>
+        )}
+        <p className="text-xs text-gray-400 line-clamp-2 text-center mb-3">
+          {character.personality?.substring(0, 80)}...
+        </p>
 
         {/* Tags */}
         {character.tags && character.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {character.tags.slice(0, 4).map((tag, idx) => (
+          <div className="flex flex-wrap gap-1 mb-3 justify-center">
+            {character.tags.slice(0, 3).map((tag, idx) => (
               <span
                 key={idx}
                 className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full"
@@ -431,43 +428,41 @@ const CommunityHub = ({
                 {tag}
               </span>
             ))}
-            {character.tags.length > 4 && (
-              <span className="text-xs text-gray-500">+{character.tags.length - 4}</span>
+            {character.tags.length > 3 && (
+              <span className="text-xs text-gray-500">+{character.tags.length - 3}</span>
             )}
           </div>
         )}
 
-        {/* Stats and Actions */}
-        <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <Eye size={12} />
-              <span>{character.view_count || 0}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Download size={12} />
-              <span>{character.import_count || 0}</span>
-            </div>
-            <button
-              onClick={(e) => handleLike(character, e)}
-              disabled={likingCharacter === character.id}
-              className={`flex items-center gap-1 transition-colors ${
-                likedCharacters.has(character.id)
-                  ? 'text-red-400 hover:text-red-300'
-                  : 'text-gray-400 hover:text-red-400'
-              }`}
-            >
-              <Heart
-                size={12}
-                fill={likedCharacters.has(character.id) ? 'currentColor' : 'none'}
-              />
-              <span>{character.favorite_count || 0}</span>
-            </button>
+        {/* Stats */}
+        <div className="flex items-center justify-center gap-3 text-xs text-gray-400 mb-3">
+          <div className="flex items-center gap-1">
+            <Eye size={12} />
+            <span>{character.view_count || 0}</span>
           </div>
+          <div className="flex items-center gap-1">
+            <Download size={12} />
+            <span>{character.import_count || 0}</span>
+          </div>
+          <button
+            onClick={(e) => handleLike(character, e)}
+            disabled={likingCharacter === character.id}
+            className={`flex items-center gap-1 transition-colors ${
+              likedCharacters.has(character.id)
+                ? 'text-red-400 hover:text-red-300'
+                : 'text-gray-400 hover:text-red-400'
+            }`}
+          >
+            <Heart
+              size={12}
+              fill={likedCharacters.has(character.id) ? 'currentColor' : 'none'}
+            />
+            <span>{character.favorite_count || 0}</span>
+          </button>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-1 flex-wrap">
           {!isUserOwnedCharacter(character) && (
             <button
               onClick={(e) => {
@@ -475,10 +470,10 @@ const CommunityHub = ({
                 setReportingCharacter(character);
                 setReportModalOpen(true);
               }}
-              className="flex items-center gap-1 text-gray-400 hover:text-orange-400 px-2 py-1 rounded transition-colors text-xs border border-white/10 hover:border-orange-400/30"
+              className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
             >
               <Flag size={12} />
-              <span>Report</span>
+              Report
             </button>
           )}
 
@@ -486,17 +481,17 @@ const CommunityHub = ({
             <button
               onClick={(e) => handleUnpublish(character, e)}
               disabled={unpublishing === character.id}
-              className="flex items-center gap-1 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
+              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors disabled:opacity-50"
             >
               {unpublishing === character.id ? (
                 <>
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                  <span>Unpublishing...</span>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-400"></div>
+                  Unpublishing...
                 </>
               ) : (
                 <>
                   <Trash2 size={12} />
-                  <span>Unpublish</span>
+                  Unpublish
                 </>
               )}
             </button>
@@ -507,17 +502,17 @@ const CommunityHub = ({
                 handleImport(character);
               }}
               disabled={importing === character.id}
-              className="flex items-center gap-1 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
+              className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 px-2 py-1 hover:bg-white/5 rounded transition-colors disabled:opacity-50"
             >
               {importing === character.id ? (
                 <>
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                  <span>Importing...</span>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400"></div>
+                  Importing...
                 </>
               ) : (
                 <>
                   <Download size={12} />
-                  <span>Import</span>
+                  Import
                 </>
               )}
             </button>
