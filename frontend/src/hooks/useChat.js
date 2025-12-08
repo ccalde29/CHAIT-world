@@ -38,12 +38,13 @@ export const useChat = (apiRequest) => {
     setError(null);
     clearResponseTimeouts();
 
-    // Add user message
+    // Add user message with persona data
     const newUserMessage = {
       id: Date.now(),
       type: 'user',
       content: userMessage,
-      timestamp: new Date()
+      timestamp: new Date(),
+      userPersona: userPersona?.persona || null
     };
 
     setMessages(prev => [...prev, newUserMessage]);
@@ -69,11 +70,18 @@ export const useChat = (apiRequest) => {
       const newTimeouts = [];
       response.responses.forEach((charResponse, index) => {
         const timeout = setTimeout(() => {
+          // Find the full character data to include image info
+          const fullCharacter = activeCharacters.find(c => c.id === charResponse.character);
+
           setMessages(prev => [...prev, {
             id: Date.now() + index,
             type: 'character',
             character: charResponse.character,
             characterName: charResponse.characterName,
+            characterAvatar: fullCharacter?.avatar,
+            characterColor: fullCharacter?.color,
+            characterImageUrl: fullCharacter?.avatar_image_url,
+            characterUsesCustomImage: fullCharacter?.uses_custom_image,
             content: charResponse.response,
             timestamp: new Date()
           }]);

@@ -145,7 +145,8 @@ const CharacterEditorV15 = ({
         body: JSON.stringify({
           provider,
           apiKey,
-          ollamaSettings: userSettings?.ollamaSettings
+          ollamaSettings: userSettings?.ollamaSettings,
+          lmStudioSettings: userSettings?.lmStudioSettings || { baseUrl: 'http://localhost:1234' }
         })
       });
 
@@ -211,7 +212,8 @@ const CharacterEditorV15 = ({
       'anthropic': 'claude-3-5-haiku-20241022',
       'openrouter': 'openai/gpt-4o-mini',
       'google': 'gemini-1.5-flash-latest',
-      'ollama': 'llama2'
+      'ollama': 'llama2',
+      'lmstudio': 'local-model'
     };
 
     setFormData(prev => ({
@@ -437,9 +439,15 @@ const CharacterEditorV15 = ({
         icon: '💻',
         color: 'text-cyan-400',
         description: 'Local models - free and private'
+      },
+      lmstudio: {
+        name: 'LM Studio',
+        icon: '🖥️',
+        color: 'text-indigo-400',
+        description: 'Local GGUF models - high performance'
       }
     };
-    
+
     return providers[formData.ai_provider] || providers.openai;
   };
   
@@ -785,46 +793,90 @@ const CharacterEditorV15 = ({
               AI Model Configuration
             </h3>
 
-            {/* Provider Selection */}
+            {/* Provider Type Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                AI Provider *
+                Provider Type *
               </label>
-              <p className="text-xs text-gray-400 mb-2">
-                Choose which AI service will power this character. Each provider offers different models with unique strengths. Make sure you've configured the API key for your chosen provider in Settings.
+              <p className="text-xs text-gray-400 mb-3">
+                Choose between cloud API providers or local models running on your machine.
               </p>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {['openai', 'anthropic', 'openrouter', 'google', 'ollama'].map(provider => {
-                  const info = {
-                    openai: { name: 'OpenAI', icon: '🤖' },
-                    anthropic: { name: 'Anthropic', icon: '🧠' },
-                    openrouter: { name: 'OpenRouter', icon: '🌐' },
-                    google: { name: 'Google', icon: '✨' },
-                    ollama: { name: 'Ollama', icon: '💻' }
-                  }[provider];
-                  
-                  const isSelected = formData.ai_provider === provider;
-                  
-                  return (
-                    <button
-                      type="button"
-                      key={provider}
-                      onClick={() => handleProviderChange(provider)}
-                      className={`p-3 rounded-lg border transition-all ${
-                        isSelected
-                          ? 'bg-red-500/20 border-red-500 text-white'
-                          : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">{info.icon}</div>
-                      <div className="text-xs font-medium">{info.name}</div>
-                    </button>
-                  );
-                })}
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const apiProviders = ['openai', 'anthropic', 'openrouter', 'google'];
+                    if (!apiProviders.includes(formData.ai_provider)) {
+                      handleProviderChange('openai');
+                    }
+                  }}
+                  className={`p-3 rounded-lg border transition-all ${
+                    ['openai', 'anthropic', 'openrouter', 'google'].includes(formData.ai_provider)
+                      ? 'bg-purple-500/20 border-purple-500 text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">☁️</div>
+                  <div className="text-xs font-medium">API Providers</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (formData.ai_provider !== 'ollama') {
+                      handleProviderChange('ollama');
+                    }
+                  }}
+                  className={`p-3 rounded-lg border transition-all ${
+                    formData.ai_provider === 'ollama'
+                      ? 'bg-cyan-500/20 border-cyan-500 text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">💻</div>
+                  <div className="text-xs font-medium">Ollama</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (formData.ai_provider !== 'lmstudio') {
+                      handleProviderChange('lmstudio');
+                    }
+                  }}
+                  className={`p-3 rounded-lg border transition-all ${
+                    formData.ai_provider === 'lmstudio'
+                      ? 'bg-indigo-500/20 border-indigo-500 text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">🖥️</div>
+                  <div className="text-xs font-medium">LM Studio</div>
+                </button>
               </div>
-              
-              <div className={`mt-2 p-3 rounded-lg bg-white/5 border border-white/10`}>
+
+              {/* API Provider Selection Dropdown */}
+              {['openai', 'anthropic', 'openrouter', 'google'].includes(formData.ai_provider) && (
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-400 mb-2">
+                    Select API Provider
+                  </label>
+                  <select
+                    value={formData.ai_provider}
+                    onChange={(e) => handleProviderChange(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-purple-400"
+                  >
+                    <option value="openai" className="bg-gray-800">🤖 OpenAI - GPT Models</option>
+                    <option value="anthropic" className="bg-gray-800">🧠 Anthropic - Claude Models</option>
+                    <option value="openrouter" className="bg-gray-800">🌐 OpenRouter - 100+ Models</option>
+                    <option value="google" className="bg-gray-800">✨ Google - Gemini Models</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Provider Info Card */}
+              <div className={`p-3 rounded-lg bg-white/5 border border-white/10`}>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{providerInfo.icon}</span>
                   <div>
@@ -878,7 +930,7 @@ const CharacterEditorV15 = ({
                   )}
                   {availableModels.map(model => (
                     <option key={model.id} value={model.id} className="bg-gray-800">
-                      {model.name || model.id}
+                      {model.tier === 'free' ? '🆓 ' : ''}{model.name || model.id}
                     </option>
                   ))}
                 </select>

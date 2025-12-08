@@ -56,23 +56,24 @@ router.post('/test', async (req, res) => {
  */
 router.post('/models', async (req, res) => {
   try {
-    const { provider, apiKey, ollamaSettings } = req.body;
-    
+    const { provider, apiKey, ollamaSettings, lmStudioSettings } = req.body;
+
     if (!provider) {
       return res.status(400).json({ error: 'Provider is required' });
     }
-    
+
     const models = await AIProviderService.getAvailableModels(
       provider,
       apiKey,
-      ollamaSettings
+      ollamaSettings,
+      lmStudioSettings
     );
-    
+
     res.json({ models });
-    
+
   } catch (error) {
     console.error('Error fetching models:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fetch models',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -150,9 +151,18 @@ router.get('/list', (req, res) => {
       defaultModel: 'mtaylor91/l3-stheno-maid-blackroot:8b',
       icon: '💻',
       websiteUrl: 'https://ollama.ai'
+    },
+    {
+      id: 'lmstudio',
+      name: 'LM Studio',
+      description: 'Run GGUF models locally via LM Studio',
+      requiresKey: false,
+      defaultModel: 'local-model',
+      icon: '🖥️',
+      websiteUrl: 'https://lmstudio.ai'
     }
   ];
-  
+
   res.json({ providers });
 });
 

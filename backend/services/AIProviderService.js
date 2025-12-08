@@ -43,7 +43,10 @@ class AIProviderService {
         
         case 'ollama':
           return await this.callOllama(model, messages, ollamaSettings, character);
-        
+
+        case 'lmstudio':
+          return await this.callLMStudio(model, messages, ollamaSettings, character);
+
         default:
           throw new Error(`Unsupported AI provider: ${provider}`);
       }
@@ -308,7 +311,36 @@ class AIProviderService {
     const data = await response.json();
     return data.response.trim();
   }
-  
+
+  // ==========================================================================
+  // LM STUDIO (OpenAI-compatible API for local GGUF models)
+  // ==========================================================================
+
+  static async callLMStudio(model, messages, lmStudioSettings = {}, character) {
+    const baseUrl = lmStudioSettings.baseUrl || 'http://localhost:1234';
+
+    // LM Studio uses OpenAI-compatible API
+    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: character.temperature || 0.8,
+        max_tokens: character.max_tokens || 150
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`LM Studio API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
+  }
+
   // ==========================================================================
   // PROVIDER UTILITIES
   // ==========================================================================
@@ -353,7 +385,8 @@ class AIProviderService {
       'anthropic': 'claude-3-5-haiku-20241022',
       'openrouter': 'openai/gpt-4o-mini',
       'google': 'gemini-2.5-flash',
-      'ollama': 'llama2'
+      'ollama': 'llama2',
+      'lmstudio': 'local-model'
     };
 
     return defaults[provider.toLowerCase()] || 'gpt-4o-mini';
@@ -362,24 +395,27 @@ class AIProviderService {
   /**
    * Get available models for a provider
    */
-  static async getAvailableModels(provider, apiKey, ollamaSettings = {}) {
+  static async getAvailableModels(provider, apiKey, ollamaSettings = {}, lmStudioSettings = {}) {
     try {
       switch (provider.toLowerCase()) {
         case 'openai':
           return await this.getOpenAIModels(apiKey);
-        
+
         case 'anthropic':
           return this.getAnthropicModels();
-        
+
         case 'openrouter':
           return await this.getOpenRouterModels(apiKey);
-        
+
         case 'google':
           return this.getGeminiModels();
-        
+
         case 'ollama':
           return await this.getOllamaModels(ollamaSettings);
-        
+
+        case 'lmstudio':
+          return await this.getLMStudioModels(lmStudioSettings);
+
         default:
           return [];
       }
@@ -419,7 +455,22 @@ class AIProviderService {
 
       const data = await response.json();
       const gptModels = data.data
-        .filter(m => m.id.includes('gpt'))
+        .filter(m => {
+          // Only include GPT chat models (exclude all non-chat models)
+          const id = m.id.toLowerCase();
+          return (id.startsWith('gpt-') &&
+                  !id.includes('instruct') &&
+                  !id.includes('embedding') &&
+                  !id.includes('whisper') &&
+                  !id.includes('tts') &&
+                  !id.includes('dall-e') &&
+                  !id.includes('davinci') &&
+                  !id.includes('babbage') &&
+                  !id.includes('ada') &&
+                  !id.includes('curie') &&
+                  !id.includes('audio') &&
+                  !id.includes('realtime'));
+        })
         .sort((a, b) => {
           // Sort by version (4 before 3.5)
           if (a.id.includes('gpt-4') && !b.id.includes('gpt-4')) return -1;
@@ -465,14 +516,34 @@ class AIProviderService {
   }
   
   static async getOpenRouterModels(apiKey) {
-    const response = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: { 'Authorization': `Bearer ${apiKey}` }
-    });
-    
-    if (!response.ok) return [];
-    
-    const data = await response.json();
-    return data.data.map(m => ({ id: m.id, name: m.name }));
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}
+      });
+
+      if (!response.ok) return [];
+
+      const data = await response.json();
+
+      // Sort by pricing tier (free first)
+      return data.data
+        .map(m => ({
+          id: m.id,
+          name: m.name,
+          tier: m.pricing?.prompt === '0' ? 'free' : 'paid',
+          context: m.context_length
+        }))
+        .sort((a, b) => {
+          // Free models first
+          if (a.tier === 'free' && b.tier !== 'free') return -1;
+          if (a.tier !== 'free' && b.tier === 'free') return 1;
+          // Then by name
+          return a.name.localeCompare(b.name);
+        });
+    } catch (error) {
+      console.error('Error fetching OpenRouter models:', error);
+      return [];
+    }
   }
   
   static getGeminiModels() {
@@ -487,12 +558,12 @@ class AIProviderService {
   
   static async getOllamaModels(ollamaSettings) {
       const baseUrl = ollamaSettings.baseUrl || 'http://localhost:11434';
-      
+
       try {
           const response = await fetch(`${baseUrl}/api/tags`);
-          
+
           if (!response.ok) return [];
-          
+
           const data = await response.json();
           return data.models.map(m => ({
           id: m.name,
@@ -502,6 +573,25 @@ class AIProviderService {
           console.error('Error fetching Ollama models:', error);
           return [];
       }
+  }
+
+  static async getLMStudioModels(lmStudioSettings) {
+    const baseUrl = lmStudioSettings.baseUrl || 'http://localhost:1234';
+
+    try {
+      const response = await fetch(`${baseUrl}/v1/models`);
+
+      if (!response.ok) return [];
+
+      const data = await response.json();
+      return data.data.map(m => ({
+        id: m.id,
+        name: m.id
+      }));
+    } catch (error) {
+      console.error('Error fetching LM Studio models:', error);
+      return [];
+    }
   }
 }
 

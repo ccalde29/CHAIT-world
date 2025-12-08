@@ -56,15 +56,22 @@ const ChatInterface = ({
                   : findCharacterById(message.character))
               : null;
 
+            // Get persona data from message if available, otherwise use current userPersona
+            const messagePersona = isUser && message.userPersona ? message.userPersona : userPersona?.persona;
+
             const displayAvatar = isUser
-              ? userPersona?.persona?.avatar || '=d'
+              ? messagePersona?.avatar || '=d'
               : character?.avatar || '>';
             const displayName = isUser
-              ? userPersona?.persona?.name || 'You'
+              ? messagePersona?.name || 'You'
               : character?.name || 'Character';
             const colorClass = isUser
-              ? userPersona?.persona?.color || 'from-blue-500 to-indigo-500'
+              ? messagePersona?.color || 'from-blue-500 to-indigo-500'
               : character?.color || 'from-gray-500 to-slate-500';
+
+            // Check for custom images
+            const hasUserImage = isUser && messagePersona?.uses_custom_image && messagePersona?.avatar_image_url;
+            const hasCharacterImage = !isUser && character?.uses_custom_image && character?.avatar_image_url;
 
             return (
               <div
@@ -73,9 +80,9 @@ const ChatInterface = ({
               >
                 {/* Avatar */}
                 <div className={`flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br ${colorClass} flex items-center justify-center text-white text-xl`}>
-                  {character?.uses_custom_image && character?.avatar_image_url ? (
+                  {(hasUserImage || hasCharacterImage) ? (
                     <img
-                      src={character.avatar_image_url}
+                      src={hasUserImage ? messagePersona.avatar_image_url : character.avatar_image_url}
                       alt={displayName}
                       className="w-full h-full rounded-full object-cover"
                     />
