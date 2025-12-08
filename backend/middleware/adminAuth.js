@@ -1,13 +1,22 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+// Lazy-load Supabase client to ensure environment variables are loaded
+let supabase = null;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('[AdminAuth] Missing Supabase configuration');
+function getSupabase() {
+  if (!supabase) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[AdminAuth] Missing Supabase configuration');
+      throw new Error('Supabase configuration missing');
+    }
+
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
+  }
+  return supabase;
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
  * Middleware to check if user has admin privileges
@@ -29,7 +38,7 @@ async function requireAdmin(req, res, next) {
     }
 
     // Check if user has admin privileges
-    const { data: userSettings, error } = await supabase
+    const { data: userSettings, error } = await getSupabase()
       .from('user_settings')
       .select('is_admin')
       .eq('user_id', userId)
@@ -82,7 +91,7 @@ async function checkAdmin(req, res, next) {
     }
 
     // Check if user has admin privileges
-    const { data: userSettings, error } = await supabase
+    const { data: userSettings, error } = await getSupabase()
       .from('user_settings')
       .select('is_admin')
       .eq('user_id', userId)

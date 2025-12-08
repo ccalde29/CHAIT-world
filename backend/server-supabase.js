@@ -79,6 +79,7 @@ const characterCommentRoutes = require('./routes/characterComments')(db.supabase
 const sceneCommentRoutes = require('./routes/sceneComments')(db.supabase);
 const personasRoutes = require('./routes/personas');
 const relationshipsRoutes = require('./routes/relationships');
+const moderationRoutes = require('./routes/moderation');
 
 // Mount routes
 app.use('/api/providers', providerRoutes);
@@ -103,6 +104,7 @@ app.use('/api/scene-comments', requireAuth, sceneCommentRoutes);
 app.use('/api', requireAuth, imageRoutes);
 app.use('/api/personas', requireAuth, personasRoutes);
 app.use('/api/characters', requireAuth, relationshipsRoutes);
+app.use('/api/moderation', requireAuth, moderationRoutes); // Admin-only routes (middleware checks inside)
 
 // ============================================================================
 // HEALTH & UTILITY ROUTES

@@ -15,6 +15,7 @@ class CommunityService {
 
   /**
    * Get community characters with filters and sorting
+   * Only returns approved characters
    */
   async getCommunityCharacters(options = {}) {
     try {
@@ -28,7 +29,8 @@ class CommunityService {
 
       let query = this.supabase
         .from('community_characters') // Using the view we created
-        .select('*');
+        .select('*')
+        .eq('moderation_status', 'approved'); // Only show approved characters
 
       // Apply tag filters
       if (tags.length > 0) {
@@ -323,6 +325,8 @@ class CommunityService {
 
   /**
    * Publish a character to the community
+   * If user has auto_approve_characters enabled, character is approved immediately
+   * Otherwise, it enters pending moderation status
    */
   async publishCharacter(userId, characterId, options = {}) {
     try {
@@ -337,6 +341,16 @@ class CommunityService {
       if (fetchError || !character) {
         throw new Error('Character not found or you are not the owner');
       }
+
+      // Check user's moderation settings
+      const { data: userSettings } = await this.supabase
+        .from('user_settings')
+        .select('auto_approve_characters')
+        .eq('user_id', userId)
+        .single();
+
+      // Determine moderation status based on user's auto-approve setting
+      const moderationStatus = userSettings?.auto_approve_characters ? 'approved' : 'pending';
 
       // Handle content locking options
       const { isLocked = false, hiddenFields = [] } = options;
@@ -364,7 +378,7 @@ class CommunityService {
         uses_custom_image: character.uses_custom_image,
         is_locked: isLocked,
         hidden_fields: hiddenFields,
-        moderation_status: 'approved'
+        moderation_status: moderationStatus
       };
 
       // Insert into community_characters table
@@ -379,8 +393,11 @@ class CommunityService {
         throw error;
       }
 
-      console.log('Character published to community:', data.id);
-      return data;
+      console.log(`Character published to community: ${data.id} (status: ${moderationStatus})`);
+      return {
+        ...data,
+        requiresModeration: moderationStatus === 'pending'
+      };
     } catch (error) {
       console.error('Error publishing character:', error);
       throw error;
