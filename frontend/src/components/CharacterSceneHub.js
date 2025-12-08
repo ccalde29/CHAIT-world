@@ -235,11 +235,11 @@ const CharacterSceneHub = ({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredScenes.map((scene) => (
-                <div
-                  key={scene.id}
-                  className="relative bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 hover:border-purple-400/30 transition-all group"
-                >
+                {filteredScenes.map((scene) => (
+                  <div
+                    key={scene.id}
+                    className="relative bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 hover:border-purple-400/30 transition-all group"
+                  >
                   {/* Scene Background Image Header */}
                   <div className="relative h-32 flex items-center justify-center bg-gradient-to-br from-purple-700 to-blue-800">
                     {scene.background_image_url && scene.uses_custom_background ? (
@@ -310,11 +310,11 @@ const CharacterSceneHub = ({
                       >
                       <Trash2 size={12} />
                       Delete
-                    </button>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
-              }
+                  </div>
+                ))}
               </div>
             )}
           </div>
