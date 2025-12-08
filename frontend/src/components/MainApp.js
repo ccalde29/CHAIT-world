@@ -3,8 +3,8 @@
  * Uses custom hooks and modular components for better maintainability
  */
 
-import React, { useState, useRef, useMemo } from 'react';
-import { Settings, Plus, Zap, User, LogOut, Users } from 'lucide-react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { Settings, Plus, Zap, User, LogOut, Users, MessageSquare, Globe, LayoutGrid, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../hooks/useChat';
 import { useCharacters } from '../hooks/useCharacters';
@@ -24,6 +24,7 @@ import PersonaManager from './PersonaManager';
 import CharacterMemoryViewer from './CharacterMemoryViewer';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import CommunityHub from './CommunityHub';
+import ModerationPanel from './ModerationPanel';
 
 const MainApp = () => {
   const { user, signOut } = useAuth();
@@ -63,8 +64,42 @@ const MainApp = () => {
   const [editingScene, setEditingScene] = useState(null);
   const [selectedCharacterForMemory, setSelectedCharacterForMemory] = useState(null);
 
+  // View state management - remember last view in localStorage
+  const [currentView, setCurrentView] = useState(() => {
+    return localStorage.getItem('chait-current-view') || 'chat';
+  });
+
+  // Admin state
+  const [isAdmin, setIsAdmin] = useState(false);
+
   const userMenuRef = useRef(null);
   const personaMenuRef = useRef(null);
+
+  // Save current view to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('chait-current-view', currentView);
+  }, [currentView]);
+
+  // Load admin status from user settings
+  useEffect(() => {
+    const loadAdminStatus = async () => {
+      try {
+        const response = await apiRequest('/api/user/settings');
+        console.log('[MainApp] User settings loaded:', response);
+        console.log('[MainApp] Admin status:', response?.isAdmin);
+        setIsAdmin(response?.isAdmin || false);
+      } catch (error) {
+        console.error('Failed to load admin status:', error);
+        setIsAdmin(false);
+      }
+    };
+    loadAdminStatus();
+  }, [user.id]);
+
+  // Debug: Log when admin status changes
+  useEffect(() => {
+    console.log('[MainApp] isAdmin state changed to:', isAdmin);
+  }, [isAdmin]);
 
   // ============================================================================
   // HANDLERS
@@ -302,74 +337,72 @@ const MainApp = () => {
         onToggleCollapse={() => setChatHistoryCollapsed(!chatHistoryCollapsed)}
       />
 
-      {/* Left Sidebar - Character/Scene Management Hub */}
-      {showManagementHub && (
-        <CharacterSceneHub
-          characters={charactersState.characters}
-          scenes={charactersState.scenarios}
-          onAddCharacter={() => {
-            setEditingCharacter(null);
-            setShowCharacterEditor(true);
-          }}
-          onEditCharacter={(character) => {
-            setEditingCharacter(character);
-            setShowCharacterEditor(true);
-          }}
-          onDeleteCharacter={handleDeleteCharacter}
-          onAddScene={() => {
-            setEditingScene(null);
-            setShowSceneEditor(true);
-          }}
-          onEditScene={(scene) => {
-            setEditingScene(scene);
-            setShowSceneEditor(true);
-          }}
-          onDeleteScene={handleDeleteScene}
-          onPublishScene={async (sceneId, options = {}) => {
-            try {
-              await apiRequest(`/api/community/scenes/${sceneId}/publish`, {
-                method: 'POST',
-                body: JSON.stringify(options)
-              });
-              await charactersState.loadScenarios();
-              alert('Scene published to community!');
-              return true;
-            } catch (error) {
-              console.error('Error publishing scene:', error);
-              alert('Failed to publish scene');
-              return false;
-            }
-          }}
-          onUnpublishScene={async (sceneId) => {
-            try {
-              await apiRequest(`/api/community/scenes/${sceneId}/unpublish`, {
-                method: 'POST'
-              });
-              await charactersState.loadScenarios();
-              alert('Scene removed from community');
-            } catch (error) {
-              console.error('Error unpublishing scene:', error);
-              alert('Failed to unpublish scene');
-            }
-          }}
-          onOpenMemoryViewer={(character) => {
-            setSelectedCharacterForMemory(character);
-            setShowMemoryViewer(true);
-          }}
-          onPublishCharacter={handlePublishCharacter}
-          onUnpublishCharacter={handleUnpublishCharacter}
-        />
-      )}
-
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Top Bar */}
         <div className="bg-gray-800 border-b border-white/10 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold">CHAIT World</h1>
-            <div className="text-sm text-gray-400">
-              {charactersState.findScenarioById(charactersState.currentScenario)?.name || 'General Chat'}
+
+            {/* View Navigation */}
+            <div className="flex items-center gap-2 ml-4">
+              <button
+                onClick={() => setCurrentView('chat')}
+                className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
+                  currentView === 'chat'
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                    : 'hover:bg-white/10 text-gray-300'
+                }`}
+                title="Chat"
+              >
+                <MessageSquare size={18} />
+                Chat
+              </button>
+              <button
+                onClick={() => setCurrentView('community')}
+                className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
+                  currentView === 'community'
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                    : 'hover:bg-white/10 text-gray-300'
+                }`}
+                title="Community Hub"
+              >
+                <Globe size={18} />
+                Community
+              </button>
+              <button
+                onClick={() => setCurrentView('manage')}
+                className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
+                  currentView === 'manage'
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                    : 'hover:bg-white/10 text-gray-300'
+                }`}
+                title="Manage Characters & Scenes"
+              >
+                <LayoutGrid size={18} />
+                Manage
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setCurrentView('moderation')}
+                  className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
+                    currentView === 'moderation'
+                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                      : 'hover:bg-white/10 text-gray-300'
+                  }`}
+                  title="Moderation Panel"
+                >
+                  <Shield size={18} />
+                  Moderation
+                </button>
+              )}
             </div>
+
+            {currentView === 'chat' && (
+              <div className="text-sm text-gray-400 ml-4">
+                {charactersState.findScenarioById(charactersState.currentScenario)?.name || 'General Chat'}
+              </div>
+            )}
 
             {/* Persona Switcher */}
             {personasState.activePersona && (
@@ -430,32 +463,16 @@ const MainApp = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowNewChatModal(true)}
-              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 rounded-lg transition-all font-medium flex items-center gap-2"
-              title="Start New Chat"
-            >
-              <Plus size={18} />
-              New Chat
-            </button>
-
-            <button
-              onClick={() => setShowManagementHub(!showManagementHub)}
-              className={`p-2 rounded-lg transition-colors ${
-                showManagementHub ? 'bg-purple-500 text-white' : 'hover:bg-white/10'
-              }`}
-              title="Toggle Management Hub"
-            >
-              <Users size={20} />
-            </button>
-
-            <button
-              onClick={() => setShowCommunityHub(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              title="Community Hub"
-            >
-              <Zap size={20} />
-            </button>
+            {currentView === 'chat' && (
+              <button
+                onClick={() => setShowNewChatModal(true)}
+                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 rounded-lg transition-all font-medium flex items-center gap-2"
+                title="Start New Chat"
+              >
+                <Plus size={18} />
+                New Chat
+              </button>
+            )}
 
             <button
               onClick={() => setShowSettings(true)}
@@ -499,24 +516,130 @@ const MainApp = () => {
           </div>
         </div>
 
-        {/* Chat Interface */}
-        <ChatInterface
-          messages={chat.messages}
-          userInput={chat.userInput}
-          isGenerating={chat.isGenerating}
-          error={chat.error}
-          messagesEndRef={chat.messagesEndRef}
-          userPersona={settings.userPersona}
-          findCharacterById={charactersState.findCharacterById}
-          onInputChange={chat.setUserInput}
-          onSendMessage={handleSendMessage}
-          onKeyPress={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !chat.isGenerating) {
-              e.preventDefault();
-              handleSendMessage();
-            }
-          }}
-        />
+        {/* Center Panel - View Switching */}
+        {currentView === 'chat' && (
+          <ChatInterface
+            messages={chat.messages}
+            userInput={chat.userInput}
+            isGenerating={chat.isGenerating}
+            error={chat.error}
+            messagesEndRef={chat.messagesEndRef}
+            userPersona={settings.userPersona}
+            findCharacterById={charactersState.findCharacterById}
+            onInputChange={chat.setUserInput}
+            onSendMessage={handleSendMessage}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !chat.isGenerating) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+          />
+        )}
+
+        {currentView === 'community' && (
+          <div className="flex-1 overflow-hidden">
+            <CommunityHub
+              fullScreen={true}
+              apiRequest={apiRequest}
+              onImportCharacter={async (communityChar) => {
+                try {
+                  await apiRequest(`/api/community/characters/${communityChar.id}/import`, {
+                    method: 'POST'
+                  });
+                  await charactersState.loadCharacters();
+                  alert('Character imported successfully!');
+                } catch (error) {
+                  console.error('Error importing character:', error);
+                  alert('Failed to import character');
+                }
+              }}
+              onImportScene={async (communityScene) => {
+                try {
+                  await apiRequest(`/api/community/scenes/${communityScene.id}/import`, {
+                    method: 'POST'
+                  });
+                  await charactersState.loadScenarios();
+                  alert('Scene imported successfully!');
+                } catch (error) {
+                  console.error('Error importing scene:', error);
+                  alert('Failed to import scene');
+                }
+              }}
+              onClose={() => setCurrentView('chat')}
+            />
+          </div>
+        )}
+
+        {currentView === 'manage' && (
+          <div className="flex-1 overflow-hidden">
+            <CharacterSceneHub
+              fullScreen={true}
+              characters={charactersState.characters}
+              scenes={charactersState.scenarios}
+              onAddCharacter={() => {
+                setEditingCharacter(null);
+                setShowCharacterEditor(true);
+              }}
+              onEditCharacter={(character) => {
+                setEditingCharacter(character);
+                setShowCharacterEditor(true);
+              }}
+              onDeleteCharacter={handleDeleteCharacter}
+              onAddScene={() => {
+                setEditingScene(null);
+                setShowSceneEditor(true);
+              }}
+              onEditScene={(scene) => {
+                setEditingScene(scene);
+                setShowSceneEditor(true);
+              }}
+              onDeleteScene={handleDeleteScene}
+              onPublishScene={async (sceneId, options = {}) => {
+                try {
+                  await apiRequest(`/api/community/scenes/${sceneId}/publish`, {
+                    method: 'POST',
+                    body: JSON.stringify(options)
+                  });
+                  await charactersState.loadScenarios();
+                  alert('Scene published to community!');
+                  return true;
+                } catch (error) {
+                  console.error('Error publishing scene:', error);
+                  alert('Failed to publish scene');
+                  return false;
+                }
+              }}
+              onUnpublishScene={async (sceneId) => {
+                try {
+                  await apiRequest(`/api/community/scenes/${sceneId}/unpublish`, {
+                    method: 'POST'
+                  });
+                  await charactersState.loadScenarios();
+                  alert('Scene removed from community');
+                } catch (error) {
+                  console.error('Error unpublishing scene:', error);
+                  alert('Failed to unpublish scene');
+                }
+              }}
+              onOpenMemoryViewer={(character) => {
+                setSelectedCharacterForMemory(character);
+                setShowMemoryViewer(true);
+              }}
+              onPublishCharacter={handlePublishCharacter}
+              onUnpublishCharacter={handleUnpublishCharacter}
+            />
+          </div>
+        )}
+
+        {currentView === 'moderation' && isAdmin && (
+          <div className="flex-1 overflow-hidden">
+            <ModerationPanel
+              fullScreen={true}
+              apiRequest={apiRequest}
+            />
+          </div>
+        )}
       </div>
 
       {/* Active Chat Panel (Right Sidebar) */}
@@ -619,22 +742,6 @@ const MainApp = () => {
           }}
           currentScenario={charactersState.currentScenario}
           onScenarioSelect={charactersState.setCurrentScenario}
-        />
-      )}
-
-      {showCommunityHub && (
-        <CommunityHub
-          apiRequest={apiRequest}
-          userCharacters={charactersState.characters}
-          userScenes={charactersState.scenarios}
-          onUnpublishCharacter={handleUnpublishCharacter}
-          onUnpublishScene={handleUnpublishScene}
-          onImport={async () => {
-            await charactersState.loadCharacters();
-            await charactersState.loadScenarios();
-            setShowCommunityHub(false);
-          }}
-          onClose={() => setShowCommunityHub(false)}
         />
       )}
 

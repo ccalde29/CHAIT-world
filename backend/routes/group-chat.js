@@ -112,12 +112,12 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     }
     
     // ========================================================================
-    // STEP 2: LOAD USER SETTINGS (API KEYS)
+    // STEP 2: LOAD USER SETTINGS (API KEYS + ADMIN PROMPT)
     // ========================================================================
-    
+
       const { data: userSettings, error: settingsError } = await supabase
         .from('user_settings')
-        .select('api_keys, ollama_settings')
+        .select('api_keys, ollama_settings, admin_system_prompt')
         .eq('user_id', userId)
         .single();
 
@@ -132,12 +132,16 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       const ollamaSettings = userSettings?.ollama_settings || {
         baseUrl: 'http://localhost:11434'
       };
+
+      const adminSystemPrompt = userSettings?.admin_system_prompt || null;
+
       if (process.env.NODE_ENV === 'development') {
         console.log('[Settings] Loaded settings for user:', userId);
         console.log('[Settings] Has OpenAI key:', !!apiKeys.openai);
         console.log('[Settings] Has Anthropic key:', !!apiKeys.anthropic);
         console.log('[Settings] Has OpenRouter key:', !!apiKeys.openrouter);
         console.log('[Settings] Has Google key:', !!apiKeys.google);
+        console.log('[Settings] Has admin system prompt:', !!adminSystemPrompt);
         // NEVER LOG: console.log('[Settings] API Keys:', apiKeys); // DANGEROUS!
       }
     // ========================================================================
@@ -296,7 +300,7 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         const memories = characterMemoriesMap.get(char.id) || [];
         const learningData = characterLearningMap.get(char.id);
 
-        const systemPrompt = buildSystemPrompt(char, userPersona, currentScene, otherCharacters, characterRelationships, userRelationship, memories, learningData);
+        const systemPrompt = buildSystemPrompt(char, userPersona, currentScene, otherCharacters, characterRelationships, userRelationship, memories, learningData, adminSystemPrompt);
         const messages = buildConversationMessages(systemPrompt, updatedHistory, isPrimary ? userMessage : null);
 
         console.log(`[Response] Generating for ${char.name}...`);
@@ -417,8 +421,16 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-function buildSystemPrompt(character, userPersona, currentScene, otherCharacters, characterRelationships, userRelationship, memories, learningData) {
-  let prompt = `You are ${character.name}.\n\n`;
+function buildSystemPrompt(character, userPersona, currentScene, otherCharacters, characterRelationships, userRelationship, memories, learningData, adminSystemPrompt) {
+  let prompt = '';
+
+  // Prepend admin system prompt if it exists
+  if (adminSystemPrompt && adminSystemPrompt.trim()) {
+    prompt += `${adminSystemPrompt.trim()}\n\n`;
+    prompt += `===== CHARACTER INSTRUCTIONS =====\n\n`;
+  }
+
+  prompt += `You are ${character.name}.\n\n`;
   prompt += `PERSONALITY & BACKGROUND:\n${character.personality}\n\n`;
 
   // Add user relationship context

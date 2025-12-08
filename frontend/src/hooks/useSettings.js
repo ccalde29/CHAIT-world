@@ -8,7 +8,10 @@ export const useSettings = (apiRequest) => {
     apiKeys: {},
     ollamaSettings: { baseUrl: 'http://localhost:11434' },
     groupDynamicsMode: 'natural',
-    messageDelay: 1200
+    messageDelay: 1200,
+    isAdmin: false,
+    adminSystemPrompt: null,
+    autoApproveCharacters: false
   });
 
   const [userPersona, setUserPersona] = useState(null);

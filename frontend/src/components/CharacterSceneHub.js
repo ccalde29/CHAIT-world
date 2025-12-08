@@ -18,7 +18,8 @@ const CharacterSceneHub = ({
   onEditScene,
   onDeleteScene,
   onPublishScene,
-  onOpenMemoryViewer
+  onOpenMemoryViewer,
+  fullScreen = false
 }) => {
   const [activeTab, setActiveTab] = useState('characters'); // 'characters' or 'scenes'
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,8 +35,12 @@ const CharacterSceneHub = ({
     scene.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const containerClass = fullScreen
+    ? "flex-1 bg-gray-900 flex flex-col overflow-hidden"
+    : "w-80 bg-gray-800 border-r border-white/10 flex flex-col overflow-hidden";
+
   return (
-    <div className="w-80 bg-gray-800 border-r border-white/10 flex flex-col overflow-hidden">
+    <div className={containerClass}>
       {/* Header */}
       <div className="p-4 border-b border-white/10">
         <h2 className="text-lg font-bold text-white mb-3">Management Hub</h2>
@@ -92,17 +97,17 @@ const CharacterSceneHub = ({
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'characters' && (
-          <div className="p-4 space-y-2">
+          <div className="p-4">
             {/* Add Character Button */}
             <button
               onClick={onAddCharacter}
-              className="w-full flex items-center gap-2 justify-center bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-3 rounded-lg transition-all font-medium"
+              className="w-full flex items-center gap-2 justify-center bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-3 rounded-lg transition-all font-medium mb-4"
             >
               <Plus size={18} />
               Create New Character
             </button>
 
-            {/* Character List */}
+            {/* Character Grid */}
             {filteredCharacters.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Users size={32} className="mx-auto mb-2 opacity-50" />
@@ -112,10 +117,11 @@ const CharacterSceneHub = ({
                 <p className="text-xs mt-1">Create your first character!</p>
               </div>
             ) : (
-              filteredCharacters.map((character) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredCharacters.map((character) => (
                 <div
                   key={character.id}
-                  className="relative bg-white/5 border border-white/10 rounded-lg p-3 hover:bg-white/10 transition-colors"
+                  className="relative bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 hover:border-purple-400/30 transition-all group"
                 >
                   {/* Delete button positioned inside the card (top-right) */}
                   <button
@@ -124,48 +130,43 @@ const CharacterSceneHub = ({
                         onDeleteCharacter(character.id);
                       }
                     }}
-                    className="absolute right-2 top-2 flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
+                    className="absolute right-2 top-2 z-10 flex items-center gap-1 text-xs text-red-400 hover:text-red-300 p-1.5 hover:bg-black/50 rounded transition-colors opacity-0 group-hover:opacity-100"
                     aria-label={`Delete ${character.name}`}
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={14} />
                   </button>
 
-                  {/* Character Image (if custom) */}
-                  {character.uses_custom_image && character.avatar_image_url && (
-                    <div className="absolute left-0 top-0 bottom-0 w-24 overflow-hidden rounded-l-lg">
+                  {/* Character Image / Avatar Header */}
+                  <div className="relative h-32 flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
+                    {character.uses_custom_image && character.avatar_image_url ? (
                       <img
                         src={character.avatar_image_url}
                         alt={character.name}
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-gray-800/50"></div>
-                    </div>
-                  )}
-
-                  <div className={`flex items-start gap-3 ${character.uses_custom_image && character.avatar_image_url ? 'ml-24' : ''}`}>
-                    {/* Avatar (emoji/gradient only shown if no custom image) */}
-                    {!(character.uses_custom_image && character.avatar_image_url) && (
+                    ) : (
                       <div
-                        className={`flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br ${
+                        className={`w-16 h-16 rounded-full bg-gradient-to-br ${
                           character.color || 'from-gray-500 to-slate-500'
-                        } flex items-center justify-center text-lg`}
+                        } flex items-center justify-center text-3xl`}
                       >
                         <span>{character.avatar || '🤖'}</span>
                       </div>
                     )}
+                  </div>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-white truncate">{character.name}</p>
-                      {character.age && (
-                        <p className="text-xs text-gray-500">{character.age} years old</p>
-                      )}
-                      <p className="text-xs text-gray-400 mt-1 line-clamp-1">
-                        {character.personality?.substring(0, 50)}...
-                      </p>
+                  {/* Info */}
+                  <div className="p-3">
+                    <p className="font-bold text-white truncate text-center mb-1">{character.name}</p>
+                    {character.age && (
+                      <p className="text-xs text-gray-500 text-center mb-2">{character.age} years old</p>
+                    )}
+                    <p className="text-xs text-gray-400 line-clamp-2 text-center mb-3">
+                      {character.personality?.substring(0, 80)}...
+                    </p>
 
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-1 mt-2 flex-wrap">
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-center gap-1 flex-wrap">
                         <button
                           onClick={() => onEditCharacter(character)}
                           className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
@@ -202,12 +203,12 @@ const CharacterSceneHub = ({
                             Publish
                           </button>
                         )}
-                        {/* Delete moved to top-right inside the card */}
                       </div>
                     </div>
-                  </div>
                 </div>
               ))
+              }
+              </div>
             )}
           </div>
         )}
@@ -223,7 +224,7 @@ const CharacterSceneHub = ({
               Create New Scene
             </button>
 
-            {/* Scene List */}
+            {/* Scene Grid */}
             {filteredScenes.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <MapPin size={32} className="mx-auto mb-2 opacity-50" />
@@ -233,75 +234,88 @@ const CharacterSceneHub = ({
                 <p className="text-xs mt-1">Create your first scene!</p>
               </div>
             ) : (
-              filteredScenes.map((scene) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredScenes.map((scene) => (
                 <div
                   key={scene.id}
-                  className="bg-white/5 border border-white/10 rounded-lg p-3 hover:bg-white/10 transition-colors"
+                  className="relative bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 hover:border-purple-400/30 transition-all group"
                 >
-                  {scene.background_image_url && scene.uses_custom_background && (
-                    <div className="h-16 mb-2 rounded overflow-hidden">
+                  {/* Scene Background Image Header */}
+                  <div className="relative h-32 flex items-center justify-center bg-gradient-to-br from-purple-700 to-blue-800">
+                    {scene.background_image_url && scene.uses_custom_background ? (
                       <img
                         src={scene.background_image_url}
                         alt={scene.name}
                         className="w-full h-full object-cover"
                       />
-                    </div>
-                  )}
-                  <p className="font-medium text-white">{scene.name}</p>
-                  <p className="text-xs text-gray-400 mt-1 line-clamp-2">
-                    {scene.description}
-                  </p>
-                  {scene.atmosphere && (
-                    <p className="text-xs text-purple-300 mt-1">
-                      {scene.atmosphere}
-                    </p>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-1 mt-2 flex-wrap">
-                    <button
-                      onClick={() => onEditScene(scene)}
-                      className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
-                    >
-                      <Edit size={12} />
-                      Edit
-                    </button>
-                    {scene.is_public ? (
-                      <button
-                        disabled
-                        className="flex items-center gap-1 text-xs text-green-200 px-2 py-1 rounded bg-white/5 cursor-not-allowed whitespace-nowrap"
-                        title="Already published to Community"
-                      >
-                        <MapPin size={12} />
-                        Published
-                      </button>
                     ) : (
+                      <MapPin size={40} className="text-white/30" />
+                    )}
+                  </div>
+
+                  {/* Scene Info */}
+                  <div className="p-3">
+                    <p className="font-semibold text-white text-center mb-2 line-clamp-1">
+                      {scene.name}
+                    </p>
+
+                    <p className="text-xs text-gray-400 text-center mb-2 line-clamp-2">
+                      {scene.description}
+                    </p>
+
+                    {scene.atmosphere && (
+                      <p className="text-xs text-purple-300 text-center mb-3 line-clamp-1">
+                        {scene.atmosphere}
+                      </p>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-center gap-1 flex-wrap">
+                      <button
+                        onClick={() => onEditScene(scene)}
+                        className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
+                      >
+                        <Edit size={12} />
+                        Edit
+                      </button>
+                      {scene.is_public ? (
+                        <button
+                          disabled
+                          className="flex items-center gap-1 text-xs text-green-200 px-2 py-1 rounded bg-white/5 cursor-not-allowed whitespace-nowrap"
+                          title="Already published to Community"
+                        >
+                          <MapPin size={12} />
+                          Published
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setPublishItem(scene);
+                            setPublishType('scene');
+                            setPublishModalOpen(true);
+                          }}
+                          className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
+                        >
+                          <Upload size={12} />
+                          Publish
+                        </button>
+                      )}
                       <button
                         onClick={() => {
-                          setPublishItem(scene);
-                          setPublishType('scene');
-                          setPublishModalOpen(true);
+                          if (window.confirm(`Delete "${scene.name}"?`)) {
+                            onDeleteScene(scene.id);
+                          }
                         }}
-                        className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 px-2 py-1 hover:bg-white/5 rounded transition-colors whitespace-nowrap"
+                        className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
                       >
-                        <Upload size={12} />
-                        Publish
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`Delete "${scene.name}"?`)) {
-                          onDeleteScene(scene.id);
-                        }
-                      }}
-                      className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
-                    >
                       <Trash2 size={12} />
                       Delete
                     </button>
                   </div>
                 </div>
               ))
+              }
+              </div>
             )}
           </div>
         )}

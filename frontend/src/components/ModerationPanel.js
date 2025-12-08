@@ -1,0 +1,369 @@
+// ============================================================================
+// Moderation Panel
+// Admin panel for moderating characters and handling reports
+// frontend/src/components/ModerationPanel.js
+// ============================================================================
+
+import React, { useState, useEffect } from 'react';
+import { Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
+
+const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
+  const [activeTab, setActiveTab] = useState('pending');
+  const [queue, setQueue] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [stats, setStats] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    unresolvedReports: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(null);
+
+  // Fetch moderation queue
+  const fetchQueue = async () => {
+    try {
+      const response = await apiRequest('/api/moderation/queue');
+      setQueue(response.queue || []);
+    } catch (error) {
+      console.error('Failed to fetch moderation queue:', error);
+    }
+  };
+
+  // Fetch reports
+  const fetchReports = async () => {
+    try {
+      const response = await apiRequest('/api/moderation/reports?status=pending');
+      setReports(response.reports || []);
+    } catch (error) {
+      console.error('Failed to fetch reports:', error);
+    }
+  };
+
+  // Fetch stats
+  const fetchStats = async () => {
+    try {
+      const response = await apiRequest('/api/moderation/stats');
+      setStats(response);
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    }
+  };
+
+  // Load initial data
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchQueue(), fetchReports(), fetchStats()]);
+      setLoading(false);
+    };
+    loadData();
+  }, []);
+
+  // Approve character
+  const handleApprove = async (characterId) => {
+    if (processing) return;
+    setProcessing(characterId);
+
+    try {
+      await apiRequest(`/api/moderation/approve/${characterId}`, {
+        method: 'POST'
+      });
+
+      // Refresh queue and stats
+      await Promise.all([fetchQueue(), fetchStats()]);
+      alert('Character approved successfully!');
+    } catch (error) {
+      console.error('Failed to approve character:', error);
+      alert('Failed to approve character. Please try again.');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  // Reject character
+  const handleReject = async (characterId) => {
+    if (processing) return;
+
+    const reason = prompt('Enter reason for rejection (optional):');
+    if (reason === null) return; // User cancelled
+
+    setProcessing(characterId);
+
+    try {
+      await apiRequest(`/api/moderation/reject/${characterId}`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+      });
+
+      // Refresh queue and stats
+      await Promise.all([fetchQueue(), fetchStats()]);
+      alert('Character rejected and unpublished.');
+    } catch (error) {
+      console.error('Failed to reject character:', error);
+      alert('Failed to reject character. Please try again.');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  // Resolve report
+  const handleResolveReport = async (reportId, action) => {
+    if (processing) return;
+    setProcessing(reportId);
+
+    try {
+      const notes = action === 'unpublish'
+        ? prompt('Enter notes for unpublishing (optional):')
+        : null;
+
+      if (action === 'unpublish' && notes === null) {
+        setProcessing(null);
+        return; // User cancelled
+      }
+
+      await apiRequest(`/api/moderation/reports/${reportId}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify({ action, notes })
+      });
+
+      // Refresh reports and stats
+      await Promise.all([fetchReports(), fetchStats(), fetchQueue()]);
+      alert(`Report ${action === 'unpublish' ? 'actioned - character unpublished' : 'dismissed'} successfully!`);
+    } catch (error) {
+      console.error('Failed to resolve report:', error);
+      alert('Failed to resolve report. Please try again.');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const containerClass = fullScreen
+    ? "flex-1 bg-gray-900 flex flex-col overflow-hidden"
+    : "w-full h-full bg-gray-900 flex flex-col overflow-hidden";
+
+  return (
+    <div className={containerClass}>
+      {/* Header */}
+      <div className="bg-gray-800 border-b border-white/10 p-4">
+        <div className="flex items-center gap-3">
+          <Shield className="text-purple-400" size={24} />
+          <div>
+            <h2 className="text-xl font-bold text-white">Moderation Panel</h2>
+            <p className="text-sm text-gray-400">Review and moderate community content</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-gray-800 border-b border-white/10 px-4">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'pending'
+                ? 'text-purple-400 border-b-2 border-purple-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Clock size={18} />
+            Pending ({queue.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'reports'
+                ? 'text-purple-400 border-b-2 border-purple-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <AlertTriangle size={18} />
+            Reports ({reports.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('stats')}
+            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'stats'
+                ? 'text-purple-400 border-b-2 border-purple-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <TrendingUp size={18} />
+            Stats
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-gray-400">Loading...</div>
+          </div>
+        ) : (
+          <>
+            {/* Pending Characters Tab */}
+            {activeTab === 'pending' && (
+              <div className="space-y-4">
+                {queue.length === 0 ? (
+                  <div className="text-center py-12">
+                    <CheckCircle className="mx-auto mb-4 text-green-400" size={48} />
+                    <p className="text-gray-400">No characters pending moderation</p>
+                  </div>
+                ) : (
+                  queue.map(item => (
+                    <div
+                      key={item.id}
+                      className="bg-gray-800 border border-white/10 rounded-lg p-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-bold text-white">{item.name}</h3>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              item.moderation_status === 'pending'
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {item.moderation_status}
+                            </span>
+                            {item.report_count > 0 && (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400 flex items-center gap-1">
+                                <AlertTriangle size={12} />
+                                {item.report_count} report{item.report_count > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-400 mb-2">{item.description}</p>
+                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <span>Published: {new Date(item.published_at).toLocaleDateString()}</span>
+                            <span>Views: {item.view_count || 0}</span>
+                            <span>Imports: {item.import_count || 0}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApprove(item.id)}
+                            disabled={processing === item.id}
+                            className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+                            title="Approve"
+                          >
+                            <CheckCircle size={18} />
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleReject(item.id)}
+                            disabled={processing === item.id}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+                            title="Reject"
+                          >
+                            <XCircle size={18} />
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Reports Tab */}
+            {activeTab === 'reports' && (
+              <div className="space-y-4">
+                {reports.length === 0 ? (
+                  <div className="text-center py-12">
+                    <CheckCircle className="mx-auto mb-4 text-green-400" size={48} />
+                    <p className="text-gray-400">No pending reports</p>
+                  </div>
+                ) : (
+                  reports.map(report => (
+                    <div
+                      key={report.id}
+                      className="bg-gray-800 border border-white/10 rounded-lg p-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-lg font-bold text-white">
+                              {report.characters?.name || 'Unknown Character'}
+                            </h3>
+                            <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
+                              {report.reason}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-400 mb-2">{report.description}</p>
+                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <span>Reported: {new Date(report.created_at).toLocaleDateString()}</span>
+                            <span>Status: {report.characters?.moderation_status || 'unknown'}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleResolveReport(report.id, 'dismiss')}
+                            disabled={processing === report.id}
+                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                            title="Dismiss report"
+                          >
+                            Dismiss
+                          </button>
+                          <button
+                            onClick={() => handleResolveReport(report.id, 'unpublish')}
+                            disabled={processing === report.id}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                            title="Unpublish character"
+                          >
+                            Unpublish
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Stats Tab */}
+            {activeTab === 'stats' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Clock className="text-yellow-400" size={24} />
+                    <h3 className="text-sm font-medium text-gray-400">Pending Review</h3>
+                  </div>
+                  <p className="text-3xl font-bold text-white">{stats.pending}</p>
+                </div>
+
+                <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <CheckCircle className="text-green-400" size={24} />
+                    <h3 className="text-sm font-medium text-gray-400">Approved</h3>
+                  </div>
+                  <p className="text-3xl font-bold text-white">{stats.approved}</p>
+                </div>
+
+                <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <XCircle className="text-red-400" size={24} />
+                    <h3 className="text-sm font-medium text-gray-400">Rejected</h3>
+                  </div>
+                  <p className="text-3xl font-bold text-white">{stats.rejected}</p>
+                </div>
+
+                <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <AlertTriangle className="text-orange-400" size={24} />
+                    <h3 className="text-sm font-medium text-gray-400">Unresolved Reports</h3>
+                  </div>
+                  <p className="text-3xl font-bold text-white">{stats.unresolvedReports}</p>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ModerationPanel;

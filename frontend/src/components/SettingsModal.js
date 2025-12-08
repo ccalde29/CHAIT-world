@@ -4,7 +4,7 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Key, Zap, CheckCircle, AlertCircle, Eye, EyeOff, Loader } from 'lucide-react';
+import { X, Settings, Key, Zap, CheckCircle, AlertCircle, Eye, EyeOff, Loader, Shield } from 'lucide-react';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -20,16 +20,20 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
     anthropicKey: '',
     openrouterKey: '',
     googleKey: '',
-    
+
     // Ollama settings
     ollamaUrl: 'http://localhost:11434',
     ollamaTestModel: 'llama2',
-    
+
     // Group dynamics
     groupDynamicsMode: 'natural',
-    
+
     // Display preferences
-    messageDelay: 1200
+    messageDelay: 1200,
+
+    // Admin settings
+    autoApproveCharacters: false,
+    adminSystemPrompt: ''
   });
   
   // UI state
@@ -66,7 +70,9 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
         googleKey: settings.apiKeys?.google || '',
         ollamaUrl: settings.ollamaSettings?.baseUrl || 'http://localhost:11434',
         groupDynamicsMode: settings.groupDynamicsMode || 'natural',
-        messageDelay: settings.messageDelay || 1200
+        messageDelay: settings.messageDelay || 1200,
+        autoApproveCharacters: settings.autoApproveCharacters || false,
+        adminSystemPrompt: settings.adminSystemPrompt || ''
       });
     }
   }, [settings]);
@@ -185,7 +191,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    
+
     try {
       const newSettings = {
         apiKeys: {
@@ -198,9 +204,11 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
           baseUrl: formData.ollamaUrl
         },
         groupDynamicsMode: formData.groupDynamicsMode,
-        messageDelay: formData.messageDelay
+        messageDelay: formData.messageDelay,
+        autoApproveCharacters: formData.autoApproveCharacters,
+        adminSystemPrompt: formData.adminSystemPrompt
       };
-      
+
       await onSave(newSettings);
       
       setSuccessMessage('Settings saved successfully!');
@@ -431,7 +439,58 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
               </div>
             </div>
           </div>
-          
+
+          {/* Admin Settings - Only show if user is admin */}
+          {settings.isAdmin && (
+            <div className="pt-6 border-t border-white/10">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Shield size={18} className="text-purple-500" />
+                Admin Settings
+              </h3>
+
+              <div className="space-y-4">
+                {/* Auto-Approve Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm font-medium text-gray-300">
+                      Auto-Approve Published Characters
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      When enabled, your published characters will bypass moderation
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleInputChange('autoApproveCharacters', !formData.autoApproveCharacters)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      formData.autoApproveCharacters ? 'bg-green-500' : 'bg-gray-600'
+                    }`}
+                  >
+                    <div className={`absolute w-5 h-5 bg-white rounded-full top-0.5 transition-transform ${
+                      formData.autoApproveCharacters ? 'right-0.5' : 'left-0.5'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* System Prompt Override */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Global System Prompt Override
+                  </label>
+                  <textarea
+                    value={formData.adminSystemPrompt}
+                    onChange={(e) => handleInputChange('adminSystemPrompt', e.target.value)}
+                    placeholder="Optional: This will be prepended to all character prompts..."
+                    rows={4}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 resize-none"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This prompt will be added before every character's system prompt
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Info Box */}
           <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
             <h4 className="text-sm font-semibold text-blue-400 mb-2">💡 Tips</h4>

@@ -34,17 +34,15 @@ function getSupabase() {
 /**
  * GET /api/moderation/queue
  * Get all characters pending moderation
- * Uses the moderation_queue view which includes:
- * - Characters with moderation_status = 'pending' or 'rejected'
- * - Characters where is_public = true
- * - Report count for each character
+ * Returns community characters with moderation_status = 'pending' or 'rejected'
  * Admin only
  */
 router.get('/queue', requireAdmin, async (req, res) => {
   try {
     const { data: queue, error } = await getSupabase()
-      .from('moderation_queue')
+      .from('community_characters')
       .select('*')
+      .in('moderation_status', ['pending', 'rejected'])
       .order('published_at', { ascending: false });
 
     if (error) {
@@ -52,9 +50,16 @@ router.get('/queue', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch moderation queue' });
     }
 
+    // Add report count for each character (if needed later)
+    // For now, just return the characters
+    const queueWithReportCount = queue.map(char => ({
+      ...char,
+      report_count: 0 // TODO: Add actual report count if character_reports table exists
+    }));
+
     res.json({
-      queue: queue || [],
-      total: queue?.length || 0
+      queue: queueWithReportCount || [],
+      total: queueWithReportCount?.length || 0
     });
 
   } catch (error) {
@@ -65,40 +70,45 @@ router.get('/queue', requireAdmin, async (req, res) => {
 
 /**
  * GET /api/moderation/stats
- * Get moderation statistics
+ * Get moderation statistics for community characters
  * Admin only
  */
 router.get('/stats', requireAdmin, async (req, res) => {
   try {
-    // Get counts for different statuses
-    const { data: pendingCount } = await getSupabase()
-      .from('characters')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_public', true)
+    // Get counts for different statuses from community_characters
+    const { count: pendingCount } = await getSupabase()
+      .from('community_characters')
+      .select('*', { count: 'exact', head: true })
       .eq('moderation_status', 'pending');
 
-    const { data: approvedCount } = await supabase
-      .from('characters')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_public', true)
+    const { count: approvedCount } = await getSupabase()
+      .from('community_characters')
+      .select('*', { count: 'exact', head: true })
       .eq('moderation_status', 'approved');
 
-    const { data: rejectedCount } = await supabase
-      .from('characters')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_public', true)
+    const { count: rejectedCount } = await getSupabase()
+      .from('community_characters')
+      .select('*', { count: 'exact', head: true })
       .eq('moderation_status', 'rejected');
 
-    const { data: unresolvedReports } = await supabase
-      .from('character_reports')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending');
+    // Character reports count (table may not exist yet)
+    let unresolvedReports = 0;
+    try {
+      const { count } = await getSupabase()
+        .from('character_reports')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      unresolvedReports = count || 0;
+    } catch (error) {
+      // character_reports table doesn't exist yet
+      console.log('[Moderation] character_reports table not found (expected if not created yet)');
+    }
 
     res.json({
       pending: pendingCount || 0,
       approved: approvedCount || 0,
       rejected: rejectedCount || 0,
-      unresolvedReports: unresolvedReports || 0
+      unresolvedReports
     });
 
   } catch (error) {
@@ -243,7 +253,7 @@ router.post('/reports/:reportId/resolve', requireAdmin, async (req, res) => {
 
 /**
  * POST /api/moderation/approve/:characterId
- * Approve a character for publication
+ * Approve a community character for publication
  * Admin only
  */
 router.post('/approve/:characterId', requireAdmin, async (req, res) => {
@@ -251,14 +261,13 @@ router.post('/approve/:characterId', requireAdmin, async (req, res) => {
     const userId = req.headers['user-id'];
     const { characterId } = req.params;
 
-    // Update character moderation status to approved
+    // Update community character moderation status to approved
     const { data: character, error } = await getSupabase()
-      .from('characters')
+      .from('community_characters')
       .update({
         moderation_status: 'approved'
       })
       .eq('id', characterId)
-      .eq('is_public', true) // Only approve public characters
       .select()
       .single();
 
@@ -268,10 +277,10 @@ router.post('/approve/:characterId', requireAdmin, async (req, res) => {
     }
 
     if (!character) {
-      return res.status(404).json({ error: 'Character not found or not public' });
+      return res.status(404).json({ error: 'Community character not found' });
     }
 
-    console.log(`[Moderation] Character ${characterId} approved by admin ${userId}`);
+    console.log(`[Moderation] Community character ${characterId} approved by admin ${userId}`);
     res.json({
       message: 'Character approved successfully',
       character
@@ -285,7 +294,7 @@ router.post('/approve/:characterId', requireAdmin, async (req, res) => {
 
 /**
  * POST /api/moderation/reject/:characterId
- * Reject a character and unpublish it
+ * Reject a community character (sets to rejected status)
  * Body: { reason?: string }
  * Admin only
  */
@@ -295,12 +304,11 @@ router.post('/reject/:characterId', requireAdmin, async (req, res) => {
     const { characterId } = req.params;
     const { reason } = req.body;
 
-    // Update character: set to rejected and unpublish
+    // Update community character: set to rejected status
     const { data: character, error } = await getSupabase()
-      .from('characters')
+      .from('community_characters')
       .update({
-        moderation_status: 'rejected',
-        is_public: false
+        moderation_status: 'rejected'
       })
       .eq('id', characterId)
       .select()
@@ -312,18 +320,18 @@ router.post('/reject/:characterId', requireAdmin, async (req, res) => {
     }
 
     if (!character) {
-      return res.status(404).json({ error: 'Character not found' });
+      return res.status(404).json({ error: 'Community character not found' });
     }
 
     // Log the rejection reason if provided
     if (reason) {
-      console.log(`[Moderation] Character ${characterId} rejected by admin ${userId}. Reason: ${reason}`);
+      console.log(`[Moderation] Community character ${characterId} rejected by admin ${userId}. Reason: ${reason}`);
     } else {
-      console.log(`[Moderation] Character ${characterId} rejected by admin ${userId}`);
+      console.log(`[Moderation] Community character ${characterId} rejected by admin ${userId}`);
     }
 
     res.json({
-      message: 'Character rejected and unpublished',
+      message: 'Character rejected',
       character,
       reason: reason || 'No reason provided'
     });
@@ -340,7 +348,7 @@ router.post('/reject/:characterId', requireAdmin, async (req, res) => {
 
 /**
  * POST /api/moderation/bulk-approve
- * Approve multiple characters at once
+ * Approve multiple community characters at once
  * Body: { characterIds: string[] }
  * Admin only
  */
@@ -354,10 +362,9 @@ router.post('/bulk-approve', requireAdmin, async (req, res) => {
     }
 
     const { data: characters, error } = await getSupabase()
-      .from('characters')
+      .from('community_characters')
       .update({ moderation_status: 'approved' })
       .in('id', characterIds)
-      .eq('is_public', true)
       .select();
 
     if (error) {
@@ -365,7 +372,7 @@ router.post('/bulk-approve', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to bulk approve characters' });
     }
 
-    console.log(`[Moderation] ${characters.length} characters bulk approved by admin ${userId}`);
+    console.log(`[Moderation] ${characters.length} community characters bulk approved by admin ${userId}`);
     res.json({
       message: `${characters.length} characters approved successfully`,
       count: characters.length

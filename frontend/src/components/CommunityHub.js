@@ -16,9 +16,11 @@ import {
   Heart,
   MapPin,
   Trash2,
-  Lock
+  Lock,
+  Flag
 } from 'lucide-react';
 import CommentsSection from './CommentsSection';
+import ReportModal from './ReportModal';
 
 const CommunityHub = ({
   onImport,
@@ -27,7 +29,10 @@ const CommunityHub = ({
   userCharacters = [],
   userScenes = [],
   onUnpublishCharacter,
-  onUnpublishScene
+  onUnpublishScene,
+  fullScreen = false,
+  onImportCharacter,
+  onImportScene
 }) => {
   // ============================================================================
   // STATE MANAGEMENT
@@ -49,6 +54,8 @@ const CommunityHub = ({
   const [likedCharacters, setLikedCharacters] = useState(new Set());
   const [likingCharacter, setLikingCharacter] = useState(null);
   const [unpublishing, setUnpublishing] = useState(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportingCharacter, setReportingCharacter] = useState(null);
   const LIMIT = 20;
 
   // ============================================================================
@@ -173,18 +180,23 @@ const CommunityHub = ({
     setImporting(character.id);
 
     try {
-      const response = await apiRequest(`/api/community/characters/${character.id}/import`, {
-        method: 'POST'
-      });
-
       // Track view
       await apiRequest(`/api/community/characters/${character.id}/view`, {
         method: 'POST'
       });
 
-      // Call parent's onImport callback
-      if (onImport) {
+      // Use new prop if available, otherwise use old pattern
+      if (onImportCharacter) {
+        await onImportCharacter(character);
+      } else if (onImport) {
+        const response = await apiRequest(`/api/community/characters/${character.id}/import`, {
+          method: 'POST'
+        });
         await onImport(response);
+      } else {
+        await apiRequest(`/api/community/characters/${character.id}/import`, {
+          method: 'POST'
+        });
       }
 
       // Show success feedback
@@ -249,18 +261,23 @@ const CommunityHub = ({
     setImporting(scene.id);
 
     try {
-      const response = await apiRequest(`/api/community/scenes/${scene.id}/import`, {
-        method: 'POST'
-      });
-
       // Track view
       await apiRequest(`/api/community/scenes/${scene.id}/view`, {
         method: 'POST'
       });
 
-      // Call parent's onImport callback
-      if (onImport) {
+      // Use new prop if available, otherwise use old pattern
+      if (onImportScene) {
+        await onImportScene(scene);
+      } else if (onImport) {
+        const response = await apiRequest(`/api/community/scenes/${scene.id}/import`, {
+          method: 'POST'
+        });
         await onImport(response);
+      } else {
+        await apiRequest(`/api/community/scenes/${scene.id}/import`, {
+          method: 'POST'
+        });
       }
 
       // Show success feedback
@@ -271,6 +288,23 @@ const CommunityHub = ({
       alert('Failed to import scene. Please try again.');
     } finally {
       setImporting(null);
+    }
+  };
+
+  const handleReport = async ({ characterId, reason, details }) => {
+    try {
+      await apiRequest(`/api/community/characters/${characterId}/report`, {
+        method: 'POST',
+        body: JSON.stringify({
+          reason,
+          details
+        })
+      });
+
+      alert('Report submitted successfully. Our moderation team will review it shortly.');
+    } catch (error) {
+      console.error('Failed to submit report:', error);
+      throw new Error(error.message || 'Failed to submit report');
     }
   };
 
@@ -404,7 +438,7 @@ const CommunityHub = ({
         )}
 
         {/* Stats and Actions */}
-        <div className="flex items-center justify-between text-xs text-gray-400">
+        <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
               <Eye size={12} />
@@ -430,6 +464,23 @@ const CommunityHub = ({
               <span>{character.favorite_count || 0}</span>
             </button>
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          {!isUserOwnedCharacter(character) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setReportingCharacter(character);
+                setReportModalOpen(true);
+              }}
+              className="flex items-center gap-1 text-gray-400 hover:text-orange-400 px-2 py-1 rounded transition-colors text-xs border border-white/10 hover:border-orange-400/30"
+            >
+              <Flag size={12} />
+              <span>Report</span>
+            </button>
+          )}
 
           {isUserOwnedCharacter(character) ? (
             <button
@@ -865,9 +916,17 @@ const CommunityHub = ({
   // MAIN RENDER
   // ============================================================================
 
+  const containerClass = fullScreen
+    ? "flex-1 bg-gray-900 flex flex-col overflow-hidden"
+    : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4";
+
+  const innerClass = fullScreen
+    ? "flex-1 flex flex-col overflow-hidden"
+    : "bg-slate-800 rounded-2xl border border-white/10 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col";
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-2xl border border-white/10 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className={containerClass}>
+      <div className={innerClass}>
         {/* Header */}
         <div className="border-b border-white/10">
           <div className="flex items-center justify-between p-6">
@@ -878,12 +937,14 @@ const CommunityHub = ({
                 <p className="text-sm text-gray-400">Browse and import shared content</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              <X size={20} />
-            </button>
+            {!fullScreen && (
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            )}
           </div>
 
           {/* Tabs */}
@@ -1058,6 +1119,17 @@ const CommunityHub = ({
       {/* Detail Modals */}
       {selectedCharacter && renderCharacterDetail()}
       {selectedScene && renderSceneDetail()}
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={reportModalOpen}
+        onClose={() => {
+          setReportModalOpen(false);
+          setReportingCharacter(null);
+        }}
+        character={reportingCharacter}
+        onSubmit={handleReport}
+      />
     </div>
   );
 };
