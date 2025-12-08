@@ -182,27 +182,78 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     }
     
     // ========================================================================
-    // STEP 4: LOAD BOT-TO-BOT RELATIONSHIPS
+    // STEP 4: LOAD RELATIONSHIPS, MEMORIES & LEARNING DATA
     // ========================================================================
 
-    // Load relationships for all responding characters
+    // Load character-to-character relationships for all responding characters
     const characterRelationshipsMap = new Map();
+    // Load character-to-user relationships for all responding characters
+    const userRelationshipsMap = new Map();
+    // Load character memories for all responding characters
+    const characterMemoriesMap = new Map();
+    // Load learning data for all responding characters
+    const characterLearningMap = new Map();
 
     for (const char of respondingCharacters) {
       try {
-        const { data: relationships } = await supabase
+        // Load all relationships (both character and persona targets)
+        const { data: allRelationships } = await supabase
           .from('character_relationships')
           .select('*')
           .eq('character_id', char.id)
-          .eq('user_id', userId)
-          .eq('target_type', 'character');
+          .eq('user_id', userId);
 
-        if (relationships) {
-          characterRelationshipsMap.set(char.id, relationships);
+        // Separate bot-to-bot relationships (target_type = 'character')
+        const botRelationships = allRelationships?.filter(r => r.target_type === 'character') || [];
+        characterRelationshipsMap.set(char.id, botRelationships);
+
+        // Get bot-to-user relationship (target_type = 'user' and target_id = userId)
+        const userRelationship = allRelationships?.find(r =>
+          r.target_type === 'user' && r.target_id === userId
+        );
+
+        if (userRelationship) {
+          userRelationshipsMap.set(char.id, userRelationship);
+        } else {
+          // Default relationship if none exists
+          userRelationshipsMap.set(char.id, {
+            relationship_type: 'acquaintance',
+            trust_level: 0.5,
+            familiarity_level: 0.1,
+            emotional_bond: 0.0,
+            interaction_count: 0
+          });
         }
+
+        // Load character memories (top 10 most important)
+        if (char.memory_enabled !== false) {
+          const memories = await memoryService.getCharacterMemories(char.id, userId, 10);
+          characterMemoriesMap.set(char.id, memories || []);
+        } else {
+          characterMemoriesMap.set(char.id, []);
+        }
+
+        // Load learning data (topics discussed)
+        try {
+          const learningData = await learningService.getCharacterLearning(userId, char.id);
+          characterLearningMap.set(char.id, learningData || null);
+        } catch (err) {
+          console.error(`[Learning] Error loading for ${char.name}:`, err);
+          characterLearningMap.set(char.id, null);
+        }
+
       } catch (error) {
         console.error(`[Relationships] Error loading for ${char.name}:`, error);
         characterRelationshipsMap.set(char.id, []);
+        userRelationshipsMap.set(char.id, {
+          relationship_type: 'acquaintance',
+          trust_level: 0.5,
+          familiarity_level: 0.1,
+          emotional_bond: 0.0,
+          interaction_count: 0
+        });
+        characterMemoriesMap.set(char.id, []);
+        characterLearningMap.set(char.id, null);
       }
     }
 
@@ -239,10 +290,13 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         // Get other characters in the chat (excluding current character)
         const otherCharacters = characters.filter(c => c.id !== char.id);
 
-        // Get this character's relationships
+        // Get this character's data
         const characterRelationships = characterRelationshipsMap.get(char.id) || [];
+        const userRelationship = userRelationshipsMap.get(char.id);
+        const memories = characterMemoriesMap.get(char.id) || [];
+        const learningData = characterLearningMap.get(char.id);
 
-        const systemPrompt = buildSystemPrompt(char, userPersona, currentScene, otherCharacters, characterRelationships);
+        const systemPrompt = buildSystemPrompt(char, userPersona, currentScene, otherCharacters, characterRelationships, userRelationship, memories, learningData);
         const messages = buildConversationMessages(systemPrompt, updatedHistory, isPrimary ? userMessage : null);
 
         console.log(`[Response] Generating for ${char.name}...`);
@@ -363,14 +417,94 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 // HELPER FUNCTIONS
 // ============================================================================
 
-function buildSystemPrompt(character, userPersona, currentScene, otherCharacters, characterRelationships) {
+function buildSystemPrompt(character, userPersona, currentScene, otherCharacters, characterRelationships, userRelationship, memories, learningData) {
   let prompt = `You are ${character.name}.\n\n`;
   prompt += `PERSONALITY & BACKGROUND:\n${character.personality}\n\n`;
+
+  // Add user relationship context
+  if (userRelationship) {
+    const userName = userPersona?.name || 'the user';
+    prompt += `YOUR RELATIONSHIP WITH ${userName.toUpperCase()}:\n`;
+
+    // Describe relationship type
+    prompt += `- Relationship: ${userRelationship.relationship_type}\n`;
+
+    // Describe familiarity level
+    const familiarity = userRelationship.familiarity_level || 0.1;
+    if (familiarity < 0.3) {
+      prompt += `- You just met them recently and don't know them well yet\n`;
+    } else if (familiarity < 0.6) {
+      prompt += `- You know them somewhat and have talked a few times\n`;
+    } else if (familiarity < 0.8) {
+      prompt += `- You know them fairly well from multiple conversations\n`;
+    } else {
+      prompt += `- You know them very well and have had many deep conversations\n`;
+    }
+
+    // Describe trust level
+    const trust = userRelationship.trust_level || 0.5;
+    if (trust < 0.3) {
+      prompt += `- You're wary and don't fully trust them\n`;
+    } else if (trust < 0.7) {
+      prompt += `- You have a neutral level of trust\n`;
+    } else {
+      prompt += `- You trust them and feel comfortable around them\n`;
+    }
+
+    // Describe emotional bond
+    const bond = userRelationship.emotional_bond || 0.0;
+    if (bond > 0.5) {
+      prompt += `- You have a strong positive emotional connection with them\n`;
+    } else if (bond > 0.2) {
+      prompt += `- You feel positively toward them\n`;
+    } else if (bond < -0.3) {
+      prompt += `- You have some tension or negative feelings toward them\n`;
+    } else if (bond < -0.1) {
+      prompt += `- You feel slightly annoyed or bothered by them\n`;
+    }
+
+    // Add interaction history context
+    if (userRelationship.interaction_count > 0) {
+      prompt += `- You've talked ${userRelationship.interaction_count} time(s) before\n`;
+    }
+
+    prompt += `\n`;
+  }
+
+  // Add character memories
+  if (memories && memories.length > 0) {
+    const userName = userPersona?.name || 'the user';
+    prompt += `WHAT YOU REMEMBER ABOUT ${userName.toUpperCase()}:\n`;
+
+    // Sort by importance and take top memories
+    const sortedMemories = [...memories]
+      .sort((a, b) => (b.importance_score || 0) - (a.importance_score || 0))
+      .slice(0, 8);
+
+    for (const memory of sortedMemories) {
+      prompt += `- ${memory.memory_content}\n`;
+    }
+
+    prompt += `\n`;
+  }
+
+  // Add learning data (topics discussed)
+  if (learningData && learningData.topics_discussed && learningData.topics_discussed.length > 0) {
+    prompt += `TOPICS YOU'VE DISCUSSED TOGETHER:\n`;
+
+    // Sort by count and show top topics
+    const topTopics = [...learningData.topics_discussed]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const topicsList = topTopics.map(t => t.topic).join(', ');
+    prompt += `${topicsList}\n\n`;
+  }
 
   if (userPersona) {
     const personaDescription = userPersona.personality || userPersona.description || '';
     const personaName = userPersona.name || 'the user';
-    prompt += `USER PERSONA:\nYou are talking to ${personaName}. ${personaDescription}\n\n`;
+    prompt += `ABOUT ${personaName.toUpperCase()}:\n${personaDescription}\n\n`;
   }
 
   if (currentScene) {
@@ -379,7 +513,7 @@ function buildSystemPrompt(character, userPersona, currentScene, otherCharacters
 
   // Add bot-to-bot relationship context
   if (otherCharacters && otherCharacters.length > 0 && characterRelationships && characterRelationships.length > 0) {
-    prompt += `YOUR RELATIONSHIPS WITH OTHERS IN THIS CHAT:\n`;
+    prompt += `YOUR RELATIONSHIPS WITH OTHER CHARACTERS:\n`;
 
     for (const otherChar of otherCharacters) {
       const relationship = characterRelationships.find(rel =>
@@ -409,11 +543,13 @@ function buildSystemPrompt(character, userPersona, currentScene, otherCharacters
 
   prompt += `IMPORTANT INSTRUCTIONS:
 - Stay in character at all times
-- Respond naturally and conversationally
+- Use your memories and knowledge of them to respond authentically
+- Respond naturally and conversationally based on your relationship
 - Keep responses concise (2-4 sentences typical)
 - Use actions in *asterisks* to show body language or emotions
 - Don't break the fourth wall or mention being an AI
-- React authentically to what others say`;
+- Reference past conversations naturally when relevant
+- React based on how well you know them and how you feel about them`;
 
   return prompt;
 }

@@ -949,6 +949,36 @@ const CharacterEditorV15 = ({
                 <span>Long (500)</span>
               </div>
             </div>
+
+            {/* Memory Toggle */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-300">
+                  Character Memory
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleInputChange('memory_enabled', !formData.memory_enabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    formData.memory_enabled ? 'bg-red-500' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.memory_enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">
+                When enabled, this character will remember facts about you, past conversations, and build an evolving relationship over time. When disabled, each conversation starts fresh with no memory of previous interactions.
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Status: <span className={formData.memory_enabled ? 'text-green-400' : 'text-gray-400'}>
+                  {formData.memory_enabled ? 'Memory Active - Character will remember your conversations' : 'Memory Disabled - Each chat starts fresh'}
+                </span>
+              </p>
+            </div>
           </div>
         </div>
         

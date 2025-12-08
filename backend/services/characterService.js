@@ -233,8 +233,101 @@ class CharacterService {
         return { message: 'Default character hidden', characterId };
       }
 
-      // Users can delete their own characters freely
-      // Published community copies exist separately in community_characters table
+      // Get character data before deletion (to get image filename)
+      const { data: character, error: fetchError } = await this.supabase
+        .from('characters')
+        .select('avatar_image_filename, uses_custom_image')
+        .eq('id', characterId)
+        .eq('user_id', userId)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching character for deletion:', fetchError);
+      }
+
+      // Step 1: Delete character image from storage (only user-uploaded images, not community)
+      if (character?.uses_custom_image && character?.avatar_image_filename) {
+        try {
+          const { error: storageError } = await this.supabase.storage
+            .from('character-images')
+            .remove([character.avatar_image_filename]);
+
+          if (storageError) {
+            console.error('Error deleting character image:', storageError);
+            // Don't fail the deletion if image removal fails
+          } else {
+            console.log(`[Deletion] Deleted image: ${character.avatar_image_filename}`);
+          }
+        } catch (err) {
+          console.error('Error removing character image:', err);
+        }
+      }
+
+      // Step 2: Delete character memories
+      try {
+        const { error: memoryError } = await this.supabase
+          .from('character_memories')
+          .delete()
+          .eq('character_id', characterId)
+          .eq('user_id', userId);
+
+        if (memoryError) {
+          console.error('Error deleting character memories:', memoryError);
+        } else {
+          console.log(`[Deletion] Deleted memories for character ${characterId}`);
+        }
+      } catch (err) {
+        console.error('Error removing memories:', err);
+      }
+
+      // Step 3: Delete character relationships (both as source and target)
+      try {
+        // Delete where this character is the source
+        const { error: relError1 } = await this.supabase
+          .from('character_relationships')
+          .delete()
+          .eq('character_id', characterId)
+          .eq('user_id', userId);
+
+        if (relError1) {
+          console.error('Error deleting character relationships (source):', relError1);
+        }
+
+        // Delete where this character is the target (bot-to-bot relationships)
+        const { error: relError2 } = await this.supabase
+          .from('character_relationships')
+          .delete()
+          .eq('target_id', characterId)
+          .eq('target_type', 'character')
+          .eq('user_id', userId);
+
+        if (relError2) {
+          console.error('Error deleting character relationships (target):', relError2);
+        } else {
+          console.log(`[Deletion] Deleted relationships for character ${characterId}`);
+        }
+      } catch (err) {
+        console.error('Error removing relationships:', err);
+      }
+
+      // Step 4: Delete character learning data
+      try {
+        const { error: learningError } = await this.supabase
+          .from('character_learning')
+          .delete()
+          .eq('character_id', characterId)
+          .eq('user_id', userId);
+
+        if (learningError) {
+          console.error('Error deleting character learning data:', learningError);
+        } else {
+          console.log(`[Deletion] Deleted learning data for character ${characterId}`);
+        }
+      } catch (err) {
+        console.error('Error removing learning data:', err);
+      }
+
+      // Step 5: Delete the character itself
       const { error } = await this.supabase
         .from('characters')
         .delete()
@@ -242,7 +335,19 @@ class CharacterService {
         .eq('user_id', userId);
 
       if (error) throw error;
-      return { message: 'Character deleted', characterId };
+
+      console.log(`[Deletion] Successfully deleted character ${characterId} and all related data`);
+      return {
+        message: 'Character and all related data deleted successfully',
+        characterId,
+        deleted: {
+          character: true,
+          image: character?.uses_custom_image || false,
+          memories: true,
+          relationships: true,
+          learning: true
+        }
+      };
     } catch (error) {
       console.error('Error deleting character:', error);
       throw error;

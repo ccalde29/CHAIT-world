@@ -14,7 +14,8 @@
       "Bash(find:*)",
       "Bash(sqlite3:*)",
       "Bash(ls:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []

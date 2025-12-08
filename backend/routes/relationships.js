@@ -222,32 +222,34 @@ router.post('/:characterId/relationships', async (req, res) => {
 });
 
 /**
- * DELETE /api/characters/:characterId/relationships/:targetCharacterId
- * Delete a bot-to-bot relationship
+ * DELETE /api/characters/:characterId/relationships/:targetId
+ * Delete a relationship (bot-to-bot or bot-to-user)
  */
-router.delete('/:characterId/relationships/:targetCharacterId', async (req, res) => {
+router.delete('/:characterId/relationships/:targetId', async (req, res) => {
   try {
     const userId = req.headers['user-id'];
-    const { characterId, targetCharacterId } = req.params;
+    const { characterId, targetId } = req.params;
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Delete relationship (works for both character and persona targets)
+    // The unique constraint is on (character_id, user_id, target_type, target_id)
+    // So we just need to match character_id, user_id, and target_id
     const { error } = await supabase
       .from('character_relationships')
       .delete()
       .eq('character_id', characterId)
       .eq('user_id', userId)
-      .eq('target_type', 'character')
-      .eq('target_id', targetCharacterId);
+      .eq('target_id', targetId);
 
     if (error) {
       console.error('[Relationships] Error deleting relationship:', error);
       return res.status(500).json({ error: 'Failed to delete relationship' });
     }
 
-    console.log(`[Relationships] Deleted relationship: ${characterId} → ${targetCharacterId}`);
+    console.log(`[Relationships] Deleted relationship: ${characterId} → ${targetId}`);
 
     res.json({ success: true, message: 'Relationship deleted successfully' });
 
