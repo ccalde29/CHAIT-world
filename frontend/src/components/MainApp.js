@@ -393,7 +393,7 @@ const MainApp = () => {
                   title="Moderation Panel"
                 >
                   <Shield size={18} />
-                  Moderation
+                  Admin
                 </button>
               )}
             </div>

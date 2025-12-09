@@ -172,7 +172,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
         <div className="flex items-center gap-3">
           <Shield className="text-purple-400" size={24} />
           <div>
-            <h2 className="text-xl font-bold text-white">Moderation Panel</h2>
+            <h2 className="text-xl font-bold text-white">Admin Panel</h2>
             <p className="text-sm text-gray-400">Review and moderate community content</p>
           </div>
         </div>

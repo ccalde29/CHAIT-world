@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Users, MapPin, Plus, Edit, Trash2, Eye, Search, X, Upload } from 'lucide-react';
+import { Users, MapPin, Plus, Edit, Trash2, Eye, Search, X, Upload, LayoutGrid } from 'lucide-react';
 import PublishModal from './PublishModal';
 
 const CharacterSceneHub = ({
@@ -43,7 +43,13 @@ const CharacterSceneHub = ({
     <div className={containerClass}>
       {/* Header */}
       <div className="p-4 border-b border-white/10">
-        <h2 className="text-lg font-bold text-white mb-3">Management Hub</h2>
+        <div className="flex items-center gap-3 mb-4">
+          <LayoutGrid className="text-purple-400" size={24} />
+          <div>
+            <h2 className="text-xl font-bold text-white">Management Hub</h2>
+            <p className="text-sm text-gray-400">Manage your characters and scenes</p>
+          </div>
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-4">
@@ -99,13 +105,15 @@ const CharacterSceneHub = ({
         {activeTab === 'characters' && (
           <div className="p-4">
             {/* Add Character Button */}
-            <button
-              onClick={onAddCharacter}
-              className="w-full flex items-center gap-2 justify-center bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-3 rounded-lg transition-all font-medium mb-4"
-            >
-              <Plus size={18} />
-              Create New Character
-            </button>
+            <div className="flex justify-center mb-4">
+              <button
+                onClick={onAddCharacter}
+                className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-2.5 rounded-lg transition-all font-medium text-sm"
+              >
+                <Plus size={16} />
+                Create New Character
+              </button>
+            </div>
 
             {/* Character Grid */}
             {filteredCharacters.length === 0 ? (
@@ -216,13 +224,15 @@ const CharacterSceneHub = ({
         {activeTab === 'scenes' && (
           <div className="p-4 space-y-2">
             {/* Add Scene Button */}
-            <button
-              onClick={onAddScene}
-              className="w-full flex items-center gap-2 justify-center bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-3 rounded-lg transition-all font-medium"
-            >
-              <Plus size={18} />
-              Create New Scene
-            </button>
+            <div className="flex justify-center mb-2">
+              <button
+                onClick={onAddScene}
+                className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white px-4 py-2.5 rounded-lg transition-all font-medium text-sm"
+              >
+                <Plus size={16} />
+                Create New Scene
+              </button>
+            </div>
 
             {/* Scene Grid */}
             {filteredScenes.length === 0 ? (

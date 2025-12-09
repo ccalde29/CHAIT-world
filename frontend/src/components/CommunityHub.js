@@ -525,72 +525,70 @@ const CommunityHub = ({
   const renderSceneCard = (scene) => (
     <div
       key={scene.id}
-      className="bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 transition-all cursor-pointer"
+      className="relative bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:bg-white/10 hover:border-purple-400/30 transition-all cursor-pointer group"
       onClick={() => setSelectedScene(scene)}
     >
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex items-start gap-3 mb-3">
-          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-cyan-500">
-            <MapPin size={24} className="text-white" />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <h3 className="text-white font-medium mb-1">
-              {scene.name}
-            </h3>
-            <p className="text-xs text-gray-300 line-clamp-2">
-              {scene.description}
-            </p>
-          </div>
-        </div>
-
-        {/* Initial Message Preview */}
-        {scene.initial_message && (
-          <div className="bg-white/5 rounded-lg p-2 mb-3 border border-white/5">
-            <p className="text-xs text-gray-400 line-clamp-2 italic">
-              "{scene.initial_message}"
-            </p>
-          </div>
+      {/* Scene Background Image Header */}
+      <div className="relative h-32 flex items-center justify-center bg-gradient-to-br from-purple-700 to-blue-800">
+        {scene.background_image_url && scene.uses_custom_background ? (
+          <img
+            src={scene.background_image_url}
+            alt={scene.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <MapPin size={40} className="text-white/30" />
         )}
+      </div>
+
+      {/* Scene Info */}
+      <div className="p-3">
+        <p className="font-bold text-white text-center mb-1 truncate">
+          {scene.name}
+        </p>
+
+        <p className="text-xs text-gray-400 text-center mb-2 line-clamp-2">
+          {scene.description}
+        </p>
 
         {/* Atmosphere Badge */}
         {scene.atmosphere && (
-          <div className="mb-3">
+          <div className="mb-3 text-center">
             <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
               {scene.atmosphere}
             </span>
           </div>
         )}
 
-        {/* Stats and Actions */}
-        <div className="flex items-center justify-between text-xs text-gray-400">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <Eye size={12} />
-              <span>{scene.view_count || 0}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Download size={12} />
-              <span>{scene.import_count || 0}</span>
-            </div>
+        {/* Stats */}
+        <div className="flex items-center justify-center gap-3 text-xs text-gray-400 mb-3">
+          <div className="flex items-center gap-1">
+            <Eye size={12} />
+            <span>{scene.view_count || 0}</span>
           </div>
+          <div className="flex items-center gap-1">
+            <Download size={12} />
+            <span>{scene.import_count || 0}</span>
+          </div>
+        </div>
 
+        {/* Action Buttons */}
+        <div className="flex items-center justify-center gap-1 flex-wrap">
           {isUserOwnedScene(scene) ? (
             <button
               onClick={(e) => handleUnpublishScene(scene, e)}
               disabled={unpublishing === scene.id}
-              className="flex items-center gap-1 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
+              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 px-2 py-1 hover:bg-white/5 rounded transition-colors disabled:opacity-50"
             >
               {unpublishing === scene.id ? (
                 <>
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                  <span>Unpublishing...</span>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-400"></div>
+                  Unpublishing...
                 </>
               ) : (
                 <>
                   <Trash2 size={12} />
-                  <span>Unpublish</span>
+                  Unpublish
                 </>
               )}
             </button>
@@ -601,17 +599,17 @@ const CommunityHub = ({
                 handleImportScene(scene);
               }}
               disabled={importing === scene.id}
-              className="flex items-center gap-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white px-3 py-1 rounded transition-colors"
+              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 px-2 py-1 hover:bg-white/5 rounded transition-colors disabled:opacity-50"
             >
               {importing === scene.id ? (
                 <>
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                  <span>Importing...</span>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400"></div>
+                  Importing...
                 </>
               ) : (
                 <>
                   <Download size={12} />
-                  <span>Import</span>
+                  Import
                 </>
               )}
             </button>
@@ -1052,7 +1050,7 @@ const CommunityHub = ({
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {characters.map(renderCharacterCard)}
                   </div>
 
@@ -1088,7 +1086,7 @@ const CommunityHub = ({
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {scenes.map(renderSceneCard)}
                   </div>
 
