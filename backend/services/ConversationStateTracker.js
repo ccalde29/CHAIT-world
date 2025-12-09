@@ -92,6 +92,11 @@ class ConversationStateTracker {
    * Track who has been speaking
    */
   updateSpeakingTurns(character) {
+    // Skip if no character provided (e.g., user messages)
+    if (!character) {
+      return;
+    }
+    
     this.state.speaking_turns.push({
       character_id: character.id,
       character_name: character.name,
