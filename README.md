@@ -4,9 +4,8 @@
 
 A powerful multi-character AI chat application that enables rich, dynamic conversations with multiple AI personalities simultaneously. Create custom characters, build immersive scenes, and watch as your characters interact with each other and remember your conversations over time.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
-![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
+![Status](https://img.shields.io/badge/app-private-green.svg)
+![Release](https://img.shields.io/badge/deployment-web-blue.svg)
 
 ---
 
@@ -71,99 +70,17 @@ A powerful multi-character AI chat application that enables rich, dynamic conver
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Overview
 
-### Prerequisites
+This is a private web application intended for hosted deployment. Installation and local setup instructions are intentionally omitted. Use the sections below to understand capabilities, authoring workflows, and architecture.
 
-- **Node.js** v18.0.0 or higher
-- **npm** or **yarn**
-- **Supabase Account** (free tier works perfectly)
-- **AI Provider API Key** - At least one of:
-  - OpenAI API Key (GPT models)
-  - Anthropic API Key (Claude models)
-  - OpenRouter API Key
-  - Google Gemini API Key
-  - Local Ollama installation (free)
+### Authoring Guides
 
-### Installation
+- Creating Content:
+  - `docs/creation_guide.md` — How to create Characters, Scenes, and Personas with the exact fields used by the app and where AI models are injected.
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/ccalde29/CHAIT-world.git
-   cd CHAIT-world
-   ```
-
-2. **Install backend dependencies**
-   ```bash
-   cd backend
-   npm install
-   ```
-
-3. **Install frontend dependencies**
-   ```bash
-   cd ../frontend
-   npm install
-   ```
-
-4. **Set up Supabase**
-   - Create a new project at [supabase.com](https://supabase.com)
-   - Go to **Settings → API** to get your:
-     - Project URL
-     - Anon/Public key
-     - Service Role key (for backend)
-   - Go to **Authentication → Providers** and enable **Google OAuth**
-
-5. **Configure environment variables**
-
-   **Backend** (`backend/.env`):
-   ```env
-   NODE_ENV=development
-   PORT=3001
-
-   # Supabase Configuration
-   SUPABASE_URL=your_supabase_project_url
-   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-
-   # CORS Configuration
-   ALLOWED_ORIGINS=http://localhost:3000
-
-   # Encryption Key (generate a random 64-character hex string)
-   ENCRYPTION_KEY=your_random_encryption_key_here
-   ```
-
-   **Frontend** (`frontend/.env`):
-   ```env
-   REACT_APP_API_URL=http://localhost:3001
-   REACT_APP_SUPABASE_URL=your_supabase_project_url
-   REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-
-6. **Set up the database**
-   - The database schema will be created automatically on first run
-   - Or use Supabase CLI:
-     ```bash
-     supabase db push
-     ```
-
-7. **Start the application**
-
-   **Terminal 1 - Backend:**
-   ```bash
-   cd backend
-   npm run dev
-   ```
-
-   **Terminal 2 - Frontend:**
-   ```bash
-   cd frontend
-   npm start
-   ```
-
-8. **Open your browser**
-   - Navigate to `http://localhost:3000`
-   - Sign in with Google
-   - Configure your AI provider API keys in **Settings**
-   - Start chatting!
+- Custom Models:
+  - `docs/custom_models_guide.md` — How to define admin-managed custom model presets that route via OpenRouter and add a custom system prompt layer.
 
 ---
 
@@ -284,11 +201,12 @@ A powerful multi-character AI chat application that enables rich, dynamic conver
 - Efficient indexing for queries
 
 **AI Providers:**
-- OpenAI (GPT-3.5, GPT-4, GPT-4 Turbo)
-- Anthropic (Claude 3 Opus, Sonnet, Haiku)
-- OpenRouter (Multiple models)
-- Google Gemini
+- OpenAI (GPT-4o, GPT-4o Mini, GPT-3.5, etc.)
+- Anthropic (Claude 3.5 Sonnet/Haiku, 3 Opus, etc.)
+- OpenRouter (Gateway to 100+ models)
+- Google Gemini (2.5/2.0 variants)
 - Ollama (Local models)
+- LM Studio (Local GGUF via OpenAI-compatible API)
 
 ### Project Structure
 
@@ -356,7 +274,8 @@ CHAIT-world/
 │   │   ├── memory.js               # Memory routes
 │   │   ├── user.js                 # User settings routes
 │   │   ├── images.js               # Image upload routes
-│   │   ├── providers.js            # AI provider info
+│   │   ├── providers.js            # AI provider info & model lists
+│   │   ├── custom-models.js        # Admin custom model presets
 │   │   ├── characterLearning.js    # Learning analytics
 │   │   ├── characterComments.js    # Character comments
 │   │   └── sceneComments.js        # Scene comments
@@ -390,6 +309,7 @@ CHAIT-world/
 - **`character_memories`** - Facts and experiences characters remember about users
 - **`character_relationships`** - Relationships between characters, and between users and characters
 - **`character_learning`** - Automatic tracking of interactions, topics, and learning patterns
+ - **`custom_models`** - Admin-defined custom model presets (OpenRouter model id + custom system prompt + defaults)
 
 ### Community Tables
 
@@ -408,7 +328,13 @@ CHAIT-world/
 
 ---
 
-## 🔑 API Endpoints
+## 🔌 Key Runtime Concepts
+
+- **Layered Prompts**: `PromptBuilder` composes system prompts per character from personality, scene, persona, relationships, and relevant memories.
+- **Response Planning**: `ResponsePlanner` selects responders and builds per-character context (primary vs. secondary turns).
+- **Provider Adaptation**: `ProviderAdapter` formats prompts/messages per provider and calculates dynamic temperature/token budgets.
+- **Memory & Relationships**: `MemoryService` and `MemoryRelevanceService` extract/store memories; relationship metrics update over time.
+- **Session Continuity**: `SessionContinuityService` tracks tone and topics for coherent sessions.
 
 ### Authentication
 All endpoints require authentication via the `user-id` header (from Google OAuth).
@@ -471,7 +397,7 @@ All endpoints require authentication via the `user-id` header (from Google OAuth
 - `DELETE /api/learning/characters/:characterId` - Clear learning data
 
 ### AI Providers
-- `GET /api/providers/available` - Get available AI providers and models
+- `POST /api/providers/models` - Get model lists for a provider (supports `custom`)
 - `POST /api/providers/test` - Test API key for a provider
 
 ### Images
@@ -482,7 +408,24 @@ All endpoints require authentication via the `user-id` header (from Google OAuth
 
 ---
 
-## ⚙️ Configuration
+## 📎 References
+
+- Backend:
+   - `backend/routes/group-chat.js`
+   - `backend/services/AIProviderService.js`
+   - `backend/services/PromptBuilder.js`
+   - `backend/services/ProviderAdapter.js`
+   - `backend/services/ResponsePlanner.js`
+   - `backend/services/MemoryService.js`
+   - `backend/services/MemoryRelevanceService.js`
+   - `backend/services/SessionContinuityService.js`
+   - `backend/routes/custom-models.js`
+   - `backend/routes/providers.js`
+- Frontend:
+   - `frontend/src/components/CharacterEditor.js`
+   - `frontend/src/components/SceneEditor.js`
+   - `frontend/src/components/PersonaManager.js`
+   - `frontend/src/components/ChatInterface.js`
 
 ### AI Provider Settings
 
