@@ -1,6 +1,6 @@
 // ============================================================================
-// CHAIT World - Simplified Group Chat Endpoint (v2.0)
-// Streamlined response generation with core decision logic
+// CHAIT World - Enhanced Group Chat Endpoint (v3.0)
+// Layered prompts, multi-character planning, and consistency improvements
 // ============================================================================
 
 const express = require('express');
@@ -13,10 +13,24 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+// Core services
 const MemoryService = require('../services/MemoryService');
 const CharacterLearningService = require('../services/CharacterLearningService');
+
+// New consistency services
+const PromptBuilder = require('../services/PromptBuilder');
+const ProviderAdapter = require('../services/ProviderAdapter');
+const ConversationStateTracker = require('../services/ConversationStateTracker');
+const ResponsePlanner = require('../services/ResponsePlanner');
+const MemoryRelevanceService = require('../services/MemoryRelevanceService');
+const SessionContinuityService = require('../services/SessionContinuityService');
+
 const memoryService = new MemoryService(supabase);
 const learningService = new CharacterLearningService(supabase);
+const promptBuilder = new PromptBuilder();
+const conversationTracker = new ConversationStateTracker();
+const sessionContinuity = new SessionContinuityService(supabase);
 
 /**
  * POST /api/chat/group-response
@@ -112,177 +126,163 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     }
     
     // ========================================================================
-    // STEP 2: LOAD USER SETTINGS (API KEYS + ADMIN PROMPT)
+    // STEP 2: LOAD USER SETTINGS & SCENE DATA
     // ========================================================================
 
-      const { data: userSettings, error: settingsError } = await supabase
-        .from('user_settings')
-        .select('api_keys, ollama_settings, admin_system_prompt')
-        .eq('user_id', userId)
+    const { data: userSettings, error: settingsError } = await supabase
+      .from('user_settings')
+      .select('api_keys, ollama_settings, admin_system_prompt')
+      .eq('user_id', userId)
+      .single();
+
+    const apiKeys = userSettings?.api_keys || {
+      openai: null,
+      anthropic: null,
+      openrouter: null,
+      google: null
+    };
+
+    const ollamaSettings = userSettings?.ollama_settings || {
+      baseUrl: 'http://localhost:11434'
+    };
+
+    const adminSystemPrompt = userSettings?.admin_system_prompt || null;
+
+    // Load scene data with context rules
+    let sceneData = null;
+    if (currentScene) {
+      const { data: scene } = await supabase
+        .from('scenarios')
+        .select('*')
+        .eq('id', currentScene)
         .single();
+      sceneData = scene;
+    }
 
-      // api_keys is already a JSONB object, no need to parse
-      const apiKeys = userSettings?.api_keys || {
-        openai: null,
-        anthropic: null,
-        openrouter: null,
-        google: null
-      };
-
-      const ollamaSettings = userSettings?.ollama_settings || {
-        baseUrl: 'http://localhost:11434'
-      };
-
-      const adminSystemPrompt = userSettings?.admin_system_prompt || null;
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Settings] Loaded settings for user:', userId);
-        console.log('[Settings] Has OpenAI key:', !!apiKeys.openai);
-        console.log('[Settings] Has Anthropic key:', !!apiKeys.anthropic);
-        console.log('[Settings] Has OpenRouter key:', !!apiKeys.openrouter);
-        console.log('[Settings] Has Google key:', !!apiKeys.google);
-        console.log('[Settings] Has admin system prompt:', !!adminSystemPrompt);
-        // NEVER LOG: console.log('[Settings] API Keys:', apiKeys); // DANGEROUS!
-      }
     // ========================================================================
-    // STEP 3: DETERMINE WHO SHOULD RESPOND (SIMPLIFIED LOGIC)
+    // STEP 3: ANALYZE CONTEXT & PLAN RESPONSES
     // ========================================================================
 
-    // Get recent speaker history (last 3 messages)
-    const recentSpeakers = conversationHistory
-      .slice(-3)
-      .filter(m => m.type === 'character')
-      .map(m => m.character_id || m.character);
-
-    // 1. Check if user mentioned any character by name
-    const directlyMentioned = characters.filter(char =>
-      userMessage.toLowerCase().includes(char.name.toLowerCase())
+    // Update conversation state
+    conversationTracker.updateState(
+      { content: userMessage, type: 'user' },
+      null,
+      conversationHistory
     );
 
-    let respondingCharacters = [];
+    // Analyze conversation context
+    const context = ProviderAdapter.analyzeContext(
+      conversationHistory,
+      characters,
+      sceneData
+    );
 
-    if (directlyMentioned.length > 0) {
-      // All mentioned characters will respond
-      respondingCharacters = directlyMentioned;
-      console.log(`[Decision] ${directlyMentioned.length} character(s) directly mentioned`);
-    } else {
-      // 2. Select 1-2 characters who haven't spoken recently
-      const availableCharacters = characters.filter(char =>
-        !recentSpeakers.includes(char.id)
-      );
+    // Plan which characters should respond
+    const responsePlan = ResponsePlanner.planGroupResponse(
+      userMessage,
+      characters,
+      conversationHistory,
+      conversationTracker
+    );
 
-      if (availableCharacters.length > 0) {
-        // Randomly pick 1-2 from those who haven't spoken recently
-        const numResponders = Math.random() > 0.5 ? 2 : 1;
-        respondingCharacters = availableCharacters
-          .sort(() => Math.random() - 0.5)
-          .slice(0, Math.min(numResponders, availableCharacters.length));
-      } else {
-        // Everyone spoke recently, just pick the oldest speaker
-        respondingCharacters = [characters[0]];
-      }
+    console.log(`[Planning] ${responsePlan.responders.length} character(s) will respond`);
 
-      console.log(`[Decision] ${respondingCharacters.length} character(s) selected to respond`);
-    }
-    
+    const respondingCharacters = responsePlan.responders;
+
     // ========================================================================
-    // STEP 4: LOAD RELATIONSHIPS, MEMORIES & LEARNING DATA
+    // STEP 4: LOAD CONTEXT DATA FOR RESPONDING CHARACTERS
     // ========================================================================
 
-    // Load character-to-character relationships for all responding characters
-    const characterRelationshipsMap = new Map();
-    // Load character-to-user relationships for all responding characters
-    const userRelationshipsMap = new Map();
-    // Load character memories for all responding characters
-    const characterMemoriesMap = new Map();
-    // Load learning data for all responding characters
-    const characterLearningMap = new Map();
+    const characterDataMap = new Map();
 
     for (const char of respondingCharacters) {
       try {
-        // Load all relationships (both character and persona targets)
+        const charData = {};
+
+        // Load relationships
         const { data: allRelationships } = await supabase
           .from('character_relationships')
           .select('*')
           .eq('character_id', char.id)
           .eq('user_id', userId);
 
-        // Separate bot-to-bot relationships (target_type = 'character')
-        const botRelationships = allRelationships?.filter(r => r.target_type === 'character') || [];
-        characterRelationshipsMap.set(char.id, botRelationships);
-
-        // Get bot-to-user relationship (target_type = 'user' and target_id = userId)
-        const userRelationship = allRelationships?.find(r =>
-          r.target_type === 'user' && r.target_id === userId
-        );
-
-        if (userRelationship) {
-          userRelationshipsMap.set(char.id, userRelationship);
-        } else {
-          // Default relationship if none exists
-          userRelationshipsMap.set(char.id, {
-            relationship_type: 'acquaintance',
-            trust_level: 0.5,
-            familiarity_level: 0.1,
-            emotional_bond: 0.0,
-            interaction_count: 0
-          });
-        }
-
-        // Load character memories (top 10 most important)
-        if (char.memory_enabled !== false) {
-          const memories = await memoryService.getCharacterMemories(char.id, userId, 10);
-          characterMemoriesMap.set(char.id, memories || []);
-        } else {
-          characterMemoriesMap.set(char.id, []);
-        }
-
-        // Load learning data (topics discussed)
-        try {
-          const learningData = await learningService.getCharacterLearning(userId, char.id);
-          characterLearningMap.set(char.id, learningData || null);
-        } catch (err) {
-          console.error(`[Learning] Error loading for ${char.name}:`, err);
-          characterLearningMap.set(char.id, null);
-        }
-
-      } catch (error) {
-        console.error(`[Relationships] Error loading for ${char.name}:`, error);
-        characterRelationshipsMap.set(char.id, []);
-        userRelationshipsMap.set(char.id, {
+        charData.characterRelationships = allRelationships?.filter(r => r.target_type === 'character') || [];
+        charData.userRelationship = allRelationships?.find(r => r.target_type === 'user' && r.target_id === userId) || {
           relationship_type: 'acquaintance',
           trust_level: 0.5,
           familiarity_level: 0.1,
           emotional_bond: 0.0,
           interaction_count: 0
+        };
+
+        // Load relevant memories using new relevance scoring
+        if (char.memory_enabled !== false) {
+          charData.memories = await MemoryRelevanceService.getRelevantMemories(
+            memoryService,
+            char.id,
+            userId,
+            userMessage,
+            context,
+            8
+          );
+        } else {
+          charData.memories = [];
+        }
+
+        // Load learning data
+        charData.learningData = await learningService.getCharacterLearning(userId, char.id);
+
+        // Load session continuity
+        charData.continuity = await sessionContinuity.loadContinuityContext(
+          char.id,
+          userId,
+          activeSessionId
+        );
+
+        characterDataMap.set(char.id, charData);
+
+      } catch (error) {
+        console.error(`[Data Loading] Error for ${char.name}:`, error);
+        // Set defaults
+        characterDataMap.set(char.id, {
+          characterRelationships: [],
+          userRelationship: {
+            relationship_type: 'acquaintance',
+            trust_level: 0.5,
+            familiarity_level: 0.1,
+            emotional_bond: 0.0,
+            interaction_count: 0
+          },
+          memories: [],
+          learningData: null,
+          continuity: null
         });
-        characterMemoriesMap.set(char.id, []);
-        characterLearningMap.set(char.id, null);
       }
     }
 
     // ========================================================================
-    // STEP 5: GENERATE RESPONSES FOR SELECTED CHARACTERS
+    // STEP 5: GENERATE RESPONSES WITH NEW ARCHITECTURE
     // ========================================================================
 
     const responses = [];
+    const otherCharacters = characters.filter(c => 
+      !respondingCharacters.find(rc => rc.id === c.id)
+    );
 
-    // Generate responses sequentially with staggered delays
     for (let index = 0; index < respondingCharacters.length; index++) {
       const char = respondingCharacters[index];
       const isPrimary = index === 0;
+      const charData = characterDataMap.get(char.id);
 
       try {
-        // Build conversation history that includes previous responses in this turn
+        // Build conversation history with previous responses
         let updatedHistory = conversationHistory;
         if (index > 0) {
-          // Include previous character responses from this turn
           updatedHistory = [
             ...conversationHistory,
             { role: 'user', content: userMessage }
           ];
 
-          // Add previous responses from this turn
           for (let i = 0; i < index; i++) {
             updatedHistory.push({
               role: 'assistant',
@@ -291,28 +291,74 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           }
         }
 
-        // Get other characters in the chat (excluding current character)
-        const otherCharacters = characters.filter(c => c.id !== char.id);
-
-        // Get this character's data
-        const characterRelationships = characterRelationshipsMap.get(char.id) || [];
-        const userRelationship = userRelationshipsMap.get(char.id);
-        const memories = characterMemoriesMap.get(char.id) || [];
-        const learningData = characterLearningMap.get(char.id);
-
-        const systemPrompt = buildSystemPrompt(char, userPersona, currentScene, otherCharacters, characterRelationships, userRelationship, memories, learningData, adminSystemPrompt);
-        const messages = buildConversationMessages(systemPrompt, updatedHistory, isPrimary ? userMessage : null);
-
-        console.log(`[Response] Generating for ${char.name}...`);
-
-        const response = await AIProviderService.generateResponse(
+        // Build character-specific context
+        const charContext = ResponsePlanner.buildCharacterContext(
           char,
+          responsePlan,
+          conversationTracker,
+          sceneData
+        );
+
+        // Add user relationship familiarity to context
+        charContext.user_familiarity = charData.userRelationship.familiarity_level || 0.1;
+        charContext.turn_number = conversationHistory.length;
+
+        // Build layered system prompt
+        const systemPrompt = promptBuilder.buildSystemPrompt({
+          character: char,
+          userPersona,
+          scene: sceneData,
+          otherCharacters,
+          characterRelationships: charData.characterRelationships,
+          userRelationship: charData.userRelationship,
+          memories: charData.memories,
+          learningData: charData.learningData,
+          adminSystemPrompt,
+          sessionContinuity: charData.continuity
+        });
+
+        // Adapt prompt for provider
+        const adaptedPrompt = ProviderAdapter.adaptPrompt(
+          systemPrompt,
+          char.ai_provider || 'openai',
+          char
+        );
+
+        // Build conversation messages
+        const messages = promptBuilder.buildConversationMessages(
+          adaptedPrompt,
+          updatedHistory,
+          isPrimary ? userMessage : null
+        );
+
+        // Calculate dynamic temperature and token budget
+        const dynamicTemp = ProviderAdapter.calculateDynamicTemperature(char, charContext);
+        const tokenBudget = ProviderAdapter.calculateResponseBudget(char, charContext);
+
+        console.log(`[Response] ${char.name} - Temp: ${dynamicTemp.toFixed(2)}, Tokens: ${tokenBudget}`);
+
+        // Generate response with adjusted character settings
+        const adjustedChar = {
+          ...char,
+          temperature: dynamicTemp,
+          max_tokens: tokenBudget
+        };
+
+        const rawResponse = await AIProviderService.generateResponse(
+          adjustedChar,
           messages,
           apiKeys,
           ollamaSettings
         );
 
-        // Save to database
+        // Normalize response
+        const response = ProviderAdapter.normalizeResponse(
+          rawResponse,
+          char,
+          char.ai_provider || 'openai'
+        );
+
+        // Save to database with metadata
         await supabase
           .from('messages')
           .insert({
@@ -320,24 +366,32 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
             type: 'character',
             character_id: char.id,
             content: response,
-            is_primary_response: isPrimary
+            is_primary_response: isPrimary,
+            response_metadata: {
+              temperature_used: dynamicTemp,
+              tokens_used: tokenBudget,
+              provider: char.ai_provider || 'openai',
+              model: char.ai_model || 'gpt-3.5-turbo'
+            }
           });
 
-        // Update message count
-        await supabase.rpc('increment_message_count', {
-          p_session_id: activeSessionId
-        });
+        // Update conversation state
+        conversationTracker.updateState(
+          { content: response, type: 'character' },
+          char,
+          [...conversationHistory, { content: userMessage, type: 'user' }]
+        );
 
         responses.push({
           character: char.id,
           characterName: char.name,
           response: response,
           timestamp: new Date().toISOString(),
-          delay: index * 1200, // Stagger by 1.2s
+          delay: index * 1200,
           isPrimary: isPrimary
         });
 
-        // Persist memories and relationships
+        // Process memories and relationships
         try {
           const newMemories = memoryService.analyzeConversationForMemories(
             userMessage,
@@ -359,31 +413,26 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
           await memoryService.updateCharacterRelationship(char.id, userId, relationshipUpdate);
         } catch (memErr) {
-          console.error(`[Memory] Error processing memories for ${char.name}:`, memErr);
+          console.error(`[Memory] Error for ${char.name}:`, memErr);
         }
 
-        // Track learning/interaction
+        // Track learning
         try {
-          // Record interaction count
           await learningService.recordInteraction(userId, char.id);
-
-          // Extract and record topics (simple keyword extraction)
+          
           const topicKeywords = extractTopicsFromText(userMessage + ' ' + response);
           for (const topic of topicKeywords) {
             await learningService.addTopicDiscussed(userId, char.id, topic);
           }
-
-          console.log(`[Learning] Recorded interaction and ${topicKeywords.length} topics for ${char.name}`);
         } catch (learnErr) {
-          console.error(`[Learning] Error processing for ${char.name}:`, learnErr);
+          console.error(`[Learning] Error for ${char.name}:`, learnErr);
         }
 
-        console.log(`[Response] ${char.name}: "${response}"`);
+        console.log(`[Response] ${char.name}: "${response.substring(0, 80)}..."`);
 
       } catch (error) {
         console.error(`[Response] Error for ${char.name}:`, error);
         if (isPrimary) {
-          // If primary fails, still add error response
           responses.push({
             character: char.id,
             characterName: char.name,
@@ -393,15 +442,28 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
             error: true
           });
         }
-        // Secondary failures are silent
       }
     }
-    
+
     // ========================================================================
-    // STEP 6: RETURN ALL RESPONSES
+    // STEP 6: VALIDATE COHERENCE & RETURN RESPONSES
     // ========================================================================
 
-    console.log(`[Group Chat v2.0] Generated ${responses.length} responses`);
+    // Validate group coherence
+    const isCoherent = ResponsePlanner.validateGroupCoherence(responses);
+    if (!isCoherent) {
+      console.log('[Coherence] Warning: Potential contradictions detected in responses');
+    }
+
+    // Store session metadata for continuity
+    const conversationSummary = conversationTracker.getSummary();
+    await sessionContinuity.storeSessionMetadata(activeSessionId, {
+      tone: conversationSummary.mood,
+      key_topics: conversationSummary.active_topics,
+      message_count: conversationHistory.length + responses.length
+    });
+
+    console.log(`[Group Chat v3.0] Generated ${responses.length} responses`);
 
     res.json({
       sessionId: activeSessionId,
@@ -409,7 +471,7 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Group Chat v2.0] Error:', error);
+    console.error('[Group Chat v3.0] Error:', error);
     res.status(500).json({
       error: 'Failed to generate group response',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -418,23 +480,44 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 });
 
 // ============================================================================
-// HELPER FUNCTIONS
+// HELPER FUNCTIONS (Legacy - kept for backward compatibility)
 // ============================================================================
 
-function buildSystemPrompt(character, userPersona, currentScene, otherCharacters, characterRelationships, userRelationship, memories, learningData, adminSystemPrompt) {
-  let prompt = '';
+function extractTopicsFromText(text) {
+  const commonWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during',
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'am', 'is', 'are', 'was',
+    'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+    'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can',
+    'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where',
+    'why', 'how', 'my', 'your', 'his', 'her', 'its', 'our', 'their'
+  ]);
 
-  // If admin system prompt exists, use it as the base (replaces default)
-  if (adminSystemPrompt && adminSystemPrompt.trim()) {
-    prompt += `${adminSystemPrompt.trim()}\n\n`;
-  } else {
-    // Default character instructions only if no admin prompt
-    prompt += `You are ${character.name}.\n\n`;
-    prompt += `PERSONALITY & BACKGROUND:\n${character.personality}\n\n`;
-  }
+  const words = text.toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word =>
+      word.length > 3 &&
+      !commonWords.has(word) &&
+      !/^\d+$/.test(word)
+    );
 
-  // Add user relationship context
-  if (userRelationship) {
+  const frequency = {};
+  words.forEach(word => {
+    frequency[word] = (frequency[word] || 0) + 1;
+  });
+
+  const topics = Object.entries(frequency)
+    .filter(([_, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([word]) => word);
+
+  return topics;
+}
+
+module.exports = router;
     const userName = userPersona?.name || 'the user';
     prompt += `YOUR RELATIONSHIP WITH ${userName.toUpperCase()}:\n`;
 
