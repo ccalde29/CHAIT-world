@@ -630,8 +630,9 @@ class AIProviderService {
     if (customModel.custom_system_prompt) {
       const systemIndex = enhancedMessages.findIndex(m => m.role === 'system');
       if (systemIndex >= 0) {
+        // Inject custom system prompt AFTER the default system prompt
         enhancedMessages[systemIndex].content =
-          `${customModel.custom_system_prompt}\n\n${enhancedMessages[systemIndex].content}`;
+          `${enhancedMessages[systemIndex].content}\n\n${customModel.custom_system_prompt}`;
       } else {
         enhancedMessages.unshift({
           role: 'system',

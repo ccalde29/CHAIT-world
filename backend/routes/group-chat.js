@@ -424,14 +424,14 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 function buildSystemPrompt(character, userPersona, currentScene, otherCharacters, characterRelationships, userRelationship, memories, learningData, adminSystemPrompt) {
   let prompt = '';
 
-  // Prepend admin system prompt if it exists
+  // If admin system prompt exists, use it as the base (replaces default)
   if (adminSystemPrompt && adminSystemPrompt.trim()) {
     prompt += `${adminSystemPrompt.trim()}\n\n`;
-    prompt += `===== CHARACTER INSTRUCTIONS =====\n\n`;
+  } else {
+    // Default character instructions only if no admin prompt
+    prompt += `You are ${character.name}.\n\n`;
+    prompt += `PERSONALITY & BACKGROUND:\n${character.personality}\n\n`;
   }
-
-  prompt += `You are ${character.name}.\n\n`;
-  prompt += `PERSONALITY & BACKGROUND:\n${character.personality}\n\n`;
 
   // Add user relationship context
   if (userRelationship) {

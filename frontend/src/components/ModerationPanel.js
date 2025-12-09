@@ -240,7 +240,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4" style={{ maxHeight: 'calc(100vh - 200px)' }}>
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-gray-400">Loading...</div>

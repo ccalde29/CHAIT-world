@@ -76,7 +76,7 @@ const CharacterPanel = ({
       </div>
 
       {/* Character List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2" style={{ maxHeight: 'calc(100vh - 250px)' }}>
         {characters.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             <p className="mb-2">No characters yet</p>

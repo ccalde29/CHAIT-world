@@ -1034,7 +1034,7 @@ const CommunityHub = ({
         </div>
 
         {/* Content Grid */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: 'calc(100vh - 300px)' }}>
           {activeTab === 'characters' ? (
             <>
               {loading && characters.length === 0 ? (

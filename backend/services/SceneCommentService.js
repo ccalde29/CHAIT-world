@@ -74,7 +74,7 @@ class SceneCommentService {
       // Check if scene exists and is published
       const { data: scene, error: sceneError } = await this.supabase
         .from('scenarios')
-        .select('id, is_published')
+        .select('id, is_published, is_shared')
         .eq('id', sceneId)
         .single();
 
@@ -82,11 +82,32 @@ class SceneCommentService {
         if (sceneError.code === 'PGRST116') {
           throw new Error('Scene not found');
         }
-        throw sceneError;
-      }
+        // If column doesn't exist, fallback to checking is_shared
+        if (sceneError.code === '42703') {
+          const { data: fallbackScene, error: fallbackError } = await this.supabase
+            .from('scenarios')
+            .select('id, is_shared')
+            .eq('id', sceneId)
+            .single();
 
-      if (!scene.is_published) {
-        throw new Error('Cannot comment on unpublished scenes');
+          if (fallbackError || !fallbackScene) {
+            throw new Error('Scene not found');
+          }
+
+          if (!fallbackScene.is_shared) {
+            throw new Error('Cannot comment on unpublished scenes');
+          }
+
+          // Continue with comment creation below
+        } else {
+          throw sceneError;
+        }
+      } else {
+        // Use is_published if it exists, otherwise fall back to is_shared
+        const isPublished = scene.is_published !== undefined ? scene.is_published : scene.is_shared;
+        if (!isPublished) {
+          throw new Error('Cannot comment on unpublished scenes');
+        }
       }
 
       // Insert the comment
