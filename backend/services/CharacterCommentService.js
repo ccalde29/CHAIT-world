@@ -15,36 +15,53 @@ class CharacterCommentService {
    */
   async getCharacterComments(characterId) {
     try {
-      const { data, error } = await this.supabase
+      // Get comments (use updated_at for ordering if created_at doesn't exist yet)
+      const { data: comments, error } = await this.supabase
         .from('character_comments')
-        .select(`
-          id,
-          character_id,
-          user_id,
-          comment,
-          created_at,
-          updated_at,
-          profiles:user_id (
-            username,
-            display_name
-          )
-        `)
+        .select('id, character_id, user_id, comment, updated_at')
         .eq('character_id', characterId)
         .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
       if (error) throw error;
 
-      // Format the response to include user info at the top level
-      const formattedData = (data || []).map(comment => ({
+      if (!comments || comments.length === 0) {
+        return [];
+      }
+
+      // Fetch user info from auth.users
+      const { data: users, error: userError } = await this.supabase.auth.admin.listUsers();
+
+      if (userError) {
+        console.warn('Could not fetch user info:', userError);
+        // Return comments without user info
+        return comments.map(comment => ({
+          ...comment,
+          username: 'Anonymous',
+          display_name: 'Anonymous'
+        }));
+      }
+
+      // Create a map of user_id -> user email
+      const userMap = new Map();
+      users.users.forEach(user => {
+        const username = user.email?.split('@')[0] || 'Anonymous';
+        userMap.set(user.id, {
+          username: username,
+          display_name: user.user_metadata?.display_name || username
+        });
+      });
+
+      // Format the response to include user info
+      const formattedData = comments.map(comment => ({
         id: comment.id,
         character_id: comment.character_id,
         user_id: comment.user_id,
         comment: comment.comment,
-        created_at: comment.created_at,
+        created_at: comment.created_at || comment.updated_at, // Fallback to updated_at if created_at missing
         updated_at: comment.updated_at,
-        username: comment.profiles?.username || 'Anonymous',
-        display_name: comment.profiles?.display_name || comment.profiles?.username || 'Anonymous'
+        username: userMap.get(comment.user_id)?.username || 'Anonymous',
+        display_name: userMap.get(comment.user_id)?.display_name || 'Anonymous'
       }));
 
       return formattedData;
@@ -71,22 +88,15 @@ class CharacterCommentService {
         throw new Error('Comment must be 1000 characters or less');
       }
 
-      // Check if character exists and is published
-      const { data: character, error: characterError } = await this.supabase
-        .from('characters')
-        .select('id, is_published')
+      // Check if character exists in community (is published and approved)
+      const { data: communityCharacter, error: characterError } = await this.supabase
+        .from('community_characters')
+        .select('id')
         .eq('id', characterId)
         .single();
 
-      if (characterError) {
-        if (characterError.code === 'PGRST116') {
-          throw new Error('Character not found');
-        }
-        throw characterError;
-      }
-
-      if (!character.is_published) {
-        throw new Error('Cannot comment on unpublished characters');
+      if (characterError || !communityCharacter) {
+        throw new Error('Character not found in community or not available for comments');
       }
 
       // Insert the comment
@@ -97,21 +107,16 @@ class CharacterCommentService {
           character_id: characterId,
           comment: comment.trim()
         })
-        .select(`
-          id,
-          character_id,
-          user_id,
-          comment,
-          created_at,
-          updated_at,
-          profiles:user_id (
-            username,
-            display_name
-          )
-        `)
+        .select('id, character_id, user_id, comment, updated_at')
         .single();
 
       if (error) throw error;
+
+      // Get user info
+      const { data: { user } } = await this.supabase.auth.admin.getUserById(userId);
+
+      const username = user?.email?.split('@')[0] || 'Anonymous';
+      const display_name = user?.user_metadata?.display_name || username;
 
       // Format the response
       return {
@@ -119,10 +124,10 @@ class CharacterCommentService {
         character_id: data.character_id,
         user_id: data.user_id,
         comment: data.comment,
-        created_at: data.created_at,
+        created_at: data.created_at || data.updated_at, // Fallback to updated_at if created_at missing
         updated_at: data.updated_at,
-        username: data.profiles?.username || 'Anonymous',
-        display_name: data.profiles?.display_name || data.profiles?.username || 'Anonymous'
+        username: username,
+        display_name: display_name
       };
     } catch (error) {
       console.error('Error adding character comment:', error);
@@ -156,18 +161,7 @@ class CharacterCommentService {
         })
         .eq('id', commentId)
         .eq('user_id', userId)
-        .select(`
-          id,
-          character_id,
-          user_id,
-          comment,
-          created_at,
-          updated_at,
-          profiles:user_id (
-            username,
-            display_name
-          )
-        `)
+        .select('id, character_id, user_id, comment, updated_at')
         .single();
 
       if (error) {
@@ -177,16 +171,22 @@ class CharacterCommentService {
         throw error;
       }
 
+      // Get user info
+      const { data: { user } } = await this.supabase.auth.admin.getUserById(userId);
+
+      const username = user?.email?.split('@')[0] || 'Anonymous';
+      const display_name = user?.user_metadata?.display_name || username;
+
       // Format the response
       return {
         id: data.id,
         character_id: data.character_id,
         user_id: data.user_id,
         comment: data.comment,
-        created_at: data.created_at,
+        created_at: data.created_at || data.updated_at, // Fallback to updated_at if created_at missing
         updated_at: data.updated_at,
-        username: data.profiles?.username || 'Anonymous',
-        display_name: data.profiles?.display_name || data.profiles?.username || 'Anonymous'
+        username: username,
+        display_name: display_name
       };
     } catch (error) {
       console.error('Error updating character comment:', error);

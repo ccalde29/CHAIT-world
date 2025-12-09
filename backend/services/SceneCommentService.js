@@ -15,36 +15,53 @@ class SceneCommentService {
    */
   async getSceneComments(sceneId) {
     try {
-      const { data, error } = await this.supabase
+      // Get comments
+      const { data: comments, error } = await this.supabase
         .from('scene_comments')
-        .select(`
-          id,
-          scene_id,
-          user_id,
-          comment,
-          created_at,
-          updated_at,
-          profiles:user_id (
-            username,
-            display_name
-          )
-        `)
+        .select('id, scene_id, user_id, comment, created_at, updated_at')
         .eq('scene_id', sceneId)
         .eq('is_deleted', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Format the response to include user info at the top level
-      const formattedData = (data || []).map(comment => ({
+      if (!comments || comments.length === 0) {
+        return [];
+      }
+
+      // Fetch user info from auth.users
+      const { data: users, error: userError } = await this.supabase.auth.admin.listUsers();
+
+      if (userError) {
+        console.warn('Could not fetch user info:', userError);
+        // Return comments without user info
+        return comments.map(comment => ({
+          ...comment,
+          username: 'Anonymous',
+          display_name: 'Anonymous'
+        }));
+      }
+
+      // Create a map of user_id -> user email
+      const userMap = new Map();
+      users.users.forEach(user => {
+        const username = user.email?.split('@')[0] || 'Anonymous';
+        userMap.set(user.id, {
+          username: username,
+          display_name: user.user_metadata?.display_name || username
+        });
+      });
+
+      // Format the response to include user info
+      const formattedData = comments.map(comment => ({
         id: comment.id,
         scene_id: comment.scene_id,
         user_id: comment.user_id,
         comment: comment.comment,
         created_at: comment.created_at,
         updated_at: comment.updated_at,
-        username: comment.profiles?.username || 'Anonymous',
-        display_name: comment.profiles?.display_name || comment.profiles?.username || 'Anonymous'
+        username: userMap.get(comment.user_id)?.username || 'Anonymous',
+        display_name: userMap.get(comment.user_id)?.display_name || 'Anonymous'
       }));
 
       return formattedData;
@@ -71,43 +88,15 @@ class SceneCommentService {
         throw new Error('Comment must be 1000 characters or less');
       }
 
-      // Check if scene exists and is published
-      const { data: scene, error: sceneError } = await this.supabase
-        .from('scenarios')
-        .select('id, is_published, is_shared')
+      // Check if scene exists in community (is published and approved)
+      const { data: communityScene, error: sceneError } = await this.supabase
+        .from('community_scenes')
+        .select('id')
         .eq('id', sceneId)
         .single();
 
-      if (sceneError) {
-        if (sceneError.code === 'PGRST116') {
-          throw new Error('Scene not found');
-        }
-        // If column doesn't exist, fallback to checking is_shared
-        if (sceneError.code === '42703') {
-          const { data: fallbackScene, error: fallbackError } = await this.supabase
-            .from('scenarios')
-            .select('id, is_shared')
-            .eq('id', sceneId)
-            .single();
-
-          if (fallbackError || !fallbackScene) {
-            throw new Error('Scene not found');
-          }
-
-          if (!fallbackScene.is_shared) {
-            throw new Error('Cannot comment on unpublished scenes');
-          }
-
-          // Continue with comment creation below
-        } else {
-          throw sceneError;
-        }
-      } else {
-        // Use is_published if it exists, otherwise fall back to is_shared
-        const isPublished = scene.is_published !== undefined ? scene.is_published : scene.is_shared;
-        if (!isPublished) {
-          throw new Error('Cannot comment on unpublished scenes');
-        }
+      if (sceneError || !communityScene) {
+        throw new Error('Scene not found in community or not available for comments');
       }
 
       // Insert the comment
@@ -118,21 +107,16 @@ class SceneCommentService {
           scene_id: sceneId,
           comment: comment.trim()
         })
-        .select(`
-          id,
-          scene_id,
-          user_id,
-          comment,
-          created_at,
-          updated_at,
-          profiles:user_id (
-            username,
-            display_name
-          )
-        `)
+        .select('id, scene_id, user_id, comment, created_at, updated_at')
         .single();
 
       if (error) throw error;
+
+      // Get user info
+      const { data: { user } } = await this.supabase.auth.admin.getUserById(userId);
+
+      const username = user?.email?.split('@')[0] || 'Anonymous';
+      const display_name = user?.user_metadata?.display_name || username;
 
       // Format the response
       return {
@@ -142,8 +126,8 @@ class SceneCommentService {
         comment: data.comment,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        username: data.profiles?.username || 'Anonymous',
-        display_name: data.profiles?.display_name || data.profiles?.username || 'Anonymous'
+        username: username,
+        display_name: display_name
       };
     } catch (error) {
       console.error('Error adding scene comment:', error);
@@ -177,18 +161,7 @@ class SceneCommentService {
         })
         .eq('id', commentId)
         .eq('user_id', userId)
-        .select(`
-          id,
-          scene_id,
-          user_id,
-          comment,
-          created_at,
-          updated_at,
-          profiles:user_id (
-            username,
-            display_name
-          )
-        `)
+        .select('id, scene_id, user_id, comment, created_at, updated_at')
         .single();
 
       if (error) {
@@ -198,6 +171,12 @@ class SceneCommentService {
         throw error;
       }
 
+      // Get user info
+      const { data: { user } } = await this.supabase.auth.admin.getUserById(userId);
+
+      const username = user?.email?.split('@')[0] || 'Anonymous';
+      const display_name = user?.user_metadata?.display_name || username;
+
       // Format the response
       return {
         id: data.id,
@@ -206,8 +185,8 @@ class SceneCommentService {
         comment: data.comment,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        username: data.profiles?.username || 'Anonymous',
-        display_name: data.profiles?.display_name || data.profiles?.username || 'Anonymous'
+        username: username,
+        display_name: display_name
       };
     } catch (error) {
       console.error('Error updating scene comment:', error);

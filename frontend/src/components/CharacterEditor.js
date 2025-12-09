@@ -445,6 +445,12 @@ const CharacterEditorV15 = ({
         icon: '🖥️',
         color: 'text-indigo-400',
         description: 'Local GGUF models - high performance'
+      },
+      custom: {
+        name: 'Custom Model',
+        icon: '⚙️',
+        color: 'text-yellow-400',
+        description: 'Admin-created custom model presets'
       }
     };
 
@@ -802,7 +808,7 @@ const CharacterEditorV15 = ({
                 Choose between cloud API providers or local models running on your machine.
               </p>
 
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="grid grid-cols-4 gap-2 mb-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -854,6 +860,23 @@ const CharacterEditorV15 = ({
                   <div className="text-2xl mb-1">🖥️</div>
                   <div className="text-xs font-medium">LM Studio</div>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (formData.ai_provider !== 'custom') {
+                      handleProviderChange('custom');
+                    }
+                  }}
+                  className={`p-3 rounded-lg border transition-all ${
+                    formData.ai_provider === 'custom'
+                      ? 'bg-yellow-500/20 border-yellow-500 text-white'
+                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">⚙️</div>
+                  <div className="text-xs font-medium">Custom</div>
+                </button>
               </div>
 
               {/* API Provider Selection Dropdown */}
@@ -871,6 +894,7 @@ const CharacterEditorV15 = ({
                     <option value="anthropic" className="bg-gray-800">🧠 Anthropic - Claude Models</option>
                     <option value="openrouter" className="bg-gray-800">🌐 OpenRouter - 100+ Models</option>
                     <option value="google" className="bg-gray-800">✨ Google - Gemini Models</option>
+                    <option value="custom" className="bg-gray-800">⚙️ Custom Model</option>
                   </select>
                 </div>
               )}

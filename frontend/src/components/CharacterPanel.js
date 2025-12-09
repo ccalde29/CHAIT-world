@@ -2,7 +2,7 @@
 // Character selection and management panel
 
 import React from 'react';
-import { Plus, Search, SortAsc, Eye, EyeOff, Brain, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, SortAsc, Eye, EyeOff, Brain, Edit, Trash2, Users } from 'lucide-react';
 
 const CharacterPanel = ({
   characters,
@@ -27,10 +27,16 @@ const CharacterPanel = ({
       {/* Header */}
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-white">Characters</h2>
+          <div className="flex items-center gap-3">
+            <Users className="text-red-400" size={24} />
+            <div>
+              <h2 className="text-xl font-bold text-white">Character Management</h2>
+              <p className="text-sm text-gray-400">Create and manage your characters</p>
+            </div>
+          </div>
           <button
             onClick={onAddCharacter}
-            className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+            className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex-shrink-0"
             title="Add Character"
           >
             <Plus size={18} />
