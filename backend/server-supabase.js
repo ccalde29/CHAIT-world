@@ -103,12 +103,13 @@ app.use('/api/character', requireAuth, memoryRoutes);
 app.use('/api/learning', requireAuth, characterLearningRoutes);
 app.use('/api/character-comments', requireAuth, characterCommentRoutes);
 app.use('/api/scene-comments', requireAuth, sceneCommentRoutes);
-app.use('/api', requireAuth, imageRoutes);
 app.use('/api/personas', requireAuth, personasRoutes);
 app.use('/api/characters', requireAuth, relationshipsRoutes);
 app.use('/api/moderation', requireAuth, moderationRoutes); // Admin-only routes (middleware checks inside)
 app.use('/api/custom-models', requireAuth, customModelsRoutes);
 app.use('/api/pricing', requireAuth, pricingRoutes);
+// Image routes last since they use catch-all patterns
+app.use('/api', requireAuth, imageRoutes);
 
 // ============================================================================
 // HEALTH & UTILITY ROUTES

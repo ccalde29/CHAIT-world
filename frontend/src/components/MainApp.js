@@ -137,8 +137,9 @@ const MainApp = () => {
       }
     }
 
-    // Close modal
+    // Close modal and switch to chat view
     setShowNewChatModal(false);
+    setCurrentView('chat');
   };
 
   const handleSendMessage = () => {
@@ -359,18 +360,6 @@ const MainApp = () => {
                 Chat
               </button>
               <button
-                onClick={() => setCurrentView('community')}
-                className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
-                  currentView === 'community'
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                    : 'hover:bg-white/10 text-gray-300'
-                }`}
-                title="Community Hub"
-              >
-                <Globe size={18} />
-                Community
-              </button>
-              <button
                 onClick={() => setCurrentView('manage')}
                 className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
                   currentView === 'manage'
@@ -381,6 +370,18 @@ const MainApp = () => {
               >
                 <LayoutGrid size={18} />
                 Manage
+              </button>
+              <button
+                onClick={() => setCurrentView('community')}
+                className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
+                  currentView === 'community'
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
+                    : 'hover:bg-white/10 text-gray-300'
+                }`}
+                title="Community Hub"
+              >
+                <Globe size={18} />
+                Community
               </button>
               {isAdmin && (
                 <button
@@ -398,15 +399,9 @@ const MainApp = () => {
               )}
             </div>
 
-            {currentView === 'chat' && (
-              <div className="text-sm text-gray-400 ml-4">
-                {charactersState.findScenarioById(charactersState.currentScenario)?.name || 'General Chat'}
-              </div>
-            )}
-
-            {/* Persona Switcher */}
+            {/* Persona Switcher - Always visible, on left side */}
             {personasState.activePersona && (
-              <div className="relative" ref={personaMenuRef}>
+              <div className="relative ml-4" ref={personaMenuRef}>
                 <button
                   onClick={() => setShowPersonaMenu(!showPersonaMenu)}
                   className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-sm"
@@ -460,19 +455,25 @@ const MainApp = () => {
                 )}
               </div>
             )}
+
+            {/* Chat Name - Only visible in chat view */}
+            {currentView === 'chat' && (
+              <div className="text-sm text-gray-400 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg">
+                {charactersState.findScenarioById(charactersState.currentScenario)?.name || 'General Chat'}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
-            {currentView === 'chat' && (
-              <button
-                onClick={() => setShowNewChatModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 rounded-lg transition-all font-medium flex items-center gap-2"
-                title="Start New Chat"
-              >
-                <Plus size={18} />
-                New Chat
-              </button>
-            )}
+            {/* New Chat Button - Always visible */}
+            <button
+              onClick={() => setShowNewChatModal(true)}
+              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 rounded-lg transition-all font-medium flex items-center gap-2"
+              title="Start New Chat"
+            >
+              <Plus size={18} />
+              New Chat
+            </button>
 
             <button
               onClick={() => setShowSettings(true)}

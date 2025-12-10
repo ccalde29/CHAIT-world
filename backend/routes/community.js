@@ -433,5 +433,31 @@ module.exports = (communityService, characterService) => {
         }
     });
 
+    /**
+     * Report a scene
+     * POST /api/community/scenes/:id/report
+     */
+    router.post('/scenes/:id/report', async (req, res) => {
+        try {
+            const { reason, details } = req.body;
+
+            if (!reason) {
+                return res.status(400).json({ error: 'Reason is required' });
+            }
+
+            await communityService.reportScene(
+                req.userId,
+                req.params.id,
+                reason,
+                details
+            );
+
+            res.json({ message: 'Report submitted successfully' });
+        } catch (error) {
+            console.error('Error reporting scene:', error);
+            res.status(500).json({ error: 'Failed to submit report' });
+        }
+    });
+
     return router;
 };

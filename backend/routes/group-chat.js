@@ -145,6 +145,11 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     const ollamaSettings = userSettings?.ollama_settings || {
       baseUrl: 'http://localhost:11434'
     };
+    
+    // Add LM Studio settings
+    ollamaSettings.lmStudioSettings = userSettings?.lmstudio_settings || {
+      baseUrl: 'http://127.0.0.1:1234'
+    };
 
     const adminSystemPrompt = userSettings?.admin_system_prompt || null;
 
@@ -187,7 +192,8 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
     console.log(`[Planning] ${responsePlan.responders.length} character(s) will respond`);
 
-    const respondingCharacters = responsePlan.responders;
+    // Limit to max 3 responding characters to prevent conversation breakdown
+    const respondingCharacters = responsePlan.responders.slice(0, 3);
 
     // ========================================================================
     // STEP 4: LOAD CONTEXT DATA FOR RESPONDING CHARACTERS

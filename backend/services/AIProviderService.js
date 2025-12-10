@@ -45,7 +45,9 @@ class AIProviderService {
           return await this.callOllama(model, messages, ollamaSettings, character);
 
         case 'lmstudio':
-          return await this.callLMStudio(model, messages, ollamaSettings, character);
+          // LM Studio settings should be in ollamaSettings object with lmStudioSettings key
+          const lmStudioSettings = ollamaSettings?.lmStudioSettings || ollamaSettings || {};
+          return await this.callLMStudio(model, messages, lmStudioSettings, character);
 
         case 'custom':
           return await this.callCustomModel(model, messages, apiKeys.openrouter, character);
@@ -322,26 +324,41 @@ class AIProviderService {
   static async callLMStudio(model, messages, lmStudioSettings = {}, character) {
     const baseUrl = lmStudioSettings.baseUrl || 'http://localhost:1234';
 
-    // LM Studio uses OpenAI-compatible API
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: messages,
-        temperature: character.temperature || 0.8,
-        max_tokens: character.max_tokens || 150
-      })
-    });
+    try {
+      // LM Studio uses OpenAI-compatible API
+      const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: messages,
+          temperature: character.temperature || 0.8,
+          max_tokens: character.max_tokens || 150
+        })
+      });
 
-    if (!response.ok) {
-      throw new Error(`LM Studio API error: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.error('[LM Studio] Error response:', response.status, errorText);
+        throw new Error(`LM Studio API error: ${response.status} - ${errorText || 'Unknown error'}. Make sure LM Studio is running and a model is loaded.`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        console.error('[LM Studio] Invalid response structure:', data);
+        throw new Error('LM Studio returned invalid response structure');
+      }
+      
+      return data.choices[0].message.content.trim();
+    } catch (error) {
+      if (error.code === 'ECONNREFUSED') {
+        throw new Error('Cannot connect to LM Studio. Make sure LM Studio is running at ' + baseUrl);
+      }
+      throw error;
     }
-
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
   }
 
   // ==========================================================================

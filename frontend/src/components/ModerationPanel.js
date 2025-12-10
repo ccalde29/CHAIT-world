@@ -136,8 +136,11 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
     setProcessing(reportId);
 
     try {
+      const report = reports.find(r => r.id === reportId);
+      const isCharacter = report?.report_type === 'character';
+      
       const notes = action === 'unpublish'
-        ? prompt('Enter notes for unpublishing (optional):')
+        ? prompt(`Enter notes for ${isCharacter ? 'unpublishing character' : 'deleting scene'} (optional):`)
         : null;
 
       if (action === 'unpublish' && notes === null) {
@@ -145,14 +148,19 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
         return; // User cancelled
       }
 
-      await apiRequest(`/api/moderation/reports/${reportId}/resolve`, {
+      const response = await apiRequest(`/api/moderation/reports/${reportId}/resolve`, {
         method: 'POST',
         body: JSON.stringify({ action, notes })
       });
 
       // Refresh reports and stats
       await Promise.all([fetchReports(), fetchStats(), fetchQueue()]);
-      alert(`Report ${action === 'unpublish' ? 'actioned - character unpublished' : 'dismissed'} successfully!`);
+      
+      const actionText = action === 'unpublish' 
+        ? (response.type === 'scene' ? 'deleted' : 'unpublished')
+        : 'dismissed';
+      
+      alert(`Report ${actionText} successfully!`);
     } catch (error) {
       console.error('Failed to resolve report:', error);
       alert('Failed to resolve report. Please try again.');
@@ -322,85 +330,182 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                     <p className="text-gray-400">No pending reports</p>
                   </div>
                 ) : (
-                  reports.map(report => (
-                    <div
-                      key={report.id}
-                      className="bg-gray-800 border border-white/10 rounded-lg p-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-bold text-white">
-                              {report.characters?.name || 'Unknown Character'}
-                            </h3>
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
-                              {report.reason}
-                            </span>
+                  reports.map(report => {
+                    const isCharacter = report.report_type === 'character';
+                    const item = isCharacter ? report.community_characters : report.community_scenes;
+                    const itemName = item?.name || 'Unknown';
+                    const itemType = isCharacter ? 'Character' : 'Scene';
+                    
+                    return (
+                      <div
+                        key={report.id}
+                        className="bg-gray-800 border border-white/10 rounded-lg p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
+                                {itemType}
+                              </span>
+                              <h3 className="text-lg font-bold text-white">
+                                {itemName}
+                              </h3>
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
+                                {report.reason}
+                              </span>
+                            </div>
+                            {report.details && (
+                              <p className="text-sm text-gray-400 mb-2">{report.details}</p>
+                            )}
+                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                              <span>Reported: {new Date(report.created_at).toLocaleDateString()}</span>
+                              {isCharacter && item?.moderation_status && (
+                                <span>Status: {item.moderation_status}</span>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-sm text-gray-400 mb-2">{report.description}</p>
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <span>Reported: {new Date(report.created_at).toLocaleDateString()}</span>
-                            <span>Status: {report.characters?.moderation_status || 'unknown'}</span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleResolveReport(report.id, 'dismiss')}
+                              disabled={processing === report.id}
+                              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                              title="Dismiss report"
+                            >
+                              Dismiss
+                            </button>
+                            <button
+                              onClick={() => handleResolveReport(report.id, 'unpublish')}
+                              disabled={processing === report.id}
+                              className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                              title={isCharacter ? "Unpublish character" : "Delete scene"}
+                            >
+                              {isCharacter ? 'Unpublish' : 'Delete'}
+                            </button>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleResolveReport(report.id, 'dismiss')}
-                            disabled={processing === report.id}
-                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                            title="Dismiss report"
-                          >
-                            Dismiss
-                          </button>
-                          <button
-                            onClick={() => handleResolveReport(report.id, 'unpublish')}
-                            disabled={processing === report.id}
-                            className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                            title="Unpublish character"
-                          >
-                            Unpublish
-                          </button>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
 
             {/* Stats Tab */}
             {activeTab === 'stats' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Clock className="text-yellow-400" size={24} />
-                    <h3 className="text-sm font-medium text-gray-400">Pending Review</h3>
+              <div className="space-y-6">
+                {/* Moderation Stats */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Moderation Statistics</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Clock className="text-yellow-400" size={24} />
+                        <h3 className="text-sm font-medium text-gray-400">Pending Review</h3>
+                      </div>
+                      <p className="text-3xl font-bold text-white">{stats.pending || 0}</p>
+                    </div>
+
+                    <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <CheckCircle className="text-green-400" size={24} />
+                        <h3 className="text-sm font-medium text-gray-400">Approved</h3>
+                      </div>
+                      <p className="text-3xl font-bold text-white">{stats.approved || 0}</p>
+                    </div>
+
+                    <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <XCircle className="text-red-400" size={24} />
+                        <h3 className="text-sm font-medium text-gray-400">Rejected</h3>
+                      </div>
+                      <p className="text-3xl font-bold text-white">{stats.rejected || 0}</p>
+                    </div>
+
+                    <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <AlertTriangle className="text-orange-400" size={24} />
+                        <h3 className="text-sm font-medium text-gray-400">Unresolved Reports</h3>
+                      </div>
+                      <p className="text-3xl font-bold text-white">{stats.unresolvedReports || 0}</p>
+                    </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{stats.pending}</p>
                 </div>
 
-                <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <CheckCircle className="text-green-400" size={24} />
-                    <h3 className="text-sm font-medium text-gray-400">Approved</h3>
+                {/* Platform Stats */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Platform Statistics</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Eye className="text-blue-400" size={24} />
+                        <h3 className="text-sm font-medium text-gray-400">Total Characters</h3>
+                      </div>
+                      <p className="text-3xl font-bold text-white">{stats.totalCharacters || 0}</p>
+                    </div>
+
+                    <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Eye className="text-purple-400" size={24} />
+                        <h3 className="text-sm font-medium text-gray-400">Total Scenes</h3>
+                      </div>
+                      <p className="text-3xl font-bold text-white">{stats.totalScenes || 0}</p>
+                    </div>
+
+                    <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Eye className="text-cyan-400" size={24} />
+                        <h3 className="text-sm font-medium text-gray-400">Total Users</h3>
+                      </div>
+                      <p className="text-3xl font-bold text-white">{stats.totalUsers || 0}</p>
+                    </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{stats.approved}</p>
                 </div>
 
-                <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <XCircle className="text-red-400" size={24} />
-                    <h3 className="text-sm font-medium text-gray-400">Rejected</h3>
+                {/* Trending Content */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Top Characters */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-4">Top Characters (By Imports)</h3>
+                    <div className="bg-gray-800 border border-white/10 rounded-lg overflow-hidden">
+                      {stats.topCharacters && stats.topCharacters.length > 0 ? (
+                        <div className="divide-y divide-white/10">
+                          {stats.topCharacters.map((character, index) => (
+                            <div key={index} className="p-4 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <span className="text-2xl font-bold text-gray-600">#{index + 1}</span>
+                                <span className="text-white">{character.name}</span>
+                              </div>
+                              <span className="text-sm text-gray-400">{character.import_count} imports</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-gray-400">No data available</div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{stats.rejected}</p>
-                </div>
 
-                <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <AlertTriangle className="text-orange-400" size={24} />
-                    <h3 className="text-sm font-medium text-gray-400">Unresolved Reports</h3>
+                  {/* Top Scenes */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-4">Top Scenes (By Views)</h3>
+                    <div className="bg-gray-800 border border-white/10 rounded-lg overflow-hidden">
+                      {stats.topScenes && stats.topScenes.length > 0 ? (
+                        <div className="divide-y divide-white/10">
+                          {stats.topScenes.map((scene, index) => (
+                            <div key={index} className="p-4 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <span className="text-2xl font-bold text-gray-600">#{index + 1}</span>
+                                <span className="text-white">{scene.name}</span>
+                              </div>
+                              <span className="text-sm text-gray-400">{scene.view_count} views</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-gray-400">No data available</div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-3xl font-bold text-white">{stats.unresolvedReports}</p>
                 </div>
               </div>
             )}

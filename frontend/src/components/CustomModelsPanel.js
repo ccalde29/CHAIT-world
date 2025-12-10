@@ -158,9 +158,10 @@ const CustomModelsPanel = ({ apiRequest }) => {
         method: 'DELETE'
       });
       await fetchModels();
+      alert(`Successfully deleted "${model.display_name}"`);
     } catch (error) {
       console.error('[CustomModels] Error deleting model:', error);
-      alert('Failed to delete custom model');
+      alert(error.message || 'Failed to delete custom model. Make sure you have admin permissions.');
     }
   };
 

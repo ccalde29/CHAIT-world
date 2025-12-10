@@ -882,6 +882,8 @@ CREATE TABLE IF NOT EXISTS "public"."characters" (
     "fallback_model" character varying(100),
     "is_locked" boolean DEFAULT false,
     "hidden_fields" "jsonb" DEFAULT '[]'::"jsonb",
+    "voice_traits" "jsonb" DEFAULT '{"humor": 0.5, "optimism": 0.5, "formality": 0.5, "verbosity": 0.5, "directness": 0.5, "emotiveness": 0.5, "intellectualism": 0.5}'::"jsonb",
+    "speech_patterns" "jsonb" DEFAULT '{"uses_slang": false, "avoided_words": [], "favored_phrases": [], "punctuation_style": "casual", "uses_contractions": true, "typical_sentence_length": "medium"}'::"jsonb",
     CONSTRAINT "age_minimum" CHECK (("age" >= 18)),
     CONSTRAINT "character_name_length" CHECK ((("length"(("name")::"text") >= 1) AND ("length"(("name")::"text") <= 50))),
     CONSTRAINT "context_window_range" CHECK ((("context_window" >= 1000) AND ("context_window" <= 32000))),
@@ -919,6 +921,14 @@ COMMENT ON COLUMN "public"."characters"."hidden_fields" IS 'Array of field names
 
 
 
+COMMENT ON COLUMN "public"."characters"."voice_traits" IS 'Structured personality traits for consistent voice (formality, verbosity, emotiveness, etc.)';
+
+
+
+COMMENT ON COLUMN "public"."characters"."speech_patterns" IS 'Speech patterns and preferences (phrases, contractions, slang usage)';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."chat_sessions" (
     "id" "text" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid",
@@ -931,11 +941,16 @@ CREATE TABLE IF NOT EXISTS "public"."chat_sessions" (
     "is_archived" boolean DEFAULT false,
     "last_message_at" timestamp with time zone,
     "updated_at" timestamp without time zone,
-    "message_count" integer DEFAULT 0
+    "message_count" integer DEFAULT 0,
+    "metadata" "jsonb" DEFAULT '{"tone": "neutral", "key_topics": [], "avg_message_length": 0, "significant_moments": []}'::"jsonb"
 );
 
 
 ALTER TABLE "public"."chat_sessions" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."chat_sessions"."metadata" IS 'Session metadata for continuity (tone, topics, moments)';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."community_characters" (
@@ -1088,6 +1103,7 @@ CREATE TABLE IF NOT EXISTS "public"."messages" (
     "mood_at_time" character varying(30),
     "mood_intensity" double precision,
     "is_primary_response" boolean DEFAULT false,
+    "response_metadata" "jsonb" DEFAULT '{"model": "", "provider": "", "tokens_used": 0, "temperature_used": 0.8}'::"jsonb",
     CONSTRAINT "messages_mood_intensity_check" CHECK ((("mood_intensity" >= (0)::double precision) AND ("mood_intensity" <= (1)::double precision)))
 );
 
@@ -1103,7 +1119,11 @@ COMMENT ON COLUMN "public"."messages"."mood_intensity" IS 'Intensity of the mood
 
 
 
-COMMENT ON COLUMN "public"."messages"."is_primary_response" IS 'True if this was the first response in multi-pass generation';
+COMMENT ON COLUMN "public"."messages"."is_primary_response" IS 'Whether this was the primary responding character';
+
+
+
+COMMENT ON COLUMN "public"."messages"."response_metadata" IS 'Metadata about how the response was generated';
 
 
 
@@ -1189,6 +1209,10 @@ CREATE TABLE IF NOT EXISTS "public"."scenarios" (
     "narrator_trigger_mode" character varying(50) DEFAULT 'manual'::character varying,
     "narrator_interval" integer DEFAULT 5,
     "narrator_personality" "text",
+    "context_rules" "jsonb" DEFAULT '{"noise_level": 0.5, "time_of_day": "afternoon", "setting_type": "casual", "allowed_topics": [], "restricted_topics": [], "formality_required": 0.3}'::"jsonb",
+    "scene_state" "jsonb" DEFAULT '{"active_npcs": [], "crowd_level": "moderate", "recent_events": [], "ambient_details": []}'::"jsonb",
+    "character_modifiers" "jsonb" DEFAULT '{}'::"jsonb",
+    "scene_cues" "jsonb" DEFAULT '[]'::"jsonb",
     CONSTRAINT "description_length" CHECK ((("length"(("description")::"text") >= 1) AND ("length"(("description")::"text") <= 200))),
     CONSTRAINT "initial_message_length" CHECK ((("length"("initial_message") >= 1) AND ("length"("initial_message") <= 500))),
     CONSTRAINT "scenario_name_length" CHECK ((("length"(("name")::"text") >= 1) AND ("length"(("name")::"text") <= 50)))
@@ -1255,6 +1279,22 @@ COMMENT ON COLUMN "public"."scenarios"."narrator_interval" IS 'Number of message
 
 
 COMMENT ON COLUMN "public"."scenarios"."narrator_personality" IS 'Optional custom narrator style/personality for this scene (e.g., "poetic", "matter-of-fact")';
+
+
+
+COMMENT ON COLUMN "public"."scenarios"."context_rules" IS 'Scene context rules (formality, noise level, allowed topics)';
+
+
+
+COMMENT ON COLUMN "public"."scenarios"."scene_state" IS 'Dynamic scene state (crowd level, NPCs, events)';
+
+
+
+COMMENT ON COLUMN "public"."scenarios"."character_modifiers" IS 'Character-specific instructions for this scene';
+
+
+
+COMMENT ON COLUMN "public"."scenarios"."scene_cues" IS 'Recurring scene messages or triggers';
 
 
 
@@ -1685,7 +1725,15 @@ CREATE INDEX "idx_characters_user_id" ON "public"."characters" USING "btree" ("u
 
 
 
+CREATE INDEX "idx_characters_voice_traits" ON "public"."characters" USING "gin" ("voice_traits");
+
+
+
 CREATE INDEX "idx_chat_sessions_archived" ON "public"."chat_sessions" USING "btree" ("user_id", "is_archived", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_chat_sessions_metadata" ON "public"."chat_sessions" USING "gin" ("metadata");
 
 
 
@@ -1762,6 +1810,10 @@ CREATE INDEX "idx_reports_character" ON "public"."character_reports" USING "btre
 
 
 CREATE INDEX "idx_reports_status" ON "public"."character_reports" USING "btree" ("status", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_scenarios_context_rules" ON "public"."scenarios" USING "gin" ("context_rules");
 
 
 

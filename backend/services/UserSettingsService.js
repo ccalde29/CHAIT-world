@@ -28,6 +28,7 @@ class UserSettingsService {
                     userId: userId,
                     apiKeys: {},
                     ollamaSettings: { baseUrl: 'http://localhost:11434' },
+                    lmStudioSettings: { baseUrl: 'http://127.0.0.1:1234' },
                     groupDynamicsMode: 'natural',
                     messageDelay: 1200
                 };
@@ -38,6 +39,7 @@ class UserSettingsService {
                 userId: data.user_id,
                 apiKeys: data.api_keys || {},
                 ollamaSettings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
+                lmStudioSettings: data.lmstudio_settings || { baseUrl: 'http://127.0.0.1:1234' },
                 groupDynamicsMode: data.group_dynamics_mode || 'natural',
                 messageDelay: data.message_delay || 1200,
                 isAdmin: data.is_admin || false,
@@ -59,6 +61,7 @@ class UserSettingsService {
                 user_id: userId,
                 api_keys: updates.api_keys || updates.apiKeys,
                 ollama_settings: updates.ollama_settings ||updates.ollamaSettings,
+                lmstudio_settings: updates.lmstudio_settings || updates.lmStudioSettings,
                 group_dynamics_mode: updates.group_dynamics_mode ||updates.groupDynamicsMode,
                 message_delay: updates.message_delay || updates.messageDelay,
                 updated_at: new Date().toISOString()
@@ -89,6 +92,7 @@ class UserSettingsService {
                 userId: data.user_id,
                 apiKeys: data.api_keys || {},
                 ollamaSettings: data.ollama_settings || { baseUrl:'http://localhost:11434' },
+                lmStudioSettings: data.lmstudio_settings || { baseUrl: 'http://127.0.0.1:1234' },
                 groupDynamicsMode: data.group_dynamics_mode || 'natural',
                 messageDelay: data.message_delay || 1200,
                 isAdmin: data.is_admin || false,

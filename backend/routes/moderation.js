@@ -91,24 +91,57 @@ router.get('/stats', requireAdmin, async (req, res) => {
       .select('*', { count: 'exact', head: true })
       .eq('moderation_status', 'rejected');
 
-    // Character reports count (table may not exist yet)
+    // Community reports count
     let unresolvedReports = 0;
     try {
       const { count } = await getSupabase()
-        .from('character_reports')
+        .from('community_reports')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
       unresolvedReports = count || 0;
     } catch (error) {
-      // character_reports table doesn't exist yet
-      console.log('[Moderation] character_reports table not found (expected if not created yet)');
+      console.log('[Moderation] Error fetching community reports count:', error);
     }
+
+    // Total community characters
+    const { count: totalCharacters } = await getSupabase()
+      .from('community_characters')
+      .select('*', { count: 'exact', head: true });
+
+    // Total community scenes
+    const { count: totalScenes } = await getSupabase()
+      .from('community_scenes')
+      .select('*', { count: 'exact', head: true });
+
+    // Total users (with settings)
+    const { count: totalUsers } = await getSupabase()
+      .from('user_settings')
+      .select('*', { count: 'exact', head: true });
+
+    // Get top characters by imports
+    const { data: topCharacters } = await getSupabase()
+      .from('community_characters')
+      .select('name, import_count')
+      .order('import_count', { ascending: false })
+      .limit(5);
+
+    // Get top scenes by views
+    const { data: topScenes } = await getSupabase()
+      .from('community_scenes')
+      .select('name, view_count')
+      .order('view_count', { ascending: false })
+      .limit(5);
 
     res.json({
       pending: pendingCount || 0,
       approved: approvedCount || 0,
       rejected: rejectedCount || 0,
-      unresolvedReports
+      unresolvedReports,
+      totalCharacters: totalCharacters || 0,
+      totalScenes: totalScenes || 0,
+      totalUsers: totalUsers || 0,
+      topCharacters: topCharacters || [],
+      topScenes: topScenes || []
     });
 
   } catch (error) {
@@ -123,25 +156,30 @@ router.get('/stats', requireAdmin, async (req, res) => {
 
 /**
  * GET /api/moderation/reports
- * Get all character reports
+ * Get all community reports (characters and scenes)
  * Optional query params:
  * - status: 'pending', 'reviewed', 'actioned', 'dismissed'
- * - characterId: filter by specific character
+ * - type: 'character', 'scene', or 'all' (default)
  * Admin only
  */
 router.get('/reports', requireAdmin, async (req, res) => {
   try {
-    const { status, characterId } = req.query;
+    const { status, type = 'all' } = req.query;
 
     let query = getSupabase()
-      .from('character_reports')
+      .from('community_reports')
       .select(`
         *,
-        characters:character_id (
+        community_characters:community_character_id (
           id,
           name,
-          user_id,
+          creator_user_id,
           moderation_status
+        ),
+        community_scenes:community_scene_id (
+          id,
+          name,
+          creator_user_id
         )
       `)
       .order('created_at', { ascending: false });
@@ -151,14 +189,14 @@ router.get('/reports', requireAdmin, async (req, res) => {
       query = query.eq('status', status);
     }
 
-    if (characterId) {
-      query = query.eq('character_id', characterId);
+    if (type && type !== 'all') {
+      query = query.eq('report_type', type);
     }
 
     const { data: reports, error } = await query;
 
     if (error) {
-      console.error('[Moderation] Error fetching reports:', error);
+      console.error('[Moderation] Error fetching community reports:', error);
       return res.status(500).json({ error: 'Failed to fetch reports' });
     }
 
@@ -175,7 +213,7 @@ router.get('/reports', requireAdmin, async (req, res) => {
 
 /**
  * POST /api/moderation/reports/:reportId/resolve
- * Resolve a character report
+ * Resolve a community report (character or scene)
  * Body: { action: 'dismiss' | 'unpublish', notes?: string }
  * Admin only
  */
@@ -189,10 +227,14 @@ router.post('/reports/:reportId/resolve', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid action. Must be "dismiss" or "unpublish"' });
     }
 
-    // Get the report to find the character
+    // Get the report to find the character or scene
     const { data: report, error: fetchError } = await getSupabase()
-      .from('character_reports')
-      .select('*, characters:character_id (id, name, user_id)')
+      .from('community_reports')
+      .select(`
+        *,
+        community_characters:community_character_id (id, name, creator_user_id),
+        community_scenes:community_scene_id (id, name, creator_user_id)
+      `)
       .eq('id', reportId)
       .single();
 
@@ -200,25 +242,38 @@ router.post('/reports/:reportId/resolve', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Report not found' });
     }
 
-    // If action is unpublish, unpublish the character
+    // If action is unpublish, unpublish the character or scene
     if (action === 'unpublish') {
-      const { error: unpublishError } = await getSupabase()
-        .from('characters')
-        .update({
-          is_public: false,
-          moderation_status: 'rejected'
-        })
-        .eq('id', report.character_id);
+      if (report.report_type === 'character' && report.community_character_id) {
+        // Unpublish community character
+        const { error: unpublishError } = await getSupabase()
+          .from('community_characters')
+          .update({
+            moderation_status: 'rejected'
+          })
+          .eq('id', report.community_character_id);
 
-      if (unpublishError) {
-        console.error('[Moderation] Error unpublishing character:', unpublishError);
-        return res.status(500).json({ error: 'Failed to unpublish character' });
+        if (unpublishError) {
+          console.error('[Moderation] Error unpublishing character:', unpublishError);
+          return res.status(500).json({ error: 'Failed to unpublish character' });
+        }
+      } else if (report.report_type === 'scene' && report.community_scene_id) {
+        // Delete community scene (scenes don't have moderation_status, just remove them)
+        const { error: deleteError } = await getSupabase()
+          .from('community_scenes')
+          .delete()
+          .eq('id', report.community_scene_id);
+
+        if (deleteError) {
+          console.error('[Moderation] Error deleting scene:', deleteError);
+          return res.status(500).json({ error: 'Failed to delete scene' });
+        }
       }
     }
 
     // Update the report status
     const { data: updatedReport, error: updateError } = await getSupabase()
-      .from('character_reports')
+      .from('community_reports')
       .update({
         status: action === 'unpublish' ? 'actioned' : 'dismissed',
         reviewed_at: new Date().toISOString(),
@@ -234,11 +289,12 @@ router.post('/reports/:reportId/resolve', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to update report' });
     }
 
-    console.log(`[Moderation] Report ${reportId} resolved with action: ${action}`);
+    console.log(`[Moderation] Report ${reportId} (${report.report_type}) resolved with action: ${action}`);
     res.json({
       message: 'Report resolved successfully',
       report: updatedReport,
-      action
+      action,
+      type: report.report_type
     });
 
   } catch (error) {

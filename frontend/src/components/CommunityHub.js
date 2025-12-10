@@ -56,6 +56,8 @@ const CommunityHub = ({
   const [unpublishing, setUnpublishing] = useState(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportingCharacter, setReportingCharacter] = useState(null);
+  const [reportingScene, setReportingScene] = useState(null);
+  const [reportType, setReportType] = useState('character');
   const LIMIT = 20;
 
   // ============================================================================
@@ -294,6 +296,23 @@ const CommunityHub = ({
   const handleReport = async ({ characterId, reason, details }) => {
     try {
       await apiRequest(`/api/community/characters/${characterId}/report`, {
+        method: 'POST',
+        body: JSON.stringify({
+          reason,
+          details
+        })
+      });
+
+      alert('Report submitted successfully. Our moderation team will review it shortly.');
+    } catch (error) {
+      console.error('Failed to submit report:', error);
+      throw new Error(error.message || 'Failed to submit report');
+    }
+  };
+
+  const handleReportScene = async ({ sceneId, reason, details }) => {
+    try {
+      await apiRequest(`/api/community/scenes/${sceneId}/report`, {
         method: 'POST',
         body: JSON.stringify({
           reason,
@@ -593,26 +612,40 @@ const CommunityHub = ({
               )}
             </button>
           ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleImportScene(scene);
-              }}
-              disabled={importing === scene.id}
-              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 px-2 py-1 hover:bg-white/5 rounded transition-colors disabled:opacity-50"
-            >
-              {importing === scene.id ? (
-                <>
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400"></div>
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Download size={12} />
-                  Import
-                </>
-              )}
-            </button>
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleImportScene(scene);
+                }}
+                disabled={importing === scene.id}
+                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 px-2 py-1 hover:bg-white/5 rounded transition-colors disabled:opacity-50"
+              >
+                {importing === scene.id ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400"></div>
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Download size={12} />
+                    Import
+                  </>
+                )}
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReportingScene(scene);
+                  setReportType('scene');
+                  setReportModalOpen(true);
+                }}
+                className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
+              >
+                <Flag size={12} />
+                Report
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -725,20 +758,33 @@ const CommunityHub = ({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
+          <div className="flex items-center justify-between p-6 border-t border-white/10">
             <button
-              onClick={() => setSelectedScene(null)}
-              className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+              onClick={() => {
+                setReportingScene(selectedScene);
+                setReportType('scene');
+                setReportModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 rounded-lg transition-colors"
             >
-              Close
+              <Flag size={16} />
+              Report
             </button>
-            <button
-              onClick={() => handleImportScene(selectedScene)}
-              disabled={importing === selectedScene.id}
-              className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 text-white rounded-lg transition-all"
-            >
-              {importing === selectedScene.id ? 'Importing...' : 'Import Scene'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSelectedScene(null)}
+                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => handleImportScene(selectedScene)}
+                disabled={importing === selectedScene.id}
+                className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 text-white rounded-lg transition-all"
+              >
+                {importing === selectedScene.id ? 'Importing...' : 'Import Scene'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1119,9 +1165,13 @@ const CommunityHub = ({
         onClose={() => {
           setReportModalOpen(false);
           setReportingCharacter(null);
+          setReportingScene(null);
+          setReportType('character');
         }}
         character={reportingCharacter}
-        onSubmit={handleReport}
+        scene={reportingScene}
+        itemType={reportType}
+        onSubmit={reportType === 'character' ? handleReport : handleReportScene}
       />
     </div>
   );

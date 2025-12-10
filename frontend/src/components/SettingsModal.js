@@ -25,6 +25,10 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
     ollamaUrl: 'http://localhost:11434',
     ollamaTestModel: 'llama2',
 
+    // LM Studio settings
+    lmStudioUrl: 'http://127.0.0.1:1234',
+    lmStudioTestModel: 'local-model',
+
     // Group dynamics
     groupDynamicsMode: 'natural',
 
@@ -50,7 +54,8 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
     anthropic: null,
     openrouter: null,
     google: null,
-    ollama: null
+    ollama: null,
+    lmstudio: null
   });
   
   const [saving, setSaving] = useState(false);
@@ -69,6 +74,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
         openrouterKey: settings.apiKeys?.openrouter || '',
         googleKey: settings.apiKeys?.google || '',
         ollamaUrl: settings.ollamaSettings?.baseUrl || 'http://localhost:11434',
+        lmStudioUrl: settings.lmStudioSettings?.baseUrl || 'http://127.0.0.1:1234',
         groupDynamicsMode: settings.groupDynamicsMode || 'natural',
         messageDelay: settings.messageDelay || 1200,
         autoApproveCharacters: settings.autoApproveCharacters || false,
@@ -147,9 +153,11 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
         ollamaSettings
       };
 
-      // For Ollama, send the user-specified model to test
+      // For Ollama and LM Studio, send the user-specified model to test
       if (provider === 'ollama') {
         requestBody.model = formData.ollamaTestModel || 'llama2';
+      } else if (provider === 'lmstudio') {
+        requestBody.model = formData.lmStudioTestModel || 'local-model';
       }
 
       const response = await fetch(`${API_BASE_URL}/api/providers/test`, {
@@ -202,6 +210,9 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
         },
         ollamaSettings: {
           baseUrl: formData.ollamaUrl
+        },
+        lmStudioSettings: {
+          baseUrl: formData.lmStudioUrl
         },
         groupDynamicsMode: formData.groupDynamicsMode,
         messageDelay: formData.messageDelay,
@@ -406,6 +417,69 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
 
                 <p className="text-xs text-gray-500 mt-2">
                   Run models locally with Ollama. <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer" className="text-red-400 hover:underline">Learn more</a>
+                </p>
+              </div>
+
+              {/* LM Studio Settings */}
+              <div className="pt-4 border-t border-white/10">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-gray-300">
+                    LM Studio (Local Models)
+                  </label>
+                  {keyStatus.lmstudio && (
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      keyStatus.lmstudio.success
+                        ? 'text-green-400 bg-green-400/20'
+                        : 'text-red-400 bg-red-400/20'
+                    }`}>
+                      {keyStatus.lmstudio.success ? '✓ Connected' : '✗ Offline'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-gray-400 mb-1 block">Server URL</label>
+                      <input
+                        type="text"
+                        value={formData.lmStudioUrl}
+                        onChange={(e) => handleInputChange('lmStudioUrl', e.target.value)}
+                        placeholder="http://127.0.0.1:1234"
+                        className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400"
+                      />
+                    </div>
+
+                    <div className="flex-1">
+                      <label className="text-xs text-gray-400 mb-1 block">Model to Test</label>
+                      <input
+                        type="text"
+                        value={formData.lmStudioTestModel}
+                        onChange={(e) => handleInputChange('lmStudioTestModel', e.target.value)}
+                        placeholder="local-model"
+                        className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => testApiKey('lmstudio')}
+                    disabled={testingKey === 'lmstudio'}
+                    className="w-full px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {testingKey === 'lmstudio' ? (
+                      <>
+                        <Loader size={16} className="animate-spin" />
+                        Testing connection to {formData.lmStudioTestModel}...
+                      </>
+                    ) : (
+                      'Test Connection'
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-xs text-gray-500 mt-2">
+                  Run models locally with LM Studio. Change to network IP if accessing from another device. <a href="https://lmstudio.ai" target="_blank" rel="noopener noreferrer" className="text-red-400 hover:underline">Learn more</a>
                 </p>
               </div>
             </div>

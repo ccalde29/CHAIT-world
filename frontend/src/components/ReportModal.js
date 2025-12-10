@@ -17,11 +17,14 @@ const REPORT_REASONS = [
   { value: 'other', label: 'Other' }
 ];
 
-const ReportModal = ({ isOpen, onClose, character, onSubmit }) => {
+const ReportModal = ({ isOpen, onClose, character, scene, itemType = 'character', onSubmit }) => {
   const [selectedReason, setSelectedReason] = useState('');
   const [details, setDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  const item = itemType === 'character' ? character : scene;
+  const itemName = item?.name || 'Unknown';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,7 +39,7 @@ const ReportModal = ({ isOpen, onClose, character, onSubmit }) => {
 
     try {
       await onSubmit({
-        characterId: character.id,
+        [itemType === 'character' ? 'characterId' : 'sceneId']: item.id,
         reason: selectedReason,
         details: details.trim()
       });
@@ -61,16 +64,18 @@ const ReportModal = ({ isOpen, onClose, character, onSubmit }) => {
     }
   };
 
-  if (!isOpen || !character) return null;
+  if (!isOpen || !item) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl border border-white/10 w-full max-w-md">
+      <div className="bg-gray-900 rounded-2xl border border-white/10 w-full max-w-md max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
             <Flag className="text-orange-500" size={24} />
-            <h2 className="text-xl font-bold text-white">Report Character</h2>
+            <h2 className="text-xl font-bold text-white">
+              Report {itemType === 'character' ? 'Character' : 'Scene'}
+            </h2>
           </div>
           <button
             onClick={handleClose}
@@ -83,10 +88,10 @@ const ReportModal = ({ isOpen, onClose, character, onSubmit }) => {
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Character Info */}
+          {/* Item Info */}
           <div className="bg-white/5 border border-white/10 rounded-lg p-3">
             <p className="text-sm text-gray-400 mb-1">Reporting:</p>
-            <p className="text-white font-medium">{character.name}</p>
+            <p className="text-white font-medium">{itemName}</p>
           </div>
 
           {/* Warning Notice */}

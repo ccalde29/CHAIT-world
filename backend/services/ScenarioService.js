@@ -45,7 +45,15 @@ class ScenarioService {
                     atmosphere: scenarioData.atmosphere || 'neutral',
                     background_image_url: scenarioData.background_image_url || null,
                     background_image_filename: scenarioData.background_image_filename || null,
-                    uses_custom_background: scenarioData.uses_custom_background || false
+                    uses_custom_background: scenarioData.uses_custom_background || false,
+                    narrator_enabled: scenarioData.narrator_enabled || false,
+                    narrator_ai_provider: scenarioData.narrator_ai_provider || null,
+                    narrator_ai_model: scenarioData.narrator_ai_model || null,
+                    narrator_temperature: scenarioData.narrator_temperature || null,
+                    narrator_max_tokens: scenarioData.narrator_max_tokens || null,
+                    narrator_trigger_mode: scenarioData.narrator_trigger_mode || null,
+                    narrator_interval: scenarioData.narrator_interval || null,
+                    narrator_personality: scenarioData.narrator_personality || null
                 })
                 .select()
                 .single();
@@ -74,6 +82,14 @@ class ScenarioService {
                     background_image_url: updates.background_image_url || null,
                     background_image_filename: updates.background_image_filename || null,
                     uses_custom_background: updates.uses_custom_background || false,
+                    narrator_enabled: updates.narrator_enabled !== undefined ? updates.narrator_enabled : false,
+                    narrator_ai_provider: updates.narrator_ai_provider || null,
+                    narrator_ai_model: updates.narrator_ai_model || null,
+                    narrator_temperature: updates.narrator_temperature !== undefined ? updates.narrator_temperature : null,
+                    narrator_max_tokens: updates.narrator_max_tokens !== undefined ? updates.narrator_max_tokens : null,
+                    narrator_trigger_mode: updates.narrator_trigger_mode || null,
+                    narrator_interval: updates.narrator_interval !== undefined ? updates.narrator_interval : null,
+                    narrator_personality: updates.narrator_personality || null,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', scenarioId)

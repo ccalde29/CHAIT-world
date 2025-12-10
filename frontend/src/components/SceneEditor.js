@@ -174,7 +174,15 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
         name: formData.name.trim(),
         description: formData.description.trim(),
         initial_message: formData.initial_message.trim(),
-        atmosphere: formData.atmosphere.trim() || 'neutral'
+        atmosphere: formData.atmosphere.trim() || 'neutral',
+        narrator_enabled: formData.narrator_enabled,
+        narrator_ai_provider: formData.narrator_ai_provider,
+        narrator_ai_model: formData.narrator_ai_model,
+        narrator_temperature: formData.narrator_temperature,
+        narrator_max_tokens: formData.narrator_max_tokens,
+        narrator_trigger_mode: formData.narrator_trigger_mode,
+        narrator_interval: formData.narrator_interval,
+        narrator_personality: formData.narrator_personality
       };
 
       if (editingScene) {
@@ -202,7 +210,15 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
       atmosphere: scene.atmosphere || '',
       background_image_url: scene.background_image_url || null,
       background_image_filename: scene.background_image_filename || null,
-      uses_custom_background: scene.uses_custom_background || false
+      uses_custom_background: scene.uses_custom_background || false,
+      narrator_enabled: scene.narrator_enabled || false,
+      narrator_ai_provider: scene.narrator_ai_provider || 'openai',
+      narrator_ai_model: scene.narrator_ai_model || 'gpt-4o-mini',
+      narrator_temperature: scene.narrator_temperature !== undefined ? scene.narrator_temperature : 0.7,
+      narrator_max_tokens: scene.narrator_max_tokens !== undefined ? scene.narrator_max_tokens : 100,
+      narrator_trigger_mode: scene.narrator_trigger_mode || 'auto_interval',
+      narrator_interval: scene.narrator_interval !== undefined ? scene.narrator_interval : 5,
+      narrator_personality: scene.narrator_personality || ''
     });
     setShowCreateForm(true);
   };

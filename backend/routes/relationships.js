@@ -71,30 +71,36 @@ router.get('/:characterId/relationships', async (req, res) => {
 
     // Fetch persona details
     if (userRelationships.length > 0) {
-      // target_id is stored as a string (could be UUID), don't parse as int
-      const targetPersonaIds = userRelationships.map(r => r.target_id);
-      console.log('[Relationships GET] Looking up personas:', targetPersonaIds);
+      // For user relationships, target_id should be persona ID (UUID)
+      // Filter out any that don't look like UUIDs to prevent errors
+      const targetPersonaIds = userRelationships
+        .map(r => r.target_id)
+        .filter(id => id && typeof id === 'string' && id.includes('-'));
+      
+      if (targetPersonaIds.length > 0) {
+        console.log('[Relationships GET] Looking up personas:', targetPersonaIds);
 
-      const { data: personas, error: personaError } = await supabase
-        .from('user_personas')
-        .select('id, name, avatar, color, uses_custom_image, avatar_image_url')
-        .in('id', targetPersonaIds);
+        const { data: personas, error: personaError } = await supabase
+          .from('user_personas')
+          .select('id, name, avatar, color, uses_custom_image, avatar_image_url')
+          .in('id', targetPersonaIds);
 
-      console.log('[Relationships GET] Found personas:', personas);
-      if (personaError) console.error('[Relationships GET] Persona error:', personaError);
+        console.log('[Relationships GET] Found personas:', personas);
+        if (personaError) console.error('[Relationships GET] Persona error:', personaError);
 
-      relationships.forEach(rel => {
-        if (rel.target_type === 'user') {
-          // Compare as strings since target_id is stored as string
-          const targetPersona = personas?.find(p => String(p.id) === String(rel.target_id));
-          if (targetPersona) {
-            rel.target_persona = targetPersona;
-            console.log('[Relationships GET] Enriched relationship with persona:', rel);
-          } else {
-            console.warn('[Relationships GET] No persona found for target_id:', rel.target_id);
+        relationships.forEach(rel => {
+          if (rel.target_type === 'user') {
+            // Compare as strings since target_id is stored as string
+            const targetPersona = personas?.find(p => String(p.id) === String(rel.target_id));
+            if (targetPersona) {
+              rel.target_persona = targetPersona;
+              console.log('[Relationships GET] Enriched relationship with persona:', rel);
+            } else {
+              console.warn('[Relationships GET] No persona found for target_id:', rel.target_id);
+            }
           }
-        }
-      });
+        });
+      }
     }
 
     res.json({ relationships });

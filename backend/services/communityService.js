@@ -483,12 +483,14 @@ class CommunityService {
   async reportCharacter(userId, characterId, reason, details = '') {
     try {
       const { data, error } = await this.supabase
-        .from('character_reports')
+        .from('community_reports')
         .insert({
-          character_id: characterId,
+          community_character_id: characterId,
+          community_scene_id: null,
           reporter_user_id: userId,
           reason: reason,
-          details: details
+          details: details,
+          report_type: 'character'
         })
         .select()
         .single();
@@ -497,6 +499,35 @@ class CommunityService {
       return data;
     } catch (error) {
       console.error('Error reporting character:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Report a scene for inappropriate content
+   */
+  async reportScene(userId, sceneId, reason, details = '') {
+    try {
+      const { data, error } = await this.supabase
+        .from('community_reports')
+        .insert({
+          community_scene_id: sceneId,
+          community_character_id: null,
+          reporter_user_id: userId,
+          reason: reason,
+          details: details,
+          report_type: 'scene'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error reporting scene:', error);
+        throw error;
+      }
+      return data;
+    } catch (error) {
+      console.error('Error reporting scene:', error);
       throw error;
     }
   }
