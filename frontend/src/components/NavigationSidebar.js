@@ -68,8 +68,7 @@ const NavigationSidebar = ({
       id: 'community',
       label: 'Community',
       icon: Globe,
-      requiresAuth: true,
-      locked: !user
+      requiresAuth: false
     },
     {
       id: 'settings',
@@ -196,36 +195,26 @@ const NavigationSidebar = ({
 
       {/* User Profile Section */}
       <div className="border-t border-white/10 p-4">
-        {user ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 px-2">
-              <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
-                <User size={18} className="text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white truncate">
-                  {user.email}
-                </div>
-                <div className="text-xs text-gray-400">Signed In</div>
-              </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
+              <User size={18} className="text-white" />
             </div>
-            <button
-              onClick={signOut}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-            >
-              <LogOut size={16} />
-              Sign Out
-            </button>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-white truncate">
+                {user?.email || 'User'}
+              </div>
+              <div className="text-xs text-gray-400">Signed In</div>
+            </div>
           </div>
-        ) : (
           <button
-            onClick={() => onNavigate('login')}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
+            onClick={signOut}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
           >
-            <User size={18} />
-            Sign In
+            <LogOut size={16} />
+            Sign Out
           </button>
-        )}
+        </div>
       </div>
     </div>
   );

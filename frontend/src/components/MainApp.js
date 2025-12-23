@@ -28,13 +28,13 @@ import OfflineIndicator from './OfflineIndicator';
 import LoginRequiredModal from './LoginRequiredModal';
 
 const MainApp = () => {
-  const { user, signOut, signInWithGoogle } = useAuth();
+  const { user, signOut } = useAuth();
 
   // ============================================================================
   // API CLIENT
   // ============================================================================
 
-  const apiRequest = useMemo(() => createApiClient(user?.id || 'guest'), [user?.id]);
+  const apiRequest = useMemo(() => createApiClient(user.id), [user.id]);
 
   // ============================================================================
   // CUSTOM HOOKS
@@ -93,7 +93,7 @@ const MainApp = () => {
       }
     };
     loadAdminStatus();
-  }, [user?.id, apiRequest]);
+  }, [user.id, apiRequest]);
 
   // Debug: Log when admin status changes
   useEffect(() => {
@@ -298,13 +298,6 @@ const MainApp = () => {
   // ============================================================================
 
   const handleNavigate = (view) => {
-    // Handle login separately
-    if (view === 'login') {
-      // Trigger Google OAuth sign-in
-      signInWithGoogle();
-      return;
-    }
-
     // Check if view requires authentication
     const requiresAuth = view === 'community';
     

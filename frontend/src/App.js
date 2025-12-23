@@ -6,6 +6,7 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import MainApp from './components/MainApp';
+import LoginScreen from './components/LoginScreen';
 import './index.css';
 
 // Inner component that has access to auth context
@@ -24,7 +25,12 @@ const AppContent = () => {
     );
   }
 
-  // Always show main app (supports guest mode)
+  // Show login screen if not authenticated
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  // Show main app if authenticated
   return <MainApp />;
 };
 
