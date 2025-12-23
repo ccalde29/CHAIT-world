@@ -91,7 +91,7 @@ class ResponsePlanner {
     const lowerMessage = message.toLowerCase();
     
     for (const char of characters) {
-      if (lowerMessage.includes(char.name.toLowerCase())) {
+      if (char && char.name && lowerMessage.includes(char.name.toLowerCase())) {
         mentioned.push(char);
       }
     }

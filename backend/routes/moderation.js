@@ -39,11 +39,18 @@ function getSupabase() {
  */
 router.get('/queue', requireAdmin, async (req, res) => {
   try {
+    console.log('[Moderation] Fetching moderation queue...');
     const { data: queue, error } = await getSupabase()
       .from('community_characters')
       .select('*')
       .in('moderation_status', ['pending', 'rejected'])
       .order('published_at', { ascending: false });
+
+    console.log('[Moderation] Queue query result:', { 
+      count: queue?.length || 0, 
+      error: error ? error.message : null,
+      items: queue?.map(q => ({ id: q.id, name: q.name, status: q.moderation_status })) || []
+    });
 
     if (error) {
       console.error('[Moderation] Error fetching queue:', error);

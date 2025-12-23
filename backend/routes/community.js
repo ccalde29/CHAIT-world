@@ -103,16 +103,8 @@ module.exports = (communityService, characterService, db) => {
                 return res.status(401).json({ error: 'Authentication required' });
             }
             
-            // Get character from appropriate database
-            let character;
-            if (db && db.isLocalMode && db.isLocalMode()) {
-                // Local mode: get from SQLite
-                character = await db.getCharacter(req.params.id);
-            } else {
-                // Web mode: get from Supabase via characterService
-                const { characters } = await characterService.getCharacters(req.userId);
-                character = characters.find(c => c.id === req.params.id);
-            }
+            // Get character from local database
+            const character = await db.getCharacter(req.params.id);
 
             if (!character) {
                 return res.status(404).json({ error: 'Character not found' });
@@ -404,13 +396,20 @@ module.exports = (communityService, characterService, db) => {
                 return res.status(401).json({ error: 'Authentication required' });
             }
 
+            // Get the scene from local database first
+            const localScene = await db.getScenario(req.userId, req.params.id);
+            if (!localScene) {
+                return res.status(404).json({ error: 'Scene not found' });
+            }
+
             // Get locking options from request body
             const { isLocked = false, hiddenFields = [] } = req.body;
 
             const published = await communityService.publishScene(
                 req.userId,
                 req.params.id,
-                { isLocked, hiddenFields }
+                { isLocked, hiddenFields },
+                localScene
             );
 
             res.json({

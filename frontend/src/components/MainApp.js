@@ -131,6 +131,11 @@ const MainApp = () => {
       // Load the newly created session (which includes the initial message)
       if (response.sessionId) {
         await chat.loadChatSession(response.sessionId);
+        
+        // Refresh the sessions list in the sidebar
+        if (loadSessionsRef.current) {
+          loadSessionsRef.current();
+        }
       }
     } catch (error) {
       console.error('Failed to create chat session:', error);
@@ -146,19 +151,17 @@ const MainApp = () => {
   };
 
   const handleSendMessage = async () => {
-    const wasNewChat = !chat.currentSessionId;
     await chat.sendMessage(
       charactersState.activeCharacters,
       charactersState.currentScenario,
-      settings.userPersona
+      settings.userPersona,
+      (newSessionId) => {
+        // Callback when new session is created - refresh immediately
+        if (loadSessionsRef.current) {
+          loadSessionsRef.current();
+        }
+      }
     );
-    // If this was a new chat, refresh the session list after first message
-    if (wasNewChat && loadSessionsRef.current) {
-      // Small delay to ensure backend has saved the session
-      setTimeout(() => {
-        loadSessionsRef.current?.();
-      }, 500);
-    }
   };
 
   const handlePersonaSwitch = async (personaId) => {
@@ -319,6 +322,12 @@ const MainApp = () => {
       return;
     }
 
+    // If navigating away from chat, clear the active chat panel
+    if (activeView === 'chat' && view !== 'chat') {
+      charactersState.setActiveCharacters([]);
+      charactersState.setCurrentScenario(null);
+    }
+
     // Navigate to view
     setActiveView(view);
   };
@@ -342,16 +351,17 @@ const MainApp = () => {
         onSessionsLoad={(loadFn) => { loadSessionsRef.current = loadFn; }}
         onSessionSelect={async (session) => {
           try {
-            // Load the chat session and get the full session data
-            const fullSession = await chat.loadChatSession(session.id);
-
-            // Restore the active characters from the session
-            if (fullSession.active_characters && fullSession.active_characters.length > 0) {
-              const sessionCharacters = fullSession.active_characters
+            // First, restore the active characters from the session
+            let sessionCharacters = [];
+            if (session.active_characters && session.active_characters.length > 0) {
+              sessionCharacters = session.active_characters
                 .map(charId => charactersState.characters.find(c => c.id === charId))
                 .filter(Boolean); // Remove any not found
               charactersState.setActiveCharacters(sessionCharacters);
             }
+
+            // Load the chat session with character data for enrichment
+            const fullSession = await chat.loadChatSession(session.id, sessionCharacters);
 
             // Restore the scene from the session
             if (fullSession.scenario_id) {
@@ -369,10 +379,12 @@ const MainApp = () => {
             await apiRequest(`/api/chat/sessions/${sessionId}`, {
               method: 'DELETE'
             });
-            // If we deleted the current session, clear it
+            // If we deleted the current session, clear everything
             if (chat.currentSessionId === sessionId) {
-              chat.setCurrentSessionId(null);
-              chat.setMessages([]);
+              chat.clearChat();
+              charactersState.setActiveCharacters([]);
+              charactersState.setCurrentScenario(null);
+              setActiveView('manage');
             }
             // Trigger session list refresh
             setSessionRefreshTrigger(prev => prev + 1);

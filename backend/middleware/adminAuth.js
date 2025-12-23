@@ -1,7 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
+const DatabaseService = require('../services/database');
 
 // Lazy-load Supabase client to ensure environment variables are loaded
 let supabase = null;
+let db = null;
 
 function getSupabase() {
   if (!supabase) {
@@ -18,9 +20,16 @@ function getSupabase() {
   return supabase;
 }
 
+function getDB() {
+  if (!db) {
+    db = new DatabaseService();
+  }
+  return db;
+}
+
 /**
  * Middleware to check if user has admin privileges
- * Uses the is_admin flag from user_settings table
+ * Uses the is_admin flag from local user_settings_local table
  *
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -37,23 +46,14 @@ async function requireAdmin(req, res, next) {
       });
     }
 
-    // Check if user has admin privileges
-    const { data: userSettings, error } = await getSupabase()
-      .from('user_settings')
-      .select('is_admin')
-      .eq('user_id', userId)
-      .single();
+    // Check if user has admin privileges from local database
+    const userSettings = await getDB().getUserSettings(userId);
 
-    if (error) {
-      console.error('[AdminAuth] Error checking admin status:', error);
-      return res.status(500).json({
-        error: 'Internal server error',
-        message: 'Failed to verify admin status'
+    if (!userSettings || !userSettings.isAdmin) {
+      console.warn(`[AdminAuth] Unauthorized admin access attempt by user: ${userId}`, { 
+        settingsFound: !!userSettings,
+        isAdmin: userSettings?.isAdmin 
       });
-    }
-
-    if (!userSettings || !userSettings.is_admin) {
-      console.warn(`[AdminAuth] Unauthorized admin access attempt by user: ${userId}`);
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Admin privileges required for this action'
@@ -90,19 +90,10 @@ async function checkAdmin(req, res, next) {
       return next();
     }
 
-    // Check if user has admin privileges
-    const { data: userSettings, error } = await getSupabase()
-      .from('user_settings')
-      .select('is_admin')
-      .eq('user_id', userId)
-      .single();
+    // Check if user has admin privileges from local database
+    const userSettings = await getDB().getUserSettings(userId);
 
-    if (error || !userSettings) {
-      req.isAdmin = false;
-      return next();
-    }
-
-    req.isAdmin = userSettings.is_admin || false;
+    req.isAdmin = userSettings?.isAdmin || false;
     next();
 
   } catch (error) {

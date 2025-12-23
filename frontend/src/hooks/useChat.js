@@ -28,7 +28,7 @@ export const useChat = (apiRequest) => {
     setResponseTimeouts([]);
   };
 
-  const sendMessage = async (activeCharacters, currentScenario, userPersona) => {
+  const sendMessage = async (activeCharacters, currentScenario, userPersona, onNewSession) => {
     if (!userInput.trim() || isGenerating || activeCharacters.length === 0) {
       return;
     }
@@ -50,6 +50,8 @@ export const useChat = (apiRequest) => {
 
     setMessages(prev => [...prev, newUserMessage]);
 
+    const wasNewChat = !currentSessionId;
+
     try {
       const response = await apiRequest('/api/chat/group-response', {
         method: 'POST',
@@ -65,6 +67,10 @@ export const useChat = (apiRequest) => {
 
       if (response.sessionId && !currentSessionId) {
         setCurrentSessionId(response.sessionId);
+        // Trigger callback for new session
+        if (wasNewChat && onNewSession) {
+          onNewSession(response.sessionId);
+        }
       }
 
       // Handle responses with delays
@@ -118,10 +124,29 @@ export const useChat = (apiRequest) => {
     setMessages(prev => [...prev, systemMessage]);
   };
 
-  const loadChatSession = async (sessionId) => {
+  const loadChatSession = async (sessionId, activeCharacters = []) => {
     try {
       const session = await apiRequest(`/api/chat/sessions/${sessionId}`);
-      setMessages(session.messages || []);
+      
+      // Enrich messages with character data for proper display
+      const enrichedMessages = (session.messages || []).map(msg => {
+        if (msg.type === 'character' && msg.character_id) {
+          const char = activeCharacters.find(c => c.id === msg.character_id);
+          if (char) {
+            return {
+              ...msg,
+              characterName: char.name,
+              characterAvatar: char.avatar,
+              characterColor: char.color,
+              characterImageUrl: char.avatar_image_url,
+              characterUsesCustomImage: char.uses_custom_image
+            };
+          }
+        }
+        return msg;
+      });
+      
+      setMessages(enrichedMessages);
       setCurrentSessionId(sessionId);
 
       // Return the full session data so the parent can restore UI state

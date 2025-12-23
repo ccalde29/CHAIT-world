@@ -80,14 +80,40 @@ class CommunityService {
    */
   async getPopularTags(limit = 20) {
     try {
-      const { data, error } = await this.supabase
-        .rpc('get_popular_tags', { tag_limit: limit });
+      // Get tags from community characters and scenes
+      const { data: characters, error: charError } = await this.supabase
+        .from('community_characters')
+        .select('tags');
 
-      if (error) throw error;
-      return data || [];
+      const { data: scenes, error: sceneError } = await this.supabase
+        .from('community_scenes')
+        .select('tags');
+
+      if (charError && sceneError) {
+        throw charError || sceneError;
+      }
+
+      // Combine and count tags
+      const tagCounts = {};
+      const allTags = [
+        ...((characters || []).flatMap(c => c.tags || [])),
+        ...((scenes || []).flatMap(s => s.tags || []))
+      ];
+
+      allTags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      });
+
+      // Sort by count and return top tags
+      const sortedTags = Object.entries(tagCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([tag, count]) => ({ tag, count }));
+
+      return sortedTags;
     } catch (error) {
       console.error('Error getting popular tags:', error);
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -593,18 +619,24 @@ class CommunityService {
   /**
    * Publish scene to community
    */
-  async publishScene(userId, sceneId, options = {}) {
+  async publishScene(userId, sceneId, options = {}, localScene = null) {
     try {
-      // Get the scene from user's scenarios table
-      const { data: scene, error: fetchError } = await this.supabase
-        .from('scenarios')
-        .select('*')
-        .eq('id', sceneId)
-        .eq('user_id', userId)
-        .single();
+      // If localScene is provided, use it; otherwise try to fetch from Supabase (legacy)
+      let scene = localScene;
+      
+      if (!scene) {
+        // Try Supabase for backwards compatibility
+        const { data: supabaseScene, error: fetchError } = await this.supabase
+          .from('scenarios')
+          .select('*')
+          .eq('id', sceneId)
+          .eq('user_id', userId)
+          .single();
 
-      if (fetchError || !scene) {
-        throw new Error('Scene not found or you are not the owner');
+        if (fetchError || !supabaseScene) {
+          throw new Error('Scene not found or you are not the owner');
+        }
+        scene = supabaseScene;
       }
 
       // Handle content locking options

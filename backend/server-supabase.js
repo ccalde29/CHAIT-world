@@ -58,6 +58,9 @@ app.options('*', cors({
 
 app.use(express.json({ limit: '10mb' }));
 
+// Serve uploaded images statically
+app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
+
 // Apply general rate limiting to all API routes
 app.use('/api', generalLimiter);
 
@@ -95,7 +98,7 @@ const characterLearningRoutes = require('./routes/characterLearning')(db.supabas
 const characterCommentRoutes = require('./routes/characterComments')(db.supabase);
 const sceneCommentRoutes = require('./routes/sceneComments')(db.supabase);
 const personasRoutes = require('./routes/personas')(db);
-const relationshipsRoutes = require('./routes/relationships');
+const relationshipsRoutes = require('./routes/relationships')(db);
 const moderationRoutes = require('./routes/moderation');
 const customModelsRoutes = require('./routes/custom-models');
 const pricingRoutes = require('./routes/pricing');
@@ -127,32 +130,30 @@ app.use('/api/characters', requireAuth, offlineCapable, relationshipsRoutes); //
 app.use('/api/moderation', requireAuth, moderationRoutes); // Admin-only, needs online
 app.use('/api/custom-models', requireAuth, offlineCapable, customModelsRoutes); // Offline-capable
 app.use('/api/pricing', requireAuth, pricingRoutes); // Needs online
-// Image routes last since they use catch-all patterns
-app.use('/api', requireAuth, offlineCapable, imageRoutes); // Offline-capable
+// Image routes
+app.use('/api/images', requireAuth, offlineCapable, imageRoutes); // Offline-capable
 
 // ============================================================================
 // HEALTH & UTILITY ROUTES
 // ============================================================================
 
 app.get('/health', (req, res) => {
-  const mode = process.env.DEPLOYMENT_MODE || 'web';
-  const isLocal = mode === 'local';
-  const communityAvailable = !isLocal || (db && db.isCommunityAvailable && db.isCommunityAvailable());
+  const communityAvailable = db && db.isCommunityAvailable && db.isCommunityAvailable();
   
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
     version: '2.0.0',
     environment: process.env.NODE_ENV || 'development',
-    mode: mode,
-    database: isLocal ? 'SQLite + Supabase (community)' : 'Supabase',
+    mode: 'local',
+    database: 'SQLite (local) + Supabase (community)',
     offline: !communityAvailable,
     features: {
       chatHistory: true,
       characterMemory: true,
       characterInteractions: true,
       modularArchitecture: true,
-      offlineMode: isLocal,
+      offlineMode: true,
       communityFeatures: communityAvailable
     }
   });

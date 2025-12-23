@@ -30,7 +30,7 @@ module.exports = (db) => {
     process.env.SUPABASE_SERVICE_ROLE_KEY
   );
   
-  const memoryService = new MemoryService(supabase);
+  const memoryService = new MemoryService(db);
   const learningService = new CharacterLearningService(supabase);
   const promptBuilder = new PromptBuilder();
   const conversationTracker = new ConversationStateTracker();
@@ -93,7 +93,7 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     // ========================================================================
     
     const characterPromises = activeCharacters.map(charId => db.getCharacter(charId));
-    const characters = (await Promise.all(characterPromises)).filter(char => char !== undefined);
+    const characters = (await Promise.all(characterPromises)).filter(char => char != null); // Filters both null and undefined
     
     if (!characters || characters.length === 0) {
       return res.status(500).json({ error: 'Failed to load character data' });

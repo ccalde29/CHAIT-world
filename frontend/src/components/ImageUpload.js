@@ -1,12 +1,11 @@
 /**
  * ImageUpload Component
  * 
- * Handles image uploads to Supabase storage with preview and management
+ * Handles image uploads with preview and management
  */
 
 import React, { useState, useRef } from 'react';
 import { Upload, X, Image as ImageIcon, Trash2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 const ImageUpload = ({
@@ -52,7 +51,7 @@ const ImageUpload = ({
     await uploadImage(file);
   };
 
-  // Upload image to Supabase Storage
+  // Upload image to backend
   const uploadImage = async (file) => {
     if (!user) {
       setError('You must be logged in to upload images');
@@ -61,59 +60,36 @@ const ImageUpload = ({
 
     setUploading(true);
     setError(null);
-    
-    let uploadedFileName = null;  // Track uploaded file
       
     try {
-      // Create a unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${type}/${Date.now()}.${fileExt}`;
-      uploadedFileName = fileName;
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('type', type);
 
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('user-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      // Upload to backend API
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/images/upload`, {
+        method: 'POST',
+        headers: {
+          'user-id': user.id
+        },
+        body: formData
+      });
 
-      if (uploadError) {
-        throw uploadError;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('user-images')
-        .getPublicUrl(fileName);
-
-      const imageUrl = urlData.publicUrl;
-
-      // Save image metadata to database
-      const { data: dbData, error: dbError } = await supabase
-        .from('user_images')
-        .insert({
-          user_id: user.id,
-          filename: fileName,
-          url: imageUrl,
-          type: type,
-          size_bytes: file.size
-        })
-        .select()
-        .single();
-
-      if (dbError) {
-          console.error('DB insert failed, rolling back storage upload');
-          await supabase.storage
-            .from('user-images')
-            .remove([fileName]);
-        throw dbError;
-      }
+      const data = await response.json();
+      
+      // Construct full URL for the uploaded image
+      const imageUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}${data.url}`;
 
       // Update parent component
       onImageChange({
         url: imageUrl,
-        filename: fileName,
+        filename: data.filename,
         useCustomImage: true
       });
 
@@ -132,33 +108,20 @@ const ImageUpload = ({
       if (!currentImage) return;
 
       try {
-        // Delete from storage if it's a custom uploaded image
-        if (currentImage.includes('user-images/')) {
+        // Delete from backend if it's a custom uploaded image
+        if (currentImage.includes('/uploads/')) {
           // Extract the filename from the URL
-          const urlParts = currentImage.split('/user-images/');
+          const urlParts = currentImage.split('/uploads/');
           if (urlParts.length > 1) {
             const fileName = urlParts[1];
             
-            const { error: storageError } = await supabase.storage
-              .from('user-images')
-              .remove([fileName]);
-
-            if (storageError) {
-              console.error('Storage deletion error:', storageError);
-              // Continue anyway - the database cleanup is more important
-            }
-
-            // Delete from database
-            const { error: dbError } = await supabase
-              .from('user_images')
-              .delete()
-              .eq('url', currentImage)
-              .eq('user_id', user.id);
-
-            if (dbError) {
-              console.error('Database deletion error:', dbError);
-              // Continue anyway - the main goal is to update the UI
-            }
+            // Call backend delete endpoint
+            await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/images/${type}/${fileName}`, {
+              method: 'DELETE',
+              headers: {
+                'user-id': user.id
+              }
+            });
           }
         }
 

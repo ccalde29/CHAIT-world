@@ -13,9 +13,7 @@ export const useOfflineStatus = (checkInterval = 30000) => {
   const [status, setStatus] = useState({
     isOnline: true,
     isChecking: true,
-    mode: 'web',
     communityAvailable: true,
-    offlineMode: false,
     lastChecked: null,
     error: null
   });
@@ -27,9 +25,7 @@ export const useOfflineStatus = (checkInterval = 30000) => {
       setStatus({
         isOnline: !health.offline,
         isChecking: false,
-        mode: health.mode || 'web',
         communityAvailable: health.features?.communityFeatures === true,
-        offlineMode: health.features?.offlineMode === true,
         lastChecked: new Date(),
         error: null
       });

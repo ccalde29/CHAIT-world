@@ -26,7 +26,10 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   // Fetch moderation queue
   const fetchQueue = async () => {
     try {
+      console.log('[ModerationPanel] Fetching queue...');
       const response = await apiRequest('/api/moderation/queue');
+      console.log('[ModerationPanel] Queue response:', response);
+      console.log('[ModerationPanel] Queue items:', response.queue);
       setQueue(response.queue || []);
     } catch (error) {
       console.error('Failed to fetch moderation queue:', error);

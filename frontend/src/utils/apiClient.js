@@ -29,9 +29,7 @@ export const checkServerHealth = async () => {
     return {
       status: 'ERROR',
       offline: true,
-      mode: 'unknown',
       features: {
-        offlineMode: false,
         communityFeatures: false
       }
     };

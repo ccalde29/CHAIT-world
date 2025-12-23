@@ -347,6 +347,11 @@ CREATE TABLE IF NOT EXISTS user_settings_local (
     default_provider TEXT DEFAULT 'openai',
     default_model TEXT,
     active_persona_id TEXT,
+    is_admin INTEGER DEFAULT 0,
+    auto_approve_characters INTEGER DEFAULT 0,
+    admin_system_prompt TEXT,
+    group_dynamics_mode TEXT DEFAULT 'natural',
+    message_delay INTEGER DEFAULT 1200,
     preferences TEXT DEFAULT '{"responseDelay": true, "showTypingIndicator": true, "maxCharactersInGroup": 5, "theme": "dark", "fontSize": "medium"}', -- JSON
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

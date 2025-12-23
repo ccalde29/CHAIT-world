@@ -2,8 +2,9 @@
 // Handles character memory and relationship operations
 
 class MemoryService {
-    constructor(supabaseClient) {
-        this.supabase = supabaseClient;
+    constructor(db) {
+        // Accept DatabaseService instance
+        this.db = db;
     }
 
     // ============================================================================
@@ -15,18 +16,7 @@ class MemoryService {
      */
     async getCharacterMemories(characterId, userId, limit = 10) {
         try {
-            const { data, error } = await this.supabase
-                .from('character_memories')
-                .select('*')
-                .eq('character_id', characterId)
-                .eq('user_id', userId)
-                .order('importance_score', { ascending: false })
-                .order('last_accessed', { ascending: false })
-                .limit(limit);
-
-            if (error) throw error;
-            return data || [];
-
+            return await this.db.getMemoriesByCharacter(characterId, userId, limit);
         } catch (error) {
             console.error('Database error getting character memories:', error);
             throw error;
@@ -38,29 +28,14 @@ class MemoryService {
      */
     async addCharacterMemory(characterId, userId, memoryData) {
         try {
-            console.log('>� Adding memory for character:', characterId);
-
-            const { data, error } = await this.supabase
-                .from('character_memories')
-                .insert({
-                    character_id: characterId,
-                    user_id: userId,
-                    memory_type: memoryData.type || 'fact',
-                    target_entity: memoryData.target_entity || userId,
-                    memory_content: memoryData.content,
-                    importance_score: memoryData.importance_score || 0.5
-                })
-                .select()
-                .single();
-
-            if (error) {
-                console.error('L Error adding memory:', error);
-                throw error;
-            }
-
-            console.log(' Memory added successfully');
-            return data;
-
+            console.log('Adding memory for character:', characterId);
+            const memory = await this.db.createMemory(characterId, userId, {
+                memory_type: memoryData.type || 'fact',
+                content: memoryData.content,
+                importance_score: memoryData.importance_score || 0.5
+            });
+            console.log('Memory added successfully');
+            return memory;
         } catch (error) {
             console.error('Database error adding character memory:', error);
             // Don't throw - memory creation shouldn't break chat
@@ -73,24 +48,13 @@ class MemoryService {
      */
     async clearCharacterMemories(characterId, userId) {
         try {
-            const { error: memError } = await this.supabase
-                .from('character_memories')
-                .delete()
-                .eq('character_id', characterId)
-                .eq('user_id', userId);
-
-            if (memError) throw memError;
-
-            const { error: relError } = await this.supabase
-                .from('character_relationships')
-                .delete()
-                .eq('character_id', characterId)
-                .eq('user_id', userId);
-
-            if (relError && relError.code !== 'PGRST116') throw relError;
-
+            await this.db.clearMemoriesForCharacter(characterId, userId);
+            // Also clear relationships
+            const relationships = await this.db.getRelationshipsForCharacter(characterId, userId);
+            for (const rel of relationships) {
+                await this.db.deleteRelationship(characterId, userId, rel.target_id);
+            }
             return { success: true };
-
         } catch (error) {
             console.error('Database error clearing memories:', error);
             throw error;
@@ -106,18 +70,9 @@ class MemoryService {
      */
     async getCharacterRelationship(characterId, userId) {
         try {
-            const { data, error } = await this.supabase
-                .from('character_relationships')
-                .select('*')
-                .eq('character_id', characterId)
-                .eq('user_id', userId)
-                .single();
-
-            if (error && error.code !== 'PGRST116') {
-                throw error;
-            }
-
-            if (!data) {
+            const relationship = await this.db.getRelationship(characterId, userId, 'user');
+            
+            if (!relationship) {
                 return {
                     relationship_type: 'neutral',
                     trust_level: 0.5,
@@ -127,8 +82,7 @@ class MemoryService {
                 };
             }
 
-            return data;
-
+            return relationship;
         } catch (error) {
             console.error('Database error getting character relationship:', error);
             throw error;
@@ -140,38 +94,18 @@ class MemoryService {
      */
     async updateCharacterRelationship(characterId, userId, relationshipData) {
         try {
-            console.log('💞 Updating relationship for character:', characterId);
-
-            // Ensure we include the target fields used by the DB unique constraint
-            // and provide sensible defaults for missing metrics.
-            const payload = {
-                character_id: characterId,
-                user_id: userId,
+            console.log('Updating relationship for character:', characterId);
+            const relationship = await this.db.createOrUpdateRelationship(characterId, userId, {
                 target_type: 'user',
                 target_id: userId,
                 relationship_type: relationshipData.relationship_type || 'neutral',
                 trust_level: relationshipData.trust_level ?? 0.5,
                 familiarity_level: relationshipData.familiarity_level ?? 0.1,
-                emotional_bond: relationshipData.emotional_bond ?? 0.0,
-                last_interaction: new Date().toISOString(),
-                interaction_count: relationshipData.interaction_count || 1
-            };
-
-            // Use explicit onConflict to match the DB unique constraint
-            const { data, error } = await this.supabase
-                .from('character_relationships')
-                .upsert(payload, { onConflict: 'character_id,user_id,target_type,target_id' })
-                .select()
-                .single();
-
-            if (error) {
-                console.error('Error updating relationship:', error);
-                throw error;
-            }
-
-            console.log('Relationship updated successfully', data);
-            return data;
-
+                emotional_bond: relationshipData.emotional_bond ?? 0.0
+            });
+            
+            console.log('Relationship updated successfully', relationship);
+            return relationship;
         } catch (error) {
             console.error('Database error updating character relationship:', error);
             // Don't throw - relationship update shouldn't break chat
@@ -184,7 +118,7 @@ class MemoryService {
      */
     async buildCharacterContext(characterId, userId, sessionId = null, otherCharacters = []) {
         try {
-            console.log('🔍 Building context for character:', characterId);
+            console.log('Building context for character:', characterId);
 
             const [memories, relationship] = await Promise.all([
                 this.getCharacterMemories(characterId, userId, 5),
@@ -194,15 +128,10 @@ class MemoryService {
             // Get recent messages from other characters in this session
             let recentCharacterMessages = [];
             if (sessionId && otherCharacters.length > 0) {
-                const { data: messages } = await this.supabase
-                    .from('messages')
-                    .select('*')
-                    .eq('session_id', sessionId)
-                    .in('character_id', otherCharacters)
-                    .order('timestamp', { ascending: false })
-                    .limit(5);
-
-                recentCharacterMessages = messages || [];
+                const allMessages = await this.db.getMessagesForSession(sessionId, userId);
+                recentCharacterMessages = allMessages
+                    .filter(m => otherCharacters.includes(m.character_id))
+                    .slice(-5);
             }
 
             const context = {
@@ -211,7 +140,7 @@ class MemoryService {
                 otherCharacterMessages: recentCharacterMessages
             };
 
-            console.log(' Context built successfully');
+            console.log('Context built successfully');
             return context;
 
         } catch (error) {
@@ -242,7 +171,7 @@ class MemoryService {
         const memories = [];
         const userText = userMessage.toLowerCase();
 
-        console.log('🔍 Analyzing conversation for memories...');
+        console.log('Analyzing conversation for memories...');
 
         // Enhanced pattern matching
         const patterns = [
@@ -279,7 +208,7 @@ class MemoryService {
                     target_entity: userId
                 });
 
-                console.log(' Found memory:', memoryContent);
+                console.log('Found memory:', memoryContent);
             }
         });
 
@@ -299,10 +228,10 @@ class MemoryService {
             memories.forEach(memory => {
                 memory.importance_score = Math.min(1.0, memory.importance_score + 0.1);
             });
-            console.log(' Boosted memory importance (character showed understanding)');
+            console.log('Boosted memory importance (character showed understanding)');
         }
 
-        console.log(`=� Total memories found: ${memories.length}`);
+        console.log(`Total memories found: ${memories.length}`);
         return memories;
     }
 
@@ -316,7 +245,7 @@ class MemoryService {
 
         const userText = userMessage.toLowerCase();
 
-        console.log('💞 Calculating relationship update...');
+        console.log('Calculating relationship update...');
 
         // Positive interactions (2-3x stronger)
         if (userText.match(/(?:thank you|thanks|appreciate|love|like|great|wonderful|amazing)/)) {
@@ -353,7 +282,7 @@ class MemoryService {
 
         const relationshipType = this.determineRelationshipType(newEmotionalBond, newFamiliarity);
 
-        console.log(` Relationship updated: ${relationshipType} (trust: ${newTrust.toFixed(2)}, familiarity: ${newFamiliarity.toFixed(2)})`);
+        console.log(`Relationship updated: ${relationshipType} (trust: ${newTrust.toFixed(2)}, familiarity: ${newFamiliarity.toFixed(2)})`);
 
         return {
             relationship_type: relationshipType,

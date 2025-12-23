@@ -68,6 +68,8 @@ class LocalDatabaseService {
 
             if (versionCheck) {
                 console.log('Database schema already exists');
+                // Run migrations for existing databases
+                this.runMigrations();
                 return;
             }
 
@@ -82,6 +84,48 @@ class LocalDatabaseService {
         } catch (error) {
             console.error('Failed to initialize schema:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Run migrations to update existing database schemas
+     */
+    runMigrations() {
+        try {
+            // Check if user_settings_local table has the new columns
+            const tableInfo = this.db.prepare("PRAGMA table_info(user_settings_local)").all();
+            const columnNames = tableInfo.map(col => col.name);
+
+            // Add missing columns if they don't exist
+            if (!columnNames.includes('group_dynamics_mode')) {
+                console.log('Adding group_dynamics_mode column to user_settings_local');
+                this.db.exec("ALTER TABLE user_settings_local ADD COLUMN group_dynamics_mode TEXT DEFAULT 'natural'");
+            }
+
+            if (!columnNames.includes('message_delay')) {
+                console.log('Adding message_delay column to user_settings_local');
+                this.db.exec("ALTER TABLE user_settings_local ADD COLUMN message_delay INTEGER DEFAULT 1200");
+            }
+
+            if (!columnNames.includes('admin_system_prompt')) {
+                console.log('Adding admin_system_prompt column to user_settings_local');
+                this.db.exec("ALTER TABLE user_settings_local ADD COLUMN admin_system_prompt TEXT");
+            }
+
+            if (!columnNames.includes('is_admin')) {
+                console.log('Adding is_admin column to user_settings_local');
+                this.db.exec("ALTER TABLE user_settings_local ADD COLUMN is_admin INTEGER DEFAULT 0");
+            }
+
+            if (!columnNames.includes('auto_approve_characters')) {
+                console.log('Adding auto_approve_characters column to user_settings_local');
+                this.db.exec("ALTER TABLE user_settings_local ADD COLUMN auto_approve_characters INTEGER DEFAULT 0");
+            }
+
+            console.log('Database migrations completed');
+        } catch (error) {
+            console.error('Failed to run migrations:', error);
+            // Don't throw - allow app to continue
         }
     }
 
@@ -296,6 +340,132 @@ class LocalDatabaseService {
             is_default: Boolean(character.is_default),
             is_modified_default: Boolean(character.is_modified_default)
         };
+    }
+
+    // ============================================================================
+    // USER SETTINGS OPERATIONS
+    // ============================================================================
+
+    getUserSettings(userId) {
+        this.ensureInitialized();
+        
+        const localSettings = this.get(
+            'SELECT * FROM user_settings_local WHERE user_id = ?',
+            [userId]
+        );
+
+        if (localSettings) {
+            // Return in frontend-expected format (camelCase)
+            return {
+                userId: localSettings.user_id,
+                apiKeys: this.safeJsonParse(localSettings.api_keys, {}),
+                ollamaSettings: this.safeJsonParse(localSettings.ollama_settings, { baseUrl: 'http://localhost:11434' }),
+                lmStudioSettings: this.safeJsonParse(localSettings.lmstudio_settings, { baseUrl: 'http://localhost:1234' }),
+                groupDynamicsMode: localSettings.group_dynamics_mode || 'natural',
+                messageDelay: localSettings.message_delay || 1200,
+                defaultProvider: localSettings.default_provider || 'openai',
+                defaultModel: localSettings.default_model,
+                activePersonaId: localSettings.active_persona_id,
+                isAdmin: localSettings.is_admin === 1,
+                autoApproveCharacters: localSettings.auto_approve_characters === 1,
+                adminSystemPrompt: localSettings.admin_system_prompt
+            };
+        }
+
+        // Return defaults if no settings exist
+        return {
+            userId: userId,
+            apiKeys: {},
+            ollamaSettings: { baseUrl: 'http://localhost:11434' },
+            lmStudioSettings: { baseUrl: 'http://localhost:1234' },
+            groupDynamicsMode: 'natural',
+            messageDelay: 1200,
+            defaultProvider: 'openai',
+            defaultModel: null,
+            isAdmin: false,
+            autoApproveCharacters: false,
+            adminSystemPrompt: null
+        };
+    }
+
+    updateUserSettings(userId, updates) {
+        this.ensureInitialized();
+        
+        // Normalize keys (handle both camelCase from frontend and snake_case from DB)
+        const normalized = {
+            api_keys: updates.apiKeys || updates.api_keys || {},
+            ollama_settings: updates.ollamaSettings || updates.ollama_settings || { baseUrl: 'http://localhost:11434' },
+            lmstudio_settings: updates.lmStudioSettings || updates.lmstudio_settings || { baseUrl: 'http://localhost:1234' },
+            preferences: updates.preferences || {},
+            default_provider: updates.defaultProvider || updates.default_provider || 'openai',
+            default_model: updates.defaultModel || updates.default_model || null,
+            group_dynamics_mode: updates.groupDynamicsMode || updates.group_dynamics_mode || 'natural',
+            message_delay: updates.messageDelay || updates.message_delay || 1200,
+            auto_approve_characters: updates.autoApproveCharacters || updates.auto_approve_characters || false,
+            admin_system_prompt: updates.adminSystemPrompt || updates.admin_system_prompt || null
+        };
+
+        // Check if settings exist
+        const existing = this.get(
+            'SELECT id FROM user_settings_local WHERE user_id = ?',
+            [userId]
+        );
+
+        if (existing) {
+            // Update existing settings
+            this.run(
+                `UPDATE user_settings_local 
+                 SET api_keys = ?, 
+                     ollama_settings = ?, 
+                     lmstudio_settings = ?,
+                     preferences = ?,
+                     default_provider = ?,
+                     default_model = ?,
+                     group_dynamics_mode = ?,
+                     message_delay = ?,
+                     auto_approve_characters = ?,
+                     admin_system_prompt = ?
+                 WHERE user_id = ?`,
+                [
+                    JSON.stringify(normalized.api_keys),
+                    JSON.stringify(normalized.ollama_settings),
+                    JSON.stringify(normalized.lmstudio_settings),
+                    JSON.stringify(normalized.preferences),
+                    normalized.default_provider,
+                    normalized.default_model,
+                    normalized.group_dynamics_mode,
+                    normalized.message_delay,
+                    normalized.auto_approve_characters ? 1 : 0,
+                    normalized.admin_system_prompt,
+                    userId
+                ]
+            );
+        } else {
+            // Insert new settings
+            this.run(
+                `INSERT INTO user_settings_local (
+                    user_id, api_keys, ollama_settings, lmstudio_settings, 
+                    preferences, default_provider, default_model, 
+                    group_dynamics_mode, message_delay, 
+                    auto_approve_characters, admin_system_prompt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    userId,
+                    JSON.stringify(normalized.api_keys),
+                    JSON.stringify(normalized.ollama_settings),
+                    JSON.stringify(normalized.lmstudio_settings),
+                    JSON.stringify(normalized.preferences),
+                    normalized.default_provider,
+                    normalized.default_model,
+                    normalized.group_dynamics_mode,
+                    normalized.message_delay,
+                    normalized.auto_approve_characters ? 1 : 0,
+                    normalized.admin_system_prompt
+                ]
+            );
+        }
+
+        return this.getUserSettings(userId);
     }
 
     // ============================================================================
@@ -662,6 +832,28 @@ class LocalDatabaseService {
         return this.get(
             'SELECT * FROM character_relationships WHERE character_id = ? AND user_id = ? AND target_type = ?',
             [characterId, userId, targetType]
+        );
+    }
+
+    getRelationshipsForCharacter(characterId, userId, targetType = null) {
+        this.ensureInitialized();
+        if (targetType) {
+            return this.all(
+                'SELECT * FROM character_relationships WHERE character_id = ? AND user_id = ? AND target_type = ? ORDER BY created_at DESC',
+                [characterId, userId, targetType]
+            );
+        }
+        return this.all(
+            'SELECT * FROM character_relationships WHERE character_id = ? AND user_id = ? ORDER BY created_at DESC',
+            [characterId, userId]
+        );
+    }
+
+    deleteRelationship(characterId, userId, targetId) {
+        this.ensureInitialized();
+        return this.run(
+            'DELETE FROM character_relationships WHERE character_id = ? AND user_id = ? AND target_id = ?',
+            [characterId, userId, targetId]
         );
     }
 
