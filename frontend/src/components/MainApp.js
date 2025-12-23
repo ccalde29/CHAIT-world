@@ -25,6 +25,7 @@ import CharacterMemoryViewer from './CharacterMemoryViewer';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import CommunityHub from './CommunityHub';
 import ModerationPanel from './ModerationPanel';
+import OfflineIndicator from './OfflineIndicator';
 
 const MainApp = () => {
   const { user, signOut } = useAuth();
@@ -303,6 +304,9 @@ const MainApp = () => {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
+      {/* Offline Status Indicator */}
+      <OfflineIndicator />
+      
       {/* Leftmost - Chat History Sidebar (Always visible) */}
       <ChatHistorySidebar
         apiRequest={apiRequest}

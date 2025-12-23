@@ -787,7 +787,7 @@ ALTER SEQUENCE "public"."character_relationships_id_seq" OWNED BY "public"."char
 
 CREATE TABLE IF NOT EXISTS "public"."character_reports" (
     "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
-    "character_id" "uuid" NOT NULL,
+    "character_id" "uuid",
     "reporter_user_id" "uuid" NOT NULL,
     "reason" "text" NOT NULL,
     "details" "text",
@@ -796,11 +796,27 @@ CREATE TABLE IF NOT EXISTS "public"."character_reports" (
     "reviewed_at" timestamp without time zone,
     "reviewed_by" "uuid",
     "action_taken" "text",
+    "scene_id" "uuid",
+    "report_type" character varying(20) DEFAULT 'character'::character varying,
+    CONSTRAINT "character_or_scene_report" CHECK (((("character_id" IS NOT NULL) AND ("scene_id" IS NULL) AND (("report_type")::"text" = 'character'::"text")) OR (("scene_id" IS NOT NULL) AND ("character_id" IS NULL) AND (("report_type")::"text" = 'scene'::"text")))),
+    CONSTRAINT "character_reports_report_type_check" CHECK ((("report_type")::"text" = ANY ((ARRAY['character'::character varying, 'scene'::character varying])::"text"[]))),
     CONSTRAINT "character_reports_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'reviewed'::"text", 'actioned'::"text", 'dismissed'::"text"])))
 );
 
 
 ALTER TABLE "public"."character_reports" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."character_reports" IS 'Reports for both characters and scenes from the community';
+
+
+
+COMMENT ON COLUMN "public"."character_reports"."scene_id" IS 'ID of the reported scene (null for character reports)';
+
+
+
+COMMENT ON COLUMN "public"."character_reports"."report_type" IS 'Type of report: character or scene';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."character_session_state" (
@@ -994,6 +1010,44 @@ COMMENT ON TABLE "public"."community_characters" IS 'Published characters availa
 
 
 COMMENT ON COLUMN "public"."community_characters"."original_character_id" IS 'ID of the original character this was published from';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."community_reports" (
+    "id" "uuid" DEFAULT "extensions"."uuid_generate_v4"() NOT NULL,
+    "community_character_id" "uuid",
+    "community_scene_id" "uuid",
+    "reporter_user_id" "uuid" NOT NULL,
+    "reason" "text" NOT NULL,
+    "details" "text",
+    "report_type" character varying(20) NOT NULL,
+    "status" "text" DEFAULT 'pending'::"text",
+    "created_at" timestamp without time zone DEFAULT "now"(),
+    "reviewed_at" timestamp without time zone,
+    "reviewed_by" "uuid",
+    "action_taken" "text",
+    CONSTRAINT "character_or_scene_report" CHECK (((("community_character_id" IS NOT NULL) AND ("community_scene_id" IS NULL) AND (("report_type")::"text" = 'character'::"text")) OR (("community_scene_id" IS NOT NULL) AND ("community_character_id" IS NULL) AND (("report_type")::"text" = 'scene'::"text")))),
+    CONSTRAINT "community_reports_report_type_check" CHECK ((("report_type")::"text" = ANY ((ARRAY['character'::character varying, 'scene'::character varying])::"text"[]))),
+    CONSTRAINT "community_reports_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'reviewed'::"text", 'actioned'::"text", 'dismissed'::"text"])))
+);
+
+
+ALTER TABLE "public"."community_reports" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."community_reports" IS 'Reports for both characters and scenes from the community hub';
+
+
+
+COMMENT ON COLUMN "public"."community_reports"."community_character_id" IS 'ID of the reported community character (null for scene reports)';
+
+
+
+COMMENT ON COLUMN "public"."community_reports"."community_scene_id" IS 'ID of the reported community scene (null for character reports)';
+
+
+
+COMMENT ON COLUMN "public"."community_reports"."report_type" IS 'Type of report: character or scene';
 
 
 
@@ -1553,6 +1607,21 @@ ALTER TABLE ONLY "public"."community_characters"
 
 
 
+ALTER TABLE ONLY "public"."community_reports"
+    ADD CONSTRAINT "community_reports_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."community_reports"
+    ADD CONSTRAINT "community_reports_unique_character" UNIQUE ("community_character_id", "reporter_user_id");
+
+
+
+ALTER TABLE ONLY "public"."community_reports"
+    ADD CONSTRAINT "community_reports_unique_scene" UNIQUE ("community_scene_id", "reporter_user_id");
+
+
+
 ALTER TABLE ONLY "public"."community_scenes"
     ADD CONSTRAINT "community_scenes_pkey" PRIMARY KEY ("id");
 
@@ -1693,6 +1762,14 @@ CREATE INDEX "idx_character_relationships_target" ON "public"."character_relatio
 
 
 
+CREATE INDEX "idx_character_reports_scene_id" ON "public"."character_reports" USING "btree" ("scene_id");
+
+
+
+CREATE INDEX "idx_character_reports_type" ON "public"."character_reports" USING "btree" ("report_type");
+
+
+
 CREATE INDEX "idx_characters_created_at" ON "public"."characters" USING "btree" ("created_at" DESC);
 
 
@@ -1754,6 +1831,22 @@ CREATE INDEX "idx_community_characters_original" ON "public"."community_characte
 
 
 CREATE INDEX "idx_community_characters_published" ON "public"."community_characters" USING "btree" ("published_at" DESC);
+
+
+
+CREATE INDEX "idx_community_reports_character_id" ON "public"."community_reports" USING "btree" ("community_character_id");
+
+
+
+CREATE INDEX "idx_community_reports_scene_id" ON "public"."community_reports" USING "btree" ("community_scene_id");
+
+
+
+CREATE INDEX "idx_community_reports_status" ON "public"."community_reports" USING "btree" ("status", "created_at" DESC);
+
+
+
+CREATE INDEX "idx_community_reports_type" ON "public"."community_reports" USING "btree" ("report_type");
 
 
 
@@ -2002,6 +2095,11 @@ ALTER TABLE ONLY "public"."character_reports"
 
 
 
+ALTER TABLE ONLY "public"."character_reports"
+    ADD CONSTRAINT "character_reports_scene_id_fkey" FOREIGN KEY ("scene_id") REFERENCES "public"."scenarios"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."character_session_state"
     ADD CONSTRAINT "character_session_state_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -2024,6 +2122,21 @@ ALTER TABLE ONLY "public"."chat_sessions"
 
 ALTER TABLE ONLY "public"."community_characters"
     ADD CONSTRAINT "community_characters_creator_user_id_fkey" FOREIGN KEY ("creator_user_id") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."community_reports"
+    ADD CONSTRAINT "community_reports_character_id_fkey" FOREIGN KEY ("community_character_id") REFERENCES "public"."community_characters"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."community_reports"
+    ADD CONSTRAINT "community_reports_reporter_fkey" FOREIGN KEY ("reporter_user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."community_reports"
+    ADD CONSTRAINT "community_reports_scene_id_fkey" FOREIGN KEY ("community_scene_id") REFERENCES "public"."community_scenes"("id") ON DELETE CASCADE;
 
 
 
@@ -2127,6 +2240,10 @@ CREATE POLICY "Users can access their own memories" ON "public"."character_memor
 
 
 CREATE POLICY "Users can access their own relationships" ON "public"."character_relationships" USING (("auth"."uid"() = "user_id"));
+
+
+
+CREATE POLICY "Users can create community reports" ON "public"."community_reports" FOR INSERT WITH CHECK (("auth"."uid"() = "reporter_user_id"));
 
 
 
@@ -2278,6 +2395,10 @@ CREATE POLICY "Users can view their own characters" ON "public"."characters" FOR
 
 
 
+CREATE POLICY "Users can view their own community reports" ON "public"."community_reports" FOR SELECT USING (("auth"."uid"() = "reporter_user_id"));
+
+
+
 CREATE POLICY "Users can view their own persona" ON "public"."user_personas" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
@@ -2332,6 +2453,9 @@ ALTER TABLE "public"."chat_sessions" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."community_characters" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."community_reports" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."community_scenes" ENABLE ROW LEVEL SECURITY;
@@ -2812,6 +2936,12 @@ GRANT ALL ON TABLE "public"."community_characters" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."community_reports" TO "anon";
+GRANT ALL ON TABLE "public"."community_reports" TO "authenticated";
+GRANT ALL ON TABLE "public"."community_reports" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."community_scenes" TO "anon";
 GRANT ALL ON TABLE "public"."community_scenes" TO "authenticated";
 GRANT ALL ON TABLE "public"."community_scenes" TO "service_role";
@@ -2946,6 +3076,18 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 
 
 drop extension if exists "pg_net";
+
+alter table "public"."character_reports" drop constraint "character_reports_report_type_check";
+
+alter table "public"."community_reports" drop constraint "community_reports_report_type_check";
+
+alter table "public"."character_reports" add constraint "character_reports_report_type_check" CHECK (((report_type)::text = ANY ((ARRAY['character'::character varying, 'scene'::character varying])::text[]))) not valid;
+
+alter table "public"."character_reports" validate constraint "character_reports_report_type_check";
+
+alter table "public"."community_reports" add constraint "community_reports_report_type_check" CHECK (((report_type)::text = ANY ((ARRAY['character'::character varying, 'scene'::character varying])::text[]))) not valid;
+
+alter table "public"."community_reports" validate constraint "community_reports_report_type_check";
 
 CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 

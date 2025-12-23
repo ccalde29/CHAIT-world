@@ -5,12 +5,18 @@
     "main": "server-supabase.js",
     "scripts": {
         "start": "node server-supabase.js",
-        "dev": "nodemon server-supabase.js"
+        "start:local": "DEPLOYMENT_MODE=local node server-supabase.js",
+        "start:web": "DEPLOYMENT_MODE=web node server-supabase.js",
+        "dev": "nodemon server-supabase.js",
+        "dev:local": "DEPLOYMENT_MODE=local nodemon server-supabase.js",
+        "dev:web": "DEPLOYMENT_MODE=web nodemon server-supabase.js",
+        "test:db": "node test-sqlite.js"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.57.4",
         "axios": "^1.6.2",
         "bad-words": "^4.0.0",
+        "better-sqlite3": "^11.8.0",
         "cors": "^2.8.5",
         "crypto": "^1.0.1",
         "dotenv": "^16.3.1",

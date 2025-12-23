@@ -1,11 +1,12 @@
 // backend/routes/community.js
 // Routes for community hub functionality
+// Always uses Supabase for community operations (works in both local and web modes)
 
 const express = require('express');
 const router = express.Router();
 const profanityFilter = require('../utils/profanityFilter');
 
-module.exports = (communityService, characterService) => {
+module.exports = (communityService, characterService, db) => {
     /**
      * Get community characters (public)
      * GET /api/community/characters
@@ -54,6 +55,7 @@ module.exports = (communityService, characterService) => {
     /**
      * Import a community character
      * POST /api/community/characters/:id/import
+     * Imports from Supabase community to local storage (if in local mode) or to user's characters (web mode)
      */
     router.post('/characters/:id/import', async (req, res) => {
         try {
@@ -62,17 +64,41 @@ module.exports = (communityService, characterService) => {
                 return res.status(401).json({ error: 'Authentication required' });
             }
 
-            const character = await communityService.importCharacter(
-                req.userId,
-                req.params.id
-            );
+            // Use the database service to handle import (automatically routes to correct DB)
+            if (db && db.importCharacterFromCommunity) {
+                const character = await db.importCharacterFromCommunity(
+                    req.userId,
+                    req.params.id
+                );
+                
+                res.status(201).json({
+                    ...character,
+                    message: 'Character imported successfully'
+                });
+            } else {
+                // Fallback to communityService for backward compatibility
+                const character = await communityService.importCharacter(
+                    req.userId,
+                    req.params.id
+                );
 
-            res.status(201).json({
-                ...character,
-                message: 'Character imported successfully'
-            });
+                res.status(201).json({
+                    ...character,
+                    message: 'Character imported successfully'
+                });
+            }
         } catch (error) {
             console.error('Error importing character:', error);
+            
+            // Handle offline errors gracefully
+            if (error.offline || error.code === 'OFFLINE') {
+                return res.status(503).json({
+                    error: 'Community features unavailable offline',
+                    offline: true,
+                    message: error.message || 'Unable to import character - no internet connection'
+                });
+            }
+            
             res.status(500).json({ error: 'Failed to import character' });
         }
     });
@@ -80,21 +106,7 @@ module.exports = (communityService, characterService) => {
     /**
      * Increment view count
      * POST /api/community/characters/:id/view
-     */
-    router.post('/characters/:id/view', async (req, res) => {
-        try {
-            await communityService.incrementViewCount(req.params.id);
-            res.json({ success: true });
-        } catch (error) {
-            console.error('Error incrementing view count:', error);
-            res.status(500).json({ error: 'Failed to update view count' });
-        }
-    });
-
-    /**
-     * Publish character to community
-     * POST /api/characters/:id/publish
-     * POST /api/community/publish/:id (legacy)
+     * Gets character from local storage (local mode) or Supabase (web mode)
      */
     // Preferred path: /:id/publish (matches frontend & README)
     router.post('/:id/publish', async (req, res) => {
@@ -103,9 +115,17 @@ module.exports = (communityService, characterService) => {
                 console.warn('Publish called without req.userId. Request headers:', req.headers);
                 return res.status(401).json({ error: 'Authentication required' });
             }
-            // Get character
-            const { characters } = await characterService.getCharacters(req.userId);
-            const character = characters.find(c => c.id === req.params.id);
+            
+            // Get character from appropriate database
+            let character;
+            if (db && db.isLocalMode && db.isLocalMode()) {
+                // Local mode: get from SQLite
+                character = await db.getCharacter(req.params.id);
+            } else {
+                // Web mode: get from Supabase via characterService
+                const { characters } = await characterService.getCharacters(req.userId);
+                character = characters.find(c => c.id === req.params.id);
+            }
 
             if (!character) {
                 return res.status(404).json({ error: 'Character not found' });
@@ -123,12 +143,23 @@ module.exports = (communityService, characterService) => {
             // Get locking options from request body
             const { isLocked = false, hiddenFields = [] } = req.body;
 
-            // Publish
-            const published = await communityService.publishCharacter(
-                req.userId,
-                req.params.id,
-                { isLocked, hiddenFields }
-            );
+            // Publish to community (always uses Supabase)
+            let published;
+            if (db && db.publishCharacter) {
+                // Use database service method that handles both modes
+                published = await db.publishCharacter(req.userId, req.params.id, {
+                    ...character,
+                    isLocked,
+                    hiddenFields
+                });
+            } else {
+                // Fallback to communityService
+                published = await communityService.publishCharacter(
+                    req.userId,
+                    req.params.id,
+                    { isLocked, hiddenFields }
+                );
+            }
 
             res.json({
                 ...(published || {}),
@@ -137,8 +168,18 @@ module.exports = (communityService, characterService) => {
 
         } catch (error) {
             console.error('Error publishing character:', error);
+            
+            // Handle offline errors
+            if (error.offline || error.code === 'OFFLINE') {
+                return res.status(503).json({
+                    error: 'Community features unavailable offline',
+                    offline: true,
+                    message: error.message || 'Unable to publish - no internet connection'
+                });
+            }
+            
             // If validation or user error, surface as 400 so frontend can show the message
-            if (error && (error.message && (error.message.includes('Character') || error.message.includes('validation') || error.message.includes('required')))) {
+            if (error && (error.message && (error.message.includes('Character') || error.message.includes('validation') || error.message.includes('required') || error.message.includes('UUID')))) {
                 return res.status(400).json({ error: error.message });
             }
             res.status(500).json({ error: 'Failed to publish character' });
@@ -184,6 +225,21 @@ module.exports = (communityService, characterService) => {
 
         } catch (error) {
             console.error('Error publishing character (legacy):', error);
+            
+            // Handle offline errors
+            if (error.offline || error.code === 'OFFLINE') {
+                return res.status(503).json({
+                    error: 'Community features unavailable offline',
+                    offline: true,
+                    message: error.message || 'Unable to publish - no internet connection'
+                });
+            }
+            
+            // Handle validation errors
+            if (error && error.message && (error.message.includes('Character') || error.message.includes('validation') || error.message.includes('required') || error.message.includes('UUID'))) {
+                return res.status(400).json({ error: error.message });
+            }
+            
             res.status(500).json({ error: 'Failed to publish character' });
         }
     });
