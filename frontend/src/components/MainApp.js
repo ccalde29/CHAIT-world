@@ -93,7 +93,7 @@ const MainApp = () => {
       }
     };
     loadAdminStatus();
-  }, [user.id]);
+  }, [user?.id, apiRequest]);
 
   // Debug: Log when admin status changes
   useEffect(() => {
