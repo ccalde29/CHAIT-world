@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Settings, Plus, Zap, User, LogOut, Users, MessageSquare, Globe, LayoutGrid, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useChat } from '../hooks/useChat';
 import { useCharacters } from '../hooks/useCharacters';
@@ -22,10 +21,11 @@ import CharacterEditor from './CharacterEditor';
 import SceneEditor from './SceneEditor';
 import PersonaManager from './PersonaManager';
 import CharacterMemoryViewer from './CharacterMemoryViewer';
-import ChatHistorySidebar from './ChatHistorySidebar';
+import NavigationSidebar from './NavigationSidebar';
 import CommunityHub from './CommunityHub';
 import ModerationPanel from './ModerationPanel';
 import OfflineIndicator from './OfflineIndicator';
+import LoginRequiredModal from './LoginRequiredModal';
 
 const MainApp = () => {
   const { user, signOut } = useAuth();
@@ -34,7 +34,7 @@ const MainApp = () => {
   // API CLIENT
   // ============================================================================
 
-  const apiRequest = useMemo(() => createApiClient(user.id), [user.id]);
+  const apiRequest = useMemo(() => createApiClient(user?.id || 'guest'), [user?.id]);
 
   // ============================================================================
   // CUSTOM HOOKS
@@ -49,37 +49,35 @@ const MainApp = () => {
   // UI STATE
   // ============================================================================
 
+  // Modal states
   const [showSettings, setShowSettings] = useState(false);
   const [showCharacterEditor, setShowCharacterEditor] = useState(false);
   const [showSceneEditor, setShowSceneEditor] = useState(false);
   const [showCommunityHub, setShowCommunityHub] = useState(false);
   const [showMemoryViewer, setShowMemoryViewer] = useState(false);
   const [showPersonaEditor, setShowPersonaEditor] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showPersonaMenu, setShowPersonaMenu] = useState(false);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
-  const [showManagementHub, setShowManagementHub] = useState(true); // Show by default
-  const [chatHistoryCollapsed, setChatHistoryCollapsed] = useState(true); // Collapsed by default
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(true); // Collapsed by default
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  
+  // View and panel states
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(true);
   const [editingCharacter, setEditingCharacter] = useState(null);
   const [editingScene, setEditingScene] = useState(null);
   const [selectedCharacterForMemory, setSelectedCharacterForMemory] = useState(null);
+  const [loginRequiredFor, setLoginRequiredFor] = useState('');
 
-  // View state management - remember last view in localStorage
-  const [currentView, setCurrentView] = useState(() => {
-    return localStorage.getItem('chait-current-view') || 'chat';
+  // Active view state - remember last view in localStorage
+  const [activeView, setActiveView] = useState(() => {
+    return localStorage.getItem('chait-active-view') || 'chat';
   });
 
   // Admin state
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const userMenuRef = useRef(null);
-  const personaMenuRef = useRef(null);
-
-  // Save current view to localStorage whenever it changes
+  // Save active view to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('chait-current-view', currentView);
-  }, [currentView]);
+    localStorage.setItem('chait-active-view', activeView);
+  }, [activeView]);
 
   // Load admin status from user settings
   useEffect(() => {
@@ -140,7 +138,7 @@ const MainApp = () => {
 
     // Close modal and switch to chat view
     setShowNewChatModal(false);
-    setCurrentView('chat');
+    setActiveView('chat');
   };
 
   const handleSendMessage = () => {
@@ -154,7 +152,6 @@ const MainApp = () => {
   const handlePersonaSwitch = async (personaId) => {
     try {
       await personasState.activatePersona(personaId);
-      setShowPersonaMenu(false);
       // Refresh to load the newly activated persona
       await personasState.fetchActivePersona();
     } catch (error) {
@@ -297,6 +294,29 @@ const MainApp = () => {
   };
 
   // ============================================================================
+  // NAVIGATION HANDLER
+  // ============================================================================
+
+  const handleNavigate = (view) => {
+    // Check if view requires authentication
+    const requiresAuth = view === 'community';
+    
+    if (requiresAuth && !user) {
+      setLoginRequiredFor(view);
+      setShowLoginModal(true);
+      return;
+    }
+
+    // Navigate to view
+    setActiveView(view);
+    
+    // Handle view-specific logic
+    if (view === 'characters' || view === 'scenes') {
+      setActiveView('manage');
+    }
+  };
+
+  // ============================================================================
   // RENDER
   // ============================================================================
 
@@ -307,8 +327,8 @@ const MainApp = () => {
       {/* Offline Status Indicator */}
       <OfflineIndicator />
       
-      {/* Leftmost - Chat History Sidebar (Always visible) */}
-      <ChatHistorySidebar
+      {/* Left Sidebar - Navigation & Chat History */}
+      <NavigationSidebar
         apiRequest={apiRequest}
         currentSessionId={chat.currentSessionId}
         onSessionSelect={async (session) => {
@@ -337,192 +357,14 @@ const MainApp = () => {
           charactersState.setActiveCharacters([]);
           charactersState.setCurrentScenario(null);
         }}
-        characters={charactersState.characters}
-        isCollapsed={chatHistoryCollapsed}
-        onToggleCollapse={() => setChatHistoryCollapsed(!chatHistoryCollapsed)}
+        onNavigate={handleNavigate}
+        activeView={activeView}
       />
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="bg-gray-800 border-b border-white/10 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold">CHAIT World</h1>
-
-            {/* View Navigation */}
-            <div className="flex items-center gap-2 ml-4">
-              <button
-                onClick={() => setCurrentView('chat')}
-                className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
-                  currentView === 'chat'
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                    : 'hover:bg-white/10 text-gray-300'
-                }`}
-                title="Chat"
-              >
-                <MessageSquare size={18} />
-                Chat
-              </button>
-              <button
-                onClick={() => setCurrentView('manage')}
-                className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
-                  currentView === 'manage'
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                    : 'hover:bg-white/10 text-gray-300'
-                }`}
-                title="Manage Characters & Scenes"
-              >
-                <LayoutGrid size={18} />
-                Manage
-              </button>
-              <button
-                onClick={() => setCurrentView('community')}
-                className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
-                  currentView === 'community'
-                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                    : 'hover:bg-white/10 text-gray-300'
-                }`}
-                title="Community Hub"
-              >
-                <Globe size={18} />
-                Community
-              </button>
-              {isAdmin && (
-                <button
-                  onClick={() => setCurrentView('moderation')}
-                  className={`px-4 py-2 rounded-lg transition-all font-medium flex items-center gap-2 ${
-                    currentView === 'moderation'
-                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-                      : 'hover:bg-white/10 text-gray-300'
-                  }`}
-                  title="Moderation Panel"
-                >
-                  <Shield size={18} />
-                  Admin
-                </button>
-              )}
-            </div>
-
-            {/* Persona Switcher - Always visible, on left side */}
-            {personasState.activePersona && (
-              <div className="relative ml-4" ref={personaMenuRef}>
-                <button
-                  onClick={() => setShowPersonaMenu(!showPersonaMenu)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-sm"
-                  title="Switch Persona"
-                >
-                  <span className="text-lg">{personasState.activePersona.avatar || '👤'}</span>
-                  <span className="text-white font-medium">{personasState.activePersona.name}</span>
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {showPersonaMenu && personasState.personas.length > 0 && (
-                  <div className="absolute left-0 mt-2 w-64 bg-gray-800 border border-white/10 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
-                    <div className="p-2 border-b border-white/10">
-                      <p className="text-xs text-gray-400 px-2 py-1">Switch Persona</p>
-                    </div>
-                    {personasState.personas.map(persona => (
-                      <button
-                        key={persona.id}
-                        onClick={() => handlePersonaSwitch(persona.id)}
-                        className={`w-full px-3 py-2 text-left hover:bg-white/10 flex items-center gap-3 transition-colors ${
-                          persona.id === personasState.activePersona?.id ? 'bg-white/5' : ''
-                        }`}
-                      >
-                        <span className="text-2xl">{persona.avatar || '👤'}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-white truncate">{persona.name}</p>
-                            {persona.id === personasState.activePersona?.id && (
-                              <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Active</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-400 line-clamp-1">{persona.personality}</p>
-                        </div>
-                      </button>
-                    ))}
-                    <div className="border-t border-white/10 p-2">
-                      <button
-                        onClick={() => {
-                          setShowPersonaEditor(true);
-                          setShowPersonaMenu(false);
-                        }}
-                        className="w-full px-3 py-2 text-left hover:bg-white/10 flex items-center gap-2 text-sm text-purple-400 transition-colors"
-                      >
-                        <Plus size={16} />
-                        Manage Personas
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Chat Name - Only visible in chat view */}
-            {currentView === 'chat' && (
-              <div className="text-sm text-gray-400 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg">
-                {charactersState.findScenarioById(charactersState.currentScenario)?.name || 'General Chat'}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* New Chat Button - Always visible */}
-            <button
-              onClick={() => setShowNewChatModal(true)}
-              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 rounded-lg transition-all font-medium flex items-center gap-2"
-              title="Start New Chat"
-            >
-              <Plus size={18} />
-              New Chat
-            </button>
-
-            <button
-              onClick={() => setShowSettings(true)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              title="Settings"
-            >
-              <Settings size={20} />
-            </button>
-
-            <div className="relative" ref={userMenuRef}>
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                title="User Menu"
-              >
-                <User size={20} />
-              </button>
-
-              {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-white/10 rounded-lg shadow-xl z-50">
-                  <button
-                    onClick={() => {
-                      setShowPersonaEditor(true);
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-white/10 flex items-center gap-2"
-                  >
-                    <User size={16} />
-                    Edit Persona
-                  </button>
-                  <button
-                    onClick={handleSignOut}
-                    className="w-full px-4 py-2 text-left hover:bg-white/10 flex items-center gap-2 text-red-400"
-                  >
-                    <LogOut size={16} />
-                    Sign Out
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Center Panel - View Switching */}
-        {currentView === 'chat' && (
+        {activeView === 'chat' && (
           <ChatInterface
             messages={chat.messages}
             userInput={chat.userInput}
@@ -547,7 +389,7 @@ const MainApp = () => {
           />
         )}
 
-        {currentView === 'community' && (
+        {activeView === 'community' && (
           <div className="flex-1 overflow-hidden">
             <CommunityHub
               fullScreen={true}
@@ -576,12 +418,12 @@ const MainApp = () => {
                   alert('Failed to import scene');
                 }
               }}
-              onClose={() => setCurrentView('chat')}
+              onClose={() => setActiveView('chat')}
             />
           </div>
         )}
 
-        {currentView === 'manage' && (
+        {activeView === 'manage' && (
           <div className="flex-1 overflow-hidden">
             <CharacterSceneHub
               fullScreen={true}
@@ -642,7 +484,7 @@ const MainApp = () => {
           </div>
         )}
 
-        {currentView === 'moderation' && isAdmin && (
+        {activeView === 'moderation' && isAdmin && (
           <div className="flex-1 overflow-hidden">
             <ModerationPanel
               fullScreen={true}
@@ -776,6 +618,16 @@ const MainApp = () => {
           apiRequest={apiRequest}
         />
       )}
+
+      {/* Login Required Modal */}
+      <LoginRequiredModal
+        isOpen={showLoginModal}
+        onClose={() => {
+          setShowLoginModal(false);
+          setLoginRequiredFor('');
+        }}
+        feature={loginRequiredFor}
+      />
     </div>
   );
 };
