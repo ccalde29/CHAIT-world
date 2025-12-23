@@ -73,6 +73,10 @@ const MainApp = () => {
 
   // Admin state
   const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Session refresh trigger and callback ref
+  const [sessionRefreshTrigger, setSessionRefreshTrigger] = useState(0);
+  const loadSessionsRef = useRef(null);
 
   // Save active view to localStorage whenever it changes
   useEffect(() => {
@@ -141,12 +145,20 @@ const MainApp = () => {
     setActiveView('chat');
   };
 
-  const handleSendMessage = () => {
-    chat.sendMessage(
+  const handleSendMessage = async () => {
+    const wasNewChat = !chat.currentSessionId;
+    await chat.sendMessage(
       charactersState.activeCharacters,
       charactersState.currentScenario,
       settings.userPersona
     );
+    // If this was a new chat, refresh the session list after first message
+    if (wasNewChat && loadSessionsRef.current) {
+      // Small delay to ensure backend has saved the session
+      setTimeout(() => {
+        loadSessionsRef.current?.();
+      }, 500);
+    }
   };
 
   const handlePersonaSwitch = async (personaId) => {
@@ -326,6 +338,8 @@ const MainApp = () => {
       <NavigationSidebar
         apiRequest={apiRequest}
         currentSessionId={chat.currentSessionId}
+        refreshTrigger={sessionRefreshTrigger}
+        onSessionsLoad={(loadFn) => { loadSessionsRef.current = loadFn; }}
         onSessionSelect={async (session) => {
           try {
             // Load the chat session and get the full session data
@@ -348,6 +362,22 @@ const MainApp = () => {
             setActiveView('chat');
           } catch (error) {
             console.error('Failed to load session:', error);
+          }
+        }}
+        onDeleteSession={async (sessionId) => {
+          try {
+            await apiRequest(`/api/chat/sessions/${sessionId}`, {
+              method: 'DELETE'
+            });
+            // If we deleted the current session, clear it
+            if (chat.currentSessionId === sessionId) {
+              chat.setCurrentSessionId(null);
+              chat.setMessages([]);
+            }
+            // Trigger session list refresh
+            setSessionRefreshTrigger(prev => prev + 1);
+          } catch (error) {
+            console.error('Failed to delete session:', error);
           }
         }}
         onNewChat={() => {
@@ -496,6 +526,18 @@ const MainApp = () => {
               user={user}
               settings={settings.userSettings}
               onSave={settings.saveUserSettings}
+              onClose={() => setActiveView('chat')}
+              fullScreen={true}
+            />
+          </div>
+        )}
+
+        {activeView === 'persona' && (
+          <div className="flex-1 overflow-hidden">
+            <PersonaManager
+              personasState={personasState}
+              user={user}
+              apiRequest={apiRequest}
               onClose={() => setActiveView('chat')}
               fullScreen={true}
             />

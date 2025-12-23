@@ -4,15 +4,9 @@
 // ============================================================================
 
 const express = require('express');
-const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
 const AIProviderService = require('../services/AIProviderService');
 const { aiCallLimiter } = require('../middleware/rateLimiter');
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const { createClient } = require('@supabase/supabase-js');
 
 // Core services
 const MemoryService = require('../services/MemoryService');
@@ -26,11 +20,21 @@ const ResponsePlanner = require('../services/ResponsePlanner');
 const MemoryRelevanceService = require('../services/MemoryRelevanceService');
 const SessionContinuityService = require('../services/SessionContinuityService');
 
-const memoryService = new MemoryService(supabase);
-const learningService = new CharacterLearningService(supabase);
-const promptBuilder = new PromptBuilder();
-const conversationTracker = new ConversationStateTracker();
-const sessionContinuity = new SessionContinuityService(supabase);
+// Export function that accepts db parameter
+module.exports = (db) => {
+  const router = express.Router();
+  
+  // Initialize Supabase for community features (memory, learning, relationships)
+  const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+  
+  const memoryService = new MemoryService(supabase);
+  const learningService = new CharacterLearningService(supabase);
+  const promptBuilder = new PromptBuilder();
+  const conversationTracker = new ConversationStateTracker();
+  const sessionContinuity = new SessionContinuityService(supabase);
 
 /**
  * POST /api/chat/group-response
@@ -63,22 +67,12 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
     // If no session provided, create a new one
     if (!activeSessionId) {
-      const { data: newSession, error: sessionError } = await supabase
-        .from('chat_sessions')
-        .insert({
-          user_id: userId,
-          scenario_id: currentScene || 'default',
-          active_characters: activeCharacters,
-          title: currentScene ? `Chat in ${currentScene}` : 'New Chat',
-          group_mode: 'natural'
-        })
-        .select()
-        .single();
-
-      if (sessionError) {
-        console.error('[Session] Error creating session:', sessionError);
-        return res.status(500).json({ error: 'Failed to create chat session' });
-      }
+      const newSession = await db.createChatSession(userId, {
+        scenario_id: currentScene || 'default',
+        active_characters: activeCharacters,
+        title: currentScene ? `Chat in ${currentScene}` : 'New Chat',
+        group_mode: 'natural'
+      });
 
       activeSessionId = newSession.id;
       console.log(`[Session] Created new session: ${activeSessionId}`);
@@ -87,28 +81,10 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     }
 
     // Save user message to database
-    await supabase
-      .from('messages')
-      .insert({
-        session_id: activeSessionId,
-        type: 'user',
-        content: userMessage
-      });
-
-    // Update message count
-    const { data: session } = await supabase
-      .from('chat_sessions')
-      .select('message_count')
-      .eq('id', activeSessionId)
-      .single();
-
-    await supabase
-      .from('chat_sessions')
-      .update({
-        message_count: (session?.message_count || 0) + 1,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', activeSessionId);
+    await db.saveChatMessage(activeSessionId, {
+      type: 'user',
+      content: userMessage
+    });
 
     console.log(`[Session] Saved user message to session ${activeSessionId}`);
 
@@ -116,12 +92,10 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     // STEP 1: LOAD CHARACTER DATA
     // ========================================================================
     
-    const { data: characters, error: charError } = await supabase
-      .from('characters')
-      .select('*')
-      .in('id', activeCharacters);
+    const characterPromises = activeCharacters.map(charId => db.getCharacter(charId));
+    const characters = (await Promise.all(characterPromises)).filter(char => char !== undefined);
     
-    if (charError || !characters || characters.length === 0) {
+    if (!characters || characters.length === 0) {
       return res.status(500).json({ error: 'Failed to load character data' });
     }
     
@@ -129,39 +103,30 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     // STEP 2: LOAD USER SETTINGS & SCENE DATA
     // ========================================================================
 
-    const { data: userSettings, error: settingsError } = await supabase
-      .from('user_settings')
-      .select('api_keys, ollama_settings, admin_system_prompt')
-      .eq('user_id', userId)
-      .single();
+    const userSettings = await db.getUserSettings(userId);
 
-    const apiKeys = userSettings?.api_keys || {
+    const apiKeys = userSettings?.apiKeys || {
       openai: null,
       anthropic: null,
       openrouter: null,
       google: null
     };
 
-    const ollamaSettings = userSettings?.ollama_settings || {
+    const ollamaSettings = userSettings?.ollamaSettings || {
       baseUrl: 'http://localhost:11434'
     };
     
     // Add LM Studio settings
-    ollamaSettings.lmStudioSettings = userSettings?.lmstudio_settings || {
+    ollamaSettings.lmStudioSettings = userSettings?.lmStudioSettings || {
       baseUrl: 'http://127.0.0.1:1234'
     };
 
-    const adminSystemPrompt = userSettings?.admin_system_prompt || null;
+    const adminSystemPrompt = userSettings?.adminSystemPrompt || null;
 
     // Load scene data with context rules
     let sceneData = null;
     if (currentScene) {
-      const { data: scene } = await supabase
-        .from('scenarios')
-        .select('*')
-        .eq('id', currentScene)
-        .single();
-      sceneData = scene;
+      sceneData = await db.getScenario(userId, currentScene);
     }
 
     // ========================================================================
@@ -365,21 +330,18 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         );
 
         // Save to database with metadata
-        await supabase
-          .from('messages')
-          .insert({
-            session_id: activeSessionId,
-            type: 'character',
-            character_id: char.id,
-            content: response,
-            is_primary_response: isPrimary,
-            response_metadata: {
-              temperature_used: dynamicTemp,
-              tokens_used: tokenBudget,
-              provider: char.ai_provider || 'openai',
-              model: char.ai_model || 'gpt-3.5-turbo'
-            }
-          });
+        await db.saveChatMessage(activeSessionId, {
+          type: 'character',
+          character_id: char.id,
+          content: response,
+          is_primary_response: isPrimary,
+          response_metadata: {
+            temperature_used: dynamicTemp,
+            tokens_used: tokenBudget,
+            provider: char.ai_provider || 'openai',
+            model: char.ai_model || 'gpt-3.5-turbo'
+          }
+        });
 
         // Update conversation state
         conversationTracker.updateState(
@@ -523,4 +485,5 @@ function extractTopicsFromText(text) {
   return topics;
 }
 
-module.exports = router;
+  return router;
+};

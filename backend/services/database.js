@@ -87,55 +87,35 @@ class DatabaseService {
     }
 
     async saveChatMessage(sessionId, messageData) {
-        if (this.isLocalMode()) {
-            return this.localDb.createMessage(messageData);
-        }
-        return this.chatService.saveChatMessage(sessionId, messageData);
+        // Ensure session_id is in messageData for local mode
+        const dataWithSession = { ...messageData, session_id: sessionId };
+        return this.localDb.createMessage(dataWithSession);
     }
 
     async getChatSession(userId, sessionId) {
-        if (this.isLocalMode()) {
-            return this.localDb.getChatSession(sessionId);
-        }
-        return this.chatService.getChatSession(userId, sessionId);
+        return this.localDb.getChatSession(sessionId);
     }
 
     async getChatHistory(userId, limit = 20) {
-        if (this.isLocalMode()) {
-            return this.localDb.getChatSessionsByUser(userId, limit);
-        }
-        return this.chatService.getChatHistory(userId, limit);
+        return this.localDb.getChatSessionsByUser(userId, limit);
     }
 
     async updateChatSessionActivity(sessionId) {
-        if (this.isLocalMode()) {
-            return this.localDb.updateChatSession(sessionId, { 
-                last_activity: new Date().toISOString() 
-            });
-        }
-        return this.chatService.updateChatSessionActivity(sessionId);
+        return this.localDb.updateChatSession(sessionId, { 
+            last_activity: new Date().toISOString() 
+        });
     }
 
     async updateChatSession(userId, sessionId, updates) {
-        if (this.isLocalMode()) {
-            return this.localDb.updateChatSession(sessionId, updates);
-        }
-        return this.chatService.updateChatSession(userId, sessionId, updates);
+        return this.localDb.updateChatSession(sessionId, updates);
     }
 
     async deleteChatSession(userId, sessionId) {
-        if (this.isLocalMode()) {
-            return this.localDb.deleteChatSession(sessionId);
-        }
-        return this.chatService.deleteChatSession(userId, sessionId);
+        return this.localDb.deleteChatSession(sessionId);
     }
 
     async getChatMessages(sessionId, limit = 100) {
-        if (this.isLocalMode()) {
-            return this.localDb.getMessagesBySession(sessionId, limit);
-        }
-        // For web mode, use existing chat service method
-        return this.chatService.getChatMessages(sessionId, limit);
+        return this.localDb.getMessagesBySession(sessionId, limit);
     }
 
     // ============================================================================
@@ -377,11 +357,17 @@ class DatabaseService {
     // Local mode: SQLite | Web mode: Supabase
     // ============================================================================
 
-    async getScenarios(userId) {
+    async getScenario(userId, scenarioId) {
         if (this.isLocalMode()) {
-            return this.localDb.getScenariosByUser(userId);
+            return this.localDb.getScenario(scenarioId);
         }
-        return this.scenarioService.getScenarios(userId);
+        // For web mode, would need to query Supabase
+        throw new Error('Single scenario retrieval in web mode needs implementation');
+    }
+
+    async getScenarios(userId) {
+        const scenarios = this.localDb.getScenariosByUser(userId);
+        return { scenarios, total: scenarios.length };
     }
 
     async createScenario(userId, scenarioData) {
@@ -798,14 +784,14 @@ class DatabaseService {
 
             if (error) throw error;
 
-            // Import to local SQLite database
+            // Import to local SQLite database with defaults for locked/hidden fields
             const characterData = {
                 name: communityChar.name,
-                personality: communityChar.personality,
+                personality: communityChar.personality || 'A mysterious character with hidden traits.',
                 age: communityChar.age,
                 sex: communityChar.sex,
-                appearance: communityChar.appearance,
-                background: communityChar.background,
+                appearance: communityChar.appearance || 'Their appearance is a mystery.',
+                background: communityChar.background || 'Their past is shrouded in mystery.',
                 avatar: communityChar.avatar,
                 color: communityChar.color,
                 chat_examples: communityChar.chat_examples,
@@ -847,8 +833,8 @@ class DatabaseService {
 
             // Import to local SQLite database
             const sceneData = {
-                name: communityScene.title,  // Map title to name
-                description: communityScene.description,
+                name: communityScene.title || communityScene.name || 'Imported Scene',
+                description: communityScene.description || 'An imported community scene.',
                 initial_message: communityScene.system_prompt || 'Welcome to this scene!',
                 atmosphere: communityScene.category || 'neutral',
                 tags: communityScene.tags,

@@ -14,7 +14,8 @@ import {
   ChevronDown,
   ChevronRight,
   Lock,
-  Shield
+  Shield,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -25,7 +26,10 @@ const NavigationSidebar = ({
   onNewChat,
   onNavigate,
   activeView,
-  isAdmin
+  isAdmin,
+  onDeleteSession,
+  refreshTrigger, // Add refresh trigger prop
+  onSessionsLoad // Callback to expose loadSessions function
 }) => {
   const { user, signOut } = useAuth();
   const [sessions, setSessions] = useState([]);
@@ -46,7 +50,15 @@ const NavigationSidebar = ({
     }
   };
 
-  // Load sessions when user changes
+  // Expose loadSessions to parent component
+  useEffect(() => {
+    if (onSessionsLoad) {
+      onSessionsLoad(loadSessions);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onSessionsLoad]);
+
+  // Load sessions when user changes or refresh trigger changes
   useEffect(() => {
     if (user) {
       loadSessions();
@@ -55,13 +67,19 @@ const NavigationSidebar = ({
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, refreshTrigger]);
 
   const menuItems = [
     {
       id: 'manage',
       label: 'Management',
       icon: Users,
+      requiresAuth: false
+    },
+    {
+      id: 'persona',
+      label: 'Persona',
+      icon: User,
       requiresAuth: false
     },
     {
@@ -144,22 +162,41 @@ const NavigationSidebar = ({
             ) : (
               <div className="space-y-1">
                 {sessions.map(session => (
-                  <button
+                  <div
                     key={session.id}
-                    onClick={() => onSessionSelect(session)}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                    className={`group relative flex items-center px-3 py-2 rounded-lg transition-colors ${
                       currentSessionId === session.id
                         ? 'bg-purple-600 text-white'
                         : 'text-gray-300 hover:bg-white/5'
                     }`}
                   >
-                    <div className="text-sm font-medium truncate">
-                      {session.title || 'Untitled Chat'}
-                    </div>
-                    <div className="text-xs text-gray-400 truncate">
-                      {new Date(session.created_at).toLocaleDateString()}
-                    </div>
-                  </button>
+                    <button
+                      onClick={() => onSessionSelect(session)}
+                      className="flex-1 text-left"
+                    >
+                      <div className="text-sm font-medium truncate">
+                        {session.title || 'Untitled Chat'}
+                      </div>
+                      <div className="text-xs text-gray-400 truncate">
+                        {new Date(session.created_at).toLocaleDateString()}
+                      </div>
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (window.confirm('Delete this chat?')) {
+                          // Immediately remove from UI for instant feedback
+                          setSessions(prev => prev.filter(s => s.id !== session.id));
+                          // Then call the delete handler
+                          await onDeleteSession(session.id);
+                        }
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
+                      title="Delete chat"
+                    >
+                      <Trash2 size={14} className="text-red-400" />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

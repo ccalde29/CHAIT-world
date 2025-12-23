@@ -28,66 +28,7 @@ const characterService = {
   supabase: db.supabase, // Keep for community operations
   getCharacters: async (userId) => {
     const characters = await db.getCharacters(userId);
-    // Get default characters
-    const defaultCharacters = [
-      {
-        id: 'maya',
-        name: 'Maya',
-        personality: 'Energetic art student who loves creativity, colors, and seeing the artistic side of everything. Optimistic and playful with a tendency to get excited about visual concepts.',
-        avatar: '🎨',
-        color: 'from-pink-500 to-purple-500',
-        age: 22,
-        sex: 'female',
-        appearance: 'Bright-eyed with paint-stained fingers, colorful style',
-        background: 'Art student with a passion for visual expression',
-        response_style: 'playful',
-        is_default: true,
-        tags: ['creative', 'optimistic', 'artist']
-      },
-      {
-        id: 'alex',
-        name: 'Alex',
-        personality: 'Thoughtful philosophy major who asks deep questions about human nature, meaning, and existence. Contemplative and curious, often references philosophical concepts.',
-        avatar: '🤔',
-        color: 'from-blue-500 to-indigo-500',
-        age: 24,
-        sex: 'non-binary',
-        appearance: 'Thoughtful expression, often lost in contemplation',
-        background: 'Philosophy student exploring the big questions',
-        response_style: 'contemplative',
-        is_default: true,
-        tags: ['philosophical', 'thoughtful', 'curious']
-      },
-      {
-        id: 'zoe',
-        name: 'Zoe',
-        personality: 'Sarcastic tech enthusiast with quick wit and dry humor. Knowledgeable about technology and internet culture, slightly cynical but ultimately caring.',
-        avatar: '💻',
-        color: 'from-green-500 to-teal-500',
-        age: 26,
-        sex: 'female',
-        appearance: 'Sharp eyes, tech gear always nearby',
-        background: 'Software developer with a sarcastic edge',
-        response_style: 'witty',
-        is_default: true,
-        tags: ['tech', 'sarcastic', 'witty']
-      },
-      {
-        id: 'finn',
-        name: 'Finn',
-        personality: 'Laid-back musician who goes with the flow and relates everything back to music, lyrics, or cultural moments. Supportive and chill with a creative soul.',
-        avatar: '🎸',
-        color: 'from-orange-500 to-red-500',
-        age: 23,
-        sex: 'male',
-        appearance: 'Relaxed demeanor, often has headphones',
-        background: 'Musician always finding the rhythm in life',
-        response_style: 'chill',
-        is_default: true,
-        tags: ['music', 'chill', 'creative']
-      }
-    ];
-    return { characters: [...defaultCharacters, ...characters], total: defaultCharacters.length + characters.length };
+    return { characters, total: characters.length };
   },
   getCharacter: (characterId, userId) => db.getCharacter(characterId),
   createCharacter: (userId, characterData) => db.createCharacter(userId, characterData),
@@ -140,7 +81,7 @@ const requireAuth = (req, res, next) => {
 
 // Existing routes (keep as-is for backward compatibility)
 const providerRoutes = require('./routes/providers');
-const groupChatRoutes = require('./routes/group-chat');
+const groupChatRoutes = require('./routes/group-chat')(db);
 
 // New modular routes
 const chatSessionRoutes = require('./routes/chat-sessions')(db);
@@ -153,7 +94,7 @@ const imageRoutes = require('./routes/images')(db);
 const characterLearningRoutes = require('./routes/characterLearning')(db.supabase);
 const characterCommentRoutes = require('./routes/characterComments')(db.supabase);
 const sceneCommentRoutes = require('./routes/sceneComments')(db.supabase);
-const personasRoutes = require('./routes/personas');
+const personasRoutes = require('./routes/personas')(db);
 const relationshipsRoutes = require('./routes/relationships');
 const moderationRoutes = require('./routes/moderation');
 const customModelsRoutes = require('./routes/custom-models');

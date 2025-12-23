@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { X, User, Palette, Smile, Sparkles, MessageCircle, Plus, Edit2, Trash2 } from 'lucide-react';
 import ImageUpload from './ImageUpload';
 
-const PersonaManager = ({ personasState, onClose, user, apiRequest }) => {
+const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen = false }) => {
   const { personas, activePersona, createPersona, updatePersona, deletePersona, activatePersona } = personasState;
 
   console.log('[PersonaManager] Rendering with personas:', personas);
@@ -242,8 +242,14 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest }) => {
 
   if (view === 'list') {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-slate-800 rounded-2xl border border-white/10 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className={fullScreen 
+        ? "h-full bg-gray-900 overflow-y-auto" 
+        : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      }>
+        <div className={fullScreen 
+          ? "h-full" 
+          : "bg-slate-800 rounded-2xl border border-white/10 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+        }>
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/10">
             <div className="flex items-center gap-3">
@@ -367,8 +373,14 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest }) => {
 
   // Edit View
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-2xl border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div className={fullScreen 
+      ? "h-full bg-gray-900 overflow-y-auto" 
+      : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    }>
+      <div className={fullScreen 
+        ? "h-full" 
+        : "bg-slate-800 rounded-2xl border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+      }>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">

@@ -41,10 +41,10 @@ module.exports = (db) => {
 
             // Create the session
             const session = await db.createChatSession(req.userId, {
-                scenario: scenario_id,
-                activeCharacters: active_characters,
+                scenario_id: scenario_id,
+                active_characters: active_characters,
                 title: title || `Chat - ${new Date().toLocaleDateString()}`,
-                groupMode: 'natural'
+                group_mode: 'natural'
             });
 
             // Add the initial message if provided
@@ -91,6 +91,11 @@ module.exports = (db) => {
             if (!session) {
                 return res.status(404).json({ error: 'Chat session not found' });
             }
+            
+            // Get messages for this session
+            const messages = await db.getChatMessages(req.params.sessionId, 100);
+            session.messages = messages;
+            
             res.json(session);
         } catch (error) {
             console.error('Error fetching chat session:', error);
