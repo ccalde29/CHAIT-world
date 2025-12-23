@@ -13,7 +13,8 @@ import {
   LogOut,
   ChevronDown,
   ChevronRight,
-  Lock
+  Lock,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -23,7 +24,8 @@ const NavigationSidebar = ({
   onSessionSelect,
   onNewChat,
   onNavigate,
-  activeView
+  activeView,
+  isAdmin
 }) => {
   const { user, signOut } = useAuth();
   const [sessions, setSessions] = useState([]);
@@ -57,15 +59,9 @@ const NavigationSidebar = ({
 
   const menuItems = [
     {
-      id: 'characters',
-      label: 'Characters',
+      id: 'manage',
+      label: 'Management',
       icon: Users,
-      requiresAuth: false
-    },
-    {
-      id: 'scenes',
-      label: 'Scenes',
-      icon: Film,
       requiresAuth: false
     },
     {
@@ -82,6 +78,16 @@ const NavigationSidebar = ({
       requiresAuth: false
     }
   ];
+
+  // Add admin menu item if user is admin
+  if (isAdmin) {
+    menuItems.push({
+      id: 'moderation',
+      label: 'Admin',
+      icon: Shield,
+      requiresAuth: false
+    });
+  }
 
   const handleMenuClick = (item) => {
     if (item.requiresAuth && !user) {

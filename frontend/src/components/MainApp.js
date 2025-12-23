@@ -309,11 +309,6 @@ const MainApp = () => {
 
     // Navigate to view
     setActiveView(view);
-    
-    // Handle view-specific logic
-    if (view === 'characters' || view === 'scenes') {
-      setActiveView('manage');
-    }
   };
 
   // ============================================================================
@@ -348,17 +343,19 @@ const MainApp = () => {
             if (fullSession.scenario_id) {
               charactersState.setCurrentScenario(fullSession.scenario_id);
             }
+
+            // Switch to chat view
+            setActiveView('chat');
           } catch (error) {
             console.error('Failed to load session:', error);
           }
         }}
         onNewChat={() => {
-          chat.clearChat();
-          charactersState.setActiveCharacters([]);
-          charactersState.setCurrentScenario(null);
+          setShowNewChatModal(true);
         }}
         onNavigate={handleNavigate}
         activeView={activeView}
+        isAdmin={isAdmin}
       />
 
       {/* Main Content Area */}
@@ -492,6 +489,18 @@ const MainApp = () => {
             />
           </div>
         )}
+
+        {activeView === 'settings' && (
+          <div className="flex-1 overflow-hidden">
+            <SettingsModal
+              user={user}
+              settings={settings.userSettings}
+              onSave={settings.saveUserSettings}
+              onClose={() => setActiveView('chat')}
+              fullScreen={true}
+            />
+          </div>
+        )}
       </div>
 
       {/* Active Chat Panel (Right Sidebar) */}
@@ -517,15 +526,6 @@ const MainApp = () => {
       )}
 
       {/* Other Modals */}
-      {showSettings && (
-        <SettingsModal
-          user={user}
-          settings={settings.userSettings}
-          onSave={settings.saveUserSettings}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
-
       {showCharacterEditor && (
         <CharacterEditor
           character={editingCharacter}

@@ -8,7 +8,7 @@ import { X, Settings, Key, Zap, CheckCircle, AlertCircle, Eye, EyeOff, Loader, S
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
+const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false }) => {
   
   // ============================================================================
   // STATE MANAGEMENT
@@ -305,8 +305,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose }) => {
   // ============================================================================
   
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl border border-white/10 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+    <div className={fullScreen 
+      ? "h-full bg-gray-900 overflow-y-auto" 
+      : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    }>
+      <div className={fullScreen 
+        ? "h-full" 
+        : "bg-gray-900 rounded-2xl border border-white/10 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+      }>
         
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-gray-900 z-10">
