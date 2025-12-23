@@ -16,18 +16,18 @@ class LocalDatabaseService {
     }
 
     /**
-     * Get default database path (~/.chait-world/local.db)
+     * Get default database path (./data/local.db in project folder)
      */
     getDefaultDbPath() {
-        const homeDir = os.homedir();
-        const appDir = path.join(homeDir, '.chait-world');
+        const projectRoot = path.join(__dirname, '..', '..');
+        const dataDir = path.join(projectRoot, 'data');
         
         // Create directory if it doesn't exist
-        if (!fs.existsSync(appDir)) {
-            fs.mkdirSync(appDir, { recursive: true });
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
         }
         
-        return path.join(appDir, 'local.db');
+        return path.join(dataDir, 'local.db');
     }
 
     /**

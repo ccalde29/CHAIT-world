@@ -28,7 +28,7 @@ import OfflineIndicator from './OfflineIndicator';
 import LoginRequiredModal from './LoginRequiredModal';
 
 const MainApp = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, signInWithGoogle } = useAuth();
 
   // ============================================================================
   // API CLIENT
@@ -298,6 +298,13 @@ const MainApp = () => {
   // ============================================================================
 
   const handleNavigate = (view) => {
+    // Handle login separately
+    if (view === 'login') {
+      // Trigger Google OAuth sign-in
+      signInWithGoogle();
+      return;
+    }
+
     // Check if view requires authentication
     const requiresAuth = view === 'community';
     
