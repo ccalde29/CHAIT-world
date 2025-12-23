@@ -237,28 +237,36 @@ class DatabaseService {
             );
 
             if (localSettings) {
+                // Return in frontend-expected format (camelCase)
                 return {
-                    ...localSettings,
-                    api_keys: this.localDb.safeJsonParse(localSettings.api_keys, {}),
-                    ollama_settings: this.localDb.safeJsonParse(localSettings.ollama_settings, {}),
-                    lmstudio_settings: this.localDb.safeJsonParse(localSettings.lmstudio_settings, {}),
-                    preferences: this.localDb.safeJsonParse(localSettings.preferences, {})
+                    userId: localSettings.user_id,
+                    apiKeys: this.localDb.safeJsonParse(localSettings.api_keys, {}),
+                    ollamaSettings: this.localDb.safeJsonParse(localSettings.ollama_settings, { baseUrl: 'http://localhost:11434' }),
+                    lmStudioSettings: this.localDb.safeJsonParse(localSettings.lmstudio_settings, { baseUrl: 'http://localhost:1234' }),
+                    groupDynamicsMode: localSettings.group_dynamics_mode || 'natural',
+                    messageDelay: localSettings.message_delay || 1200,
+                    defaultProvider: localSettings.default_provider || 'openai',
+                    defaultModel: localSettings.default_model,
+                    activePersonaId: localSettings.active_persona_id,
+                    isAdmin: false, // Local mode doesn't have admin
+                    autoApproveCharacters: false,
+                    adminSystemPrompt: null
                 };
             }
 
             // Return defaults if no settings exist
             return {
-                user_id: userId,
-                api_keys: {},
-                ollama_settings: { baseUrl: 'http://localhost:11434', models: [] },
-                lmstudio_settings: { baseUrl: 'http://localhost:1234', models: [] },
-                preferences: {
-                    responseDelay: true,
-                    showTypingIndicator: true,
-                    maxCharactersInGroup: 5,
-                    theme: 'dark',
-                    fontSize: 'medium'
-                }
+                userId: userId,
+                apiKeys: {},
+                ollamaSettings: { baseUrl: 'http://localhost:11434' },
+                lmStudioSettings: { baseUrl: 'http://localhost:1234' },
+                groupDynamicsMode: 'natural',
+                messageDelay: 1200,
+                defaultProvider: 'openai',
+                defaultModel: null,
+                isAdmin: false,
+                autoApproveCharacters: false,
+                adminSystemPrompt: null
             };
         }
         return this.userSettingsService.getUserSettings(userId);
@@ -266,6 +274,20 @@ class DatabaseService {
 
     async updateUserSettings(userId, updates) {
         if (this.isLocalMode()) {
+            // Normalize keys (handle both camelCase from frontend and snake_case from DB)
+            const normalized = {
+                api_keys: updates.apiKeys || updates.api_keys || {},
+                ollama_settings: updates.ollamaSettings || updates.ollama_settings || { baseUrl: 'http://localhost:11434' },
+                lmstudio_settings: updates.lmStudioSettings || updates.lmstudio_settings || { baseUrl: 'http://localhost:1234' },
+                preferences: updates.preferences || {},
+                default_provider: updates.defaultProvider || updates.default_provider || 'openai',
+                default_model: updates.defaultModel || updates.default_model || null,
+                group_dynamics_mode: updates.groupDynamicsMode || updates.group_dynamics_mode || 'natural',
+                message_delay: updates.messageDelay || updates.message_delay || 1200,
+                auto_approve_characters: updates.autoApproveCharacters || updates.auto_approve_characters || false,
+                admin_system_prompt: updates.adminSystemPrompt || updates.admin_system_prompt || null
+            };
+
             // Check if settings exist
             const existing = this.localDb.get(
                 'SELECT id FROM user_settings_local WHERE user_id = ?',
@@ -274,26 +296,25 @@ class DatabaseService {
 
             if (existing) {
                 // Update existing settings
-                const setClauses = [];
-                const values = [];
-
-                for (const [key, value] of Object.entries(updates)) {
-                    if (['api_keys', 'ollama_settings', 'lmstudio_settings', 'preferences'].includes(key)) {
-                        setClauses.push(`${key} = ?`);
-                        values.push(JSON.stringify(value));
-                    } else if (['default_provider', 'default_model', 'active_persona_id'].includes(key)) {
-                        setClauses.push(`${key} = ?`);
-                        values.push(value);
-                    }
-                }
-
-                if (setClauses.length > 0) {
-                    values.push(userId);
-                    this.localDb.run(
-                        `UPDATE user_settings_local SET ${setClauses.join(', ')} WHERE user_id = ?`,
-                        values
-                    );
-                }
+                this.localDb.run(
+                    `UPDATE user_settings_local 
+                     SET api_keys = ?, 
+                         ollama_settings = ?, 
+                         lmstudio_settings = ?,
+                         preferences = ?,
+                         default_provider = ?,
+                         default_model = ?
+                     WHERE user_id = ?`,
+                    [
+                        JSON.stringify(normalized.api_keys),
+                        JSON.stringify(normalized.ollama_settings),
+                        JSON.stringify(normalized.lmstudio_settings),
+                        JSON.stringify(normalized.preferences),
+                        normalized.default_provider,
+                        normalized.default_model,
+                        userId
+                    ]
+                );
             } else {
                 // Insert new settings
                 this.localDb.run(
@@ -301,12 +322,12 @@ class DatabaseService {
                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [
                         userId,
-                        JSON.stringify(updates.api_keys || {}),
-                        JSON.stringify(updates.ollama_settings || {}),
-                        JSON.stringify(updates.lmstudio_settings || {}),
-                        JSON.stringify(updates.preferences || {}),
-                        updates.default_provider || 'openai',
-                        updates.default_model || null
+                        JSON.stringify(normalized.api_keys),
+                        JSON.stringify(normalized.ollama_settings),
+                        JSON.stringify(normalized.lmstudio_settings),
+                        JSON.stringify(normalized.preferences),
+                        normalized.default_provider,
+                        normalized.default_model
                     ]
                 );
             }
