@@ -12,10 +12,8 @@ const ImageService = require('./ImageService');
 
 class DatabaseService {
     constructor(options = {}) {
-        // Determine deployment mode: 'web' or 'local'
-        // - 'web': Use Supabase for everything (traditional web app)
-        // - 'local': Use SQLite for local data, Supabase only for community features
-        this.mode = options.mode || process.env.DEPLOYMENT_MODE || 'web';
+        // Always use local mode: SQLite for local data, Supabase only for community features
+        this.mode = 'local';
         
         const supabaseUrl = process.env.SUPABASE_URL;
         const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -25,32 +23,24 @@ class DatabaseService {
             try {
                 this.supabase = createClient(supabaseUrl, supabaseServiceKey);
                 this.supabaseAvailable = true;
-                console.log(`[Database] Supabase initialized for ${this.mode} mode`);
+                console.log('[Database] Supabase initialized for community features');
             } catch (error) {
                 console.error('[Database] Failed to initialize Supabase:', error);
                 this.supabaseAvailable = false;
-                if (this.mode === 'web') {
-                    throw new Error('Failed to initialize Supabase for web mode');
-                }
             }
         } else {
             this.supabaseAvailable = false;
-            if (this.mode === 'web') {
-                throw new Error('Missing Supabase environment variables for web mode');
-            }
-            console.warn('[Database] Supabase not configured - running in offline-only mode');
+            console.warn('[Database] Supabase not configured - community features unavailable');
         }
 
-        // Initialize local database for local mode
-        if (this.mode === 'local') {
-            try {
-                this.localDb = getLocalDb(options.localDbPath);
-                this.localDb.initialize();
-                console.log('[Database] SQLite initialized for local mode');
-            } catch (error) {
-                console.error('[Database] Failed to initialize SQLite:', error);
-                throw error; // Local mode requires SQLite
-            }
+        // Initialize local SQLite database
+        try {
+            this.localDb = getLocalDb(options.localDbPath);
+            this.localDb.initialize();
+            console.log('[Database] SQLite initialized for local data');
+        } catch (error) {
+            console.error('[Database] Failed to initialize SQLite:', error);
+            throw error;
         }
 
         // Initialize Supabase-based services (for web mode or community operations)
@@ -799,7 +789,7 @@ class DatabaseService {
         }
 
         try {
-            // Get character from community
+            // Get character from Supabase community
             const { data: communityChar, error } = await this.supabase
                 .from('community_characters')
                 .select('*')
@@ -808,42 +798,66 @@ class DatabaseService {
 
             if (error) throw error;
 
-            // Import to local database (if in local mode)
-            if (this.isLocalMode()) {
-                const characterData = {
-                    name: communityChar.name,
-                    personality: communityChar.personality,
-                    age: communityChar.age,
-                    sex: communityChar.sex,
-                    appearance: communityChar.appearance,
-                    background: communityChar.background,
-                    avatar: communityChar.avatar,
-                    color: communityChar.color,
-                    chat_examples: communityChar.chat_examples,
-                    tags: communityChar.tags,
-                    temperature: communityChar.temperature,
-                    max_tokens: communityChar.max_tokens,
-                    context_window: communityChar.context_window,
-                    memory_enabled: communityChar.memory_enabled,
-                    avatar_image_url: communityChar.avatar_image_url,
-                    avatar_image_filename: communityChar.avatar_image_filename,
-                    uses_custom_image: communityChar.uses_custom_image
-                };
+            // Import to local SQLite database
+            const characterData = {
+                name: communityChar.name,
+                personality: communityChar.personality,
+                age: communityChar.age,
+                sex: communityChar.sex,
+                appearance: communityChar.appearance,
+                background: communityChar.background,
+                avatar: communityChar.avatar,
+                color: communityChar.color,
+                chat_examples: communityChar.chat_examples,
+                tags: communityChar.tags,
+                temperature: communityChar.temperature,
+                max_tokens: communityChar.max_tokens,
+                context_window: communityChar.context_window,
+                memory_enabled: communityChar.memory_enabled,
+                avatar_image_url: communityChar.avatar_image_url,
+                avatar_image_filename: communityChar.avatar_image_filename,
+                uses_custom_image: communityChar.uses_custom_image,
+                original_id: communityChar.id // Track where it came from
+            };
 
-                return this.localDb.createCharacter(userId, characterData);
-            }
-
-            // For web mode, create in Supabase characters table
-            return communityChar;
+            return this.localDb.createCharacter(userId, characterData);
         } catch (error) {
             console.error('Error importing character:', error);
-            // Check if it's a network error
-            if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.message?.includes('fetch failed')) {
-                const offlineError = new Error('Unable to import character - no internet connection');
-                offlineError.code = 'OFFLINE';
-                offlineError.offline = true;
-                throw offlineError;
-            }
+            throw error;
+        }
+    }
+
+    async importSceneFromCommunity(userId, communitySceneId) {
+        if (!this.isCommunityAvailable()) {
+            const error = new Error('Community features require internet connection');
+            error.code = 'OFFLINE';
+            error.offline = true;
+            throw error;
+        }
+
+        try {
+            // Get scene from Supabase community
+            const { data: communityScene, error } = await this.supabase
+                .from('community_scenes')
+                .select('*')
+                .eq('id', communitySceneId)
+                .single();
+
+            if (error) throw error;
+
+            // Import to local SQLite database
+            const sceneData = {
+                name: communityScene.title,  // Map title to name
+                description: communityScene.description,
+                initial_message: communityScene.system_prompt || 'Welcome to this scene!',
+                atmosphere: communityScene.category || 'neutral',
+                tags: communityScene.tags,
+                original_id: communityScene.id // Track where it came from
+            };
+
+            return this.localDb.createScenario(userId, sceneData);
+        } catch (error) {
+            console.error('Error importing scene:', error);
             throw error;
         }
     }
@@ -852,13 +866,7 @@ class DatabaseService {
      * Get database statistics
      */
     getStats() {
-        if (this.isLocalMode()) {
-            return this.localDb.getStats();
-        }
-        return {
-            mode: 'web',
-            message: 'Stats not available in web mode'
-        };
+        return this.localDb.getStats();
     }
 }
 

@@ -5,11 +5,7 @@
     "main": "server-supabase.js",
     "scripts": {
         "start": "node server-supabase.js",
-        "start:local": "DEPLOYMENT_MODE=local node server-supabase.js",
-        "start:web": "DEPLOYMENT_MODE=web node server-supabase.js",
         "dev": "nodemon server-supabase.js",
-        "dev:local": "DEPLOYMENT_MODE=local nodemon server-supabase.js",
-        "dev:web": "DEPLOYMENT_MODE=web nodemon server-supabase.js",
         "test:db": "node test-sqlite.js"
     },
     "dependencies": {
