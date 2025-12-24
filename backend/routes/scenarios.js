@@ -239,8 +239,8 @@ Keep responses brief (1-2 sentences). Focus on what's happening in the scene, no
             const response = await AIProviderService.generateResponse(
                 narratorAsCharacter,
                 [{ role: 'system', content: narratorPrompt }, ...(messages || []).slice(-10)],
-                userSettings.api_keys || {},
-                userSettings.ollama_settings || {}
+                userSettings?.apiKeys || {},
+                userSettings?.ollamaSettings || {}
             );
 
             res.json({ triggered: true, response, scene: scene.name });

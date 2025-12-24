@@ -4,8 +4,8 @@
 // ============================================================================
 
 class SessionContinuityService {
-  constructor(supabaseClient) {
-    this.supabase = supabaseClient;
+  constructor(db) {
+    this.db = db;
   }
 
   /**
@@ -54,17 +54,17 @@ class SessionContinuityService {
    */
   async getPreviousSessions(userId, characterId, currentSessionId, limit = 3) {
     try {
-      const { data, error } = await this.supabase
-        .from('chat_sessions')
-        .select('*')
-        .eq('user_id', userId)
-        .contains('active_characters', [characterId])
-        .neq('id', currentSessionId)
-        .order('updated_at', { ascending: false })
-        .limit(limit);
+      const sessions = this.db.localDb.all(
+        `SELECT * FROM chat_sessions 
+         WHERE user_id = ? 
+         AND id != ? 
+         AND active_characters LIKE ?
+         ORDER BY updated_at DESC 
+         LIMIT ?`,
+        [userId, currentSessionId, `%${characterId}%`, limit]
+      );
 
-      if (error) throw error;
-      return data || [];
+      return sessions || [];
     } catch (error) {
       console.error('[SessionContinuity] Error fetching previous sessions:', error);
       return [];
@@ -81,24 +81,25 @@ class SessionContinuityService {
     try {
       const lastSessionId = sessions[0].id;
       
-      const { data: messages, error } = await this.supabase
-        .from('messages')
-        .select('content, type')
-        .eq('session_id', lastSessionId)
-        .order('timestamp', { ascending: false })
-        .limit(10);
+      const messages = this.db.localDb.all(
+        `SELECT content, sender_type FROM messages 
+         WHERE session_id = ? 
+         ORDER BY timestamp DESC 
+         LIMIT 10`,
+        [lastSessionId]
+      );
 
-      if (error || !messages) return [];
+      if (!messages) return [];
 
       // Look for questions or topics mentioned but not resolved
       const unresolvedTopics = [];
       
       for (const msg of messages) {
-        if (msg.type === 'user' && msg.content.includes('?')) {
+        if (msg.sender_type === 'user' && msg.content.includes('?')) {
           // Check if there was a satisfactory response
           const nextMessages = messages.slice(messages.indexOf(msg) + 1, messages.indexOf(msg) + 3);
           const hasDetailedResponse = nextMessages.some(m => 
-            m.type === 'character' && m.content.length > 50
+            m.sender_type === 'character' && m.content.length > 50
           );
           
           if (!hasDetailedResponse) {
@@ -127,14 +128,15 @@ class SessionContinuityService {
     try {
       const lastSessionId = sessions[0].id;
       
-      const { data: messages, error } = await this.supabase
-        .from('messages')
-        .select('content, type')
-        .eq('session_id', lastSessionId)
-        .order('timestamp', { ascending: false })
-        .limit(20);
+      const messages = this.db.localDb.all(
+        `SELECT content, sender_type FROM messages 
+         WHERE session_id = ? 
+         ORDER BY timestamp DESC 
+         LIMIT 20`,
+        [lastSessionId]
+      );
 
-      if (error || !messages) return [];
+      if (!messages) return [];
 
       const events = [];
 
@@ -202,14 +204,13 @@ class SessionContinuityService {
    */
   async storeSessionMetadata(sessionId, metadata) {
     try {
-      const { error } = await this.supabase
-        .from('chat_sessions')
-        .update({
-          metadata: metadata
-        })
-        .eq('id', sessionId);
+      const metadataJson = JSON.stringify(metadata);
+      
+      this.db.localDb.run(
+        'UPDATE chat_sessions SET metadata = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [metadataJson, sessionId]
+      );
 
-      if (error) throw error;
       return true;
     } catch (error) {
       console.error('[SessionContinuity] Error storing metadata:', error);

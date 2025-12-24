@@ -179,11 +179,22 @@ class AIProviderService {
     });
     
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error?.message || `OpenRouter API error: ${response.status}`);
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: { message: errorText } };
+      }
+      console.error('[OpenRouter] API Error:', response.status, errorData);
+      throw new Error(errorData.error?.message || `OpenRouter API error: ${response.status} - ${errorText.substring(0, 200)}`);
     }
     
     const data = await response.json();
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('[OpenRouter] Unexpected response format:', data);
+      throw new Error('Invalid response format from OpenRouter');
+    }
     return data.choices[0].message.content.trim();
   }
   

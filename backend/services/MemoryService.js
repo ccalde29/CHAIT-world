@@ -29,8 +29,19 @@ class MemoryService {
     async addCharacterMemory(characterId, userId, memoryData) {
         try {
             console.log('Adding memory for character:', characterId);
+            
+            // Map 'fact' to 'semantic' for database constraint
+            let memoryType = memoryData.type || 'semantic';
+            if (memoryType === 'fact') {
+                memoryType = 'semantic';
+            }
+            // Ensure valid memory type
+            if (!['episodic', 'semantic', 'emotional', 'relational'].includes(memoryType)) {
+                memoryType = 'semantic';
+            }
+            
             const memory = await this.db.createMemory(characterId, userId, {
-                memory_type: memoryData.type || 'fact',
+                memory_type: memoryType,
                 content: memoryData.content,
                 importance_score: memoryData.importance_score || 0.5
             });

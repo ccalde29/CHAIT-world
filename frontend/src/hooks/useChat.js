@@ -75,7 +75,12 @@ export const useChat = (apiRequest) => {
 
       // Handle responses with delays
       const newTimeouts = [];
+      let maxDelay = 0;
+      
       response.responses.forEach((charResponse, index) => {
+        const delay = charResponse.delay || 0;
+        maxDelay = Math.max(maxDelay, delay);
+        
         const timeout = setTimeout(() => {
           // Find the full character data to include image info
           const fullCharacter = activeCharacters.find(c => c.id === charResponse.character);
@@ -92,10 +97,50 @@ export const useChat = (apiRequest) => {
             content: charResponse.response,
             timestamp: new Date()
           }]);
-        }, charResponse.delay || 0);
+        }, delay);
 
         newTimeouts.push(timeout);
       });
+
+      // Check for narrator response after all character responses
+      if (currentScenario) {
+        const narratorDelay = maxDelay + 1500; // Wait for all character responses + 1.5s
+        const narratorTimeout = setTimeout(async () => {
+          try {
+            // Get all messages including the ones we just added
+            const allMessages = [...messages, newUserMessage];
+            const messageCount = allMessages.length;
+            const lastMessage = allMessages[allMessages.length - 1];
+            const lastAction = lastMessage?.content || '';
+
+            const narratorResponse = await apiRequest(`/api/scenarios/${currentScenario}/narrator`, {
+              method: 'POST',
+              body: JSON.stringify({
+                messages: allMessages.slice(-10).map(m => ({
+                  role: m.type === 'user' ? 'user' : 'assistant',
+                  content: m.content
+                })),
+                messageCount,
+                lastAction
+              })
+            });
+
+            if (narratorResponse.triggered && narratorResponse.response) {
+              setMessages(prev => [...prev, {
+                id: Date.now() + 999,
+                type: 'narrator',
+                content: narratorResponse.response,
+                timestamp: new Date()
+              }]);
+            }
+          } catch (error) {
+            console.log('[Narrator] Not triggered or error:', error.message);
+            // Silent fail - narrator is optional
+          }
+        }, narratorDelay);
+        
+        newTimeouts.push(narratorTimeout);
+      }
 
       setResponseTimeouts(newTimeouts);
 
@@ -160,6 +205,12 @@ export const useChat = (apiRequest) => {
 
   const generatePersonaResponse = async (userPersona, currentScenario) => {
     if (!userPersona?.persona || generatingPersonaResponse) {
+      return;
+    }
+
+    // Check if persona has AI model configured
+    if (!userPersona.persona.ai_model) {
+      setError('Please configure an AI model for your persona in the Persona Manager to use auto-responses');
       return;
     }
 

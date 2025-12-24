@@ -432,15 +432,18 @@ router.post('/:personaId/generate', async (req, res) => {
     }
 
     // Verify persona belongs to user
-    const { data: persona, error } = await supabase
-      .from('user_personas')
-      .select('*')
-      .eq('id', personaId)
-      .eq('user_id', userId)
-      .single();
+    const persona = db.localDb.get(
+      'SELECT * FROM user_personas WHERE id = ? AND user_id = ?',
+      [personaId, userId]
+    );
 
-    if (error || !persona) {
+    if (!persona) {
       return res.status(404).json({ error: 'Persona not found' });
+    }
+
+    // Parse JSON fields
+    if (persona.interests && typeof persona.interests === 'string') {
+      persona.interests = JSON.parse(persona.interests);
     }
 
     // Check if persona has AI model configured
@@ -451,11 +454,7 @@ router.post('/:personaId/generate', async (req, res) => {
     }
 
     // Get user settings for API keys
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('api_keys, ollama_settings')
-      .eq('user_id', userId)
-      .single();
+    const settings = await db.getUserSettings(userId);
 
     // Build persona prompt
     let personaPrompt = `You are ${persona.name}. Respond as this persona in the ongoing conversation.
@@ -495,8 +494,8 @@ ${persona.personality}`;
         { role: 'system', content: personaPrompt },
         ...messages.slice(-10) // Last 10 messages for context
       ],
-      settings?.api_keys || {},
-      settings?.ollama_settings || {}
+      settings?.apiKeys || {},
+      settings?.ollamaSettings || {}
     );
 
     console.log(`[Personas] Generated response for persona ${persona.name}: ${response.substring(0, 50)}...`);

@@ -484,8 +484,16 @@ class DatabaseService {
     // All memory operations use local SQLite database
     // ============================================================================
 
+    async getMemoriesByCharacter(characterId, userId, limit = 20) {
+        return this.localDb.getMemoriesByCharacter(characterId, userId, limit);
+    }
+
     async getCharacterMemories(characterId, userId, limit = 20) {
         return this.localDb.getMemoriesByCharacter(characterId, userId, limit);
+    }
+
+    async createMemory(characterId, userId, memoryData) {
+        return this.localDb.createMemory(characterId, userId, memoryData);
     }
 
     async getCharacterRelationship(characterId, userId) {

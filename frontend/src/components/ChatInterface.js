@@ -42,6 +42,26 @@ const ChatInterface = ({
               );
             }
 
+            // Handle narrator messages
+            if (message.type === 'narrator') {
+              return (
+                <div key={message.id} className="flex justify-center my-4">
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-6 py-3 max-w-3xl">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-amber-400">NARRATOR</span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(message.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-gray-300 italic">{message.content}</p>
+                  </div>
+                </div>
+              );
+            }
+
             const isUser = message.type === 'user';
 
             // For character messages, use data from message first (from DB), fallback to findCharacterById
@@ -148,9 +168,13 @@ const ChatInterface = ({
           {userPersona?.persona && (
             <button
               onClick={onGeneratePersonaResponse}
-              disabled={isGenerating || generatingPersonaResponse}
+              disabled={isGenerating || generatingPersonaResponse || !userPersona?.persona?.ai_model}
               className="px-4 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              title="Generate auto-response for your persona"
+              title={
+                !userPersona?.persona?.ai_model
+                  ? "Configure AI model in Persona Manager to enable auto-responses"
+                  : "Generate an AI response as your persona"
+              }
             >
               <Sparkles size={18} />
               {generatingPersonaResponse ? 'Generating...' : 'Auto'}

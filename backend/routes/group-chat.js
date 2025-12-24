@@ -31,10 +31,10 @@ module.exports = (db) => {
   );
   
   const memoryService = new MemoryService(db);
-  const learningService = new CharacterLearningService(supabase);
+  const learningService = new CharacterLearningService(db);
   const promptBuilder = new PromptBuilder();
   const conversationTracker = new ConversationStateTracker();
-  const sessionContinuity = new SessionContinuityService(supabase);
+  const sessionContinuity = new SessionContinuityService(db);
 
 /**
  * POST /api/chat/group-response

@@ -9,7 +9,8 @@ import { useChat } from '../hooks/useChat';
 import { useCharacters } from '../hooks/useCharacters';
 import { useSettings } from '../hooks/useSettings';
 import { usePersonas } from '../hooks/usePersonas';
-import { createApiClient } from '../utils/apiClient';
+import { createUnifiedApiClient } from '../utils/unifiedApiClient';
+import { isNativePlatform } from '../utils/platform';
 
 // Components
 import ChatInterface from './ChatInterface';
@@ -34,7 +35,7 @@ const MainApp = () => {
   // API CLIENT
   // ============================================================================
 
-  const apiRequest = useMemo(() => createApiClient(user.id), [user.id]);
+  const apiRequest = useMemo(() => createUnifiedApiClient(user.id), [user.id]);
 
   // ============================================================================
   // CUSTOM HOOKS
@@ -154,7 +155,7 @@ const MainApp = () => {
     await chat.sendMessage(
       charactersState.activeCharacters,
       charactersState.currentScenario,
-      settings.userPersona,
+      personasState.activePersona ? { hasPersona: true, persona: personasState.activePersona } : null,
       (newSessionId) => {
         // Callback when new session is created - refresh immediately
         if (loadSessionsRef.current) {
@@ -411,12 +412,12 @@ const MainApp = () => {
             generatingPersonaResponse={chat.generatingPersonaResponse}
             error={chat.error}
             messagesEndRef={chat.messagesEndRef}
-            userPersona={settings.userPersona}
+            userPersona={personasState.activePersona ? { hasPersona: true, persona: personasState.activePersona } : null}
             findCharacterById={charactersState.findCharacterById}
             onInputChange={chat.setUserInput}
             onSendMessage={handleSendMessage}
             onGeneratePersonaResponse={() => chat.generatePersonaResponse(
-              settings.userPersona,
+              personasState.activePersona ? { hasPersona: true, persona: personasState.activePersona } : null,
               charactersState.findScenarioById(charactersState.currentScenario)
             )}
             onKeyPress={(e) => {

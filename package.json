@@ -3,6 +3,12 @@
     "supabase": "^2.58.5"
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^7.0.2",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/preferences": "^8.0.0",
     "update": "^0.7.4"
   }
 }

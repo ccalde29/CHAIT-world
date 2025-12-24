@@ -78,6 +78,11 @@ class MemoryRelevanceService {
    * Extract meaningful keywords from text
    */
   static extractKeywords(text) {
+    // Handle undefined, null, or non-string values
+    if (!text || typeof text !== 'string') {
+      return [];
+    }
+
     const commonWords = new Set([
       'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
       'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during',
