@@ -40,6 +40,8 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
 
     // Display preferences
     messageDelay: 1200,
+    defaultModel: '',
+    defaultProvider: 'token',
 
     // Admin settings
     autoApproveCharacters: false,
@@ -72,12 +74,19 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   
+  // Model selection state
+  const [availableModels, setAvailableModels] = useState([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState('token');
+  
   // ============================================================================
   // INITIALIZE FROM SETTINGS
   // ============================================================================
   
   useEffect(() => {
     if (settings) {
+      const savedProvider = settings.defaultProvider || 'token';
+      
       setFormData({
         openaiKey: settings.apiKeys?.openai || '',
         anthropicKey: settings.apiKeys?.anthropic || '',
@@ -91,16 +100,97 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         lmStudioUrl: settings.lmStudioSettings?.baseUrl || 'http://127.0.0.1:1234',
         groupDynamicsMode: settings.groupDynamicsMode || 'natural',
         messageDelay: settings.messageDelay || 1200,
+        defaultModel: settings.defaultModel || '',
+        defaultProvider: savedProvider,
         autoApproveCharacters: settings.autoApproveCharacters || false,
         adminSystemPrompt: settings.adminSystemPrompt || ''
       });
+      
+      // Set selected provider from saved settings
+      setSelectedProvider(savedProvider);
       
       // Load admin API keys if user is admin
       if (settings.isAdmin) {
         loadAdminKeys();
       }
+      
+      // Load models for default model selection
+      loadAvailableModels(savedProvider);
     }
   }, [settings]);
+  
+  // ============================================================================
+  // LOAD AVAILABLE MODELS
+  // ============================================================================
+  
+  const loadAvailableModels = async (provider) => {
+    if (!settings) return;
+    
+    setLoadingModels(true);
+    setAvailableModels([]);
+    
+    try {
+      // Handle token models
+      if (provider === 'token') {
+        const response = await fetch(`${API_BASE_URL}/api/token-models`, {
+          headers: { 'user-id': user.id }
+        });
+        const data = await response.json();
+        if (data.models && data.models.length > 0) {
+          const formattedModels = data.models.map(m => ({
+            id: m.id,
+            name: `${m.display_name} (${m.token_cost} tokens)`
+          }));
+          setAvailableModels(formattedModels);
+        }
+        setLoadingModels(false);
+        return;
+      }
+      
+      let apiKey = null;
+      
+      if (settings.apiKeys) {
+        switch (provider) {
+          case 'openai':
+            apiKey = settings.apiKeys.openai;
+            break;
+          case 'anthropic':
+            apiKey = settings.apiKeys.anthropic;
+            break;
+          case 'google':
+            apiKey = settings.apiKeys.google;
+            break;
+          case 'openrouter':
+            apiKey = settings.apiKeys.openrouter;
+            break;
+        }
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/api/providers/models`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'user-id': user.id
+        },
+        body: JSON.stringify({
+          provider,
+          apiKey,
+          ollamaSettings: settings.ollamaSettings,
+          lmStudioSettings: settings.lmStudioSettings
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.models && data.models.length > 0) {
+        setAvailableModels(data.models);
+      }
+    } catch (err) {
+      console.error('Error loading models:', err);
+    } finally {
+      setLoadingModels(false);
+    }
+  };
   
   // ============================================================================
   // HANDLERS
@@ -345,6 +435,8 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         },
         groupDynamicsMode: formData.groupDynamicsMode,
         messageDelay: formData.messageDelay,
+        defaultModel: formData.defaultModel,
+        defaultProvider: selectedProvider,
         autoApproveCharacters: formData.autoApproveCharacters,
         adminSystemPrompt: formData.adminSystemPrompt
       };
@@ -480,8 +572,96 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         {/* Content */}
         <div className="p-6 space-y-8">
           
-          {/* AI Provider Keys Section */}
+          {/* Group Chat Settings - Moved to top */}
           <div>
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Zap size={18} className="text-red-500" />
+              Group Chat Settings
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Default Model */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Default Character Model
+                </label>
+                <p className="text-xs text-gray-400 mb-2">
+                  This model will be pre-selected when creating new characters.
+                </p>
+                
+                {/* Provider Selector */}
+                <div className="flex gap-2 mb-2">
+                  <select
+                    value={selectedProvider}
+                    onChange={(e) => {
+                      const newProvider = e.target.value;
+                      setSelectedProvider(newProvider);
+                      setFormData(prev => ({ ...prev, defaultModel: '' }));
+                      loadAvailableModels(newProvider);
+                    }}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-400"
+                  >
+                    <option value="token">Token Models (Recommended)</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="google">Google AI</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="local">Local (Ollama/LM Studio)</option>
+                  </select>
+                </div>
+                
+                {/* Model Dropdown */}
+                <select
+                  value={formData.defaultModel}
+                  onChange={(e) => handleInputChange('defaultModel', e.target.value)}
+                  disabled={loadingModels || availableModels.length === 0}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-400 disabled:opacity-50"
+                >
+                  <option value="">Select a model...</option>
+                  {availableModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+                
+                {loadingModels && (
+                  <p className="text-xs text-gray-500 mt-1">Loading models...</p>
+                )}
+                
+                {!loadingModels && availableModels.length === 0 && (
+                  <p className="text-xs text-yellow-400 mt-1">
+                    {selectedProvider === 'token' 
+                      ? 'No token models available. Contact admin or create token models in Admin Panel.'
+                      : `Configure your ${selectedProvider} API key below to see available models.`
+                    }
+                  </p>
+                )}
+              </div>
+
+              {/* Message Delay */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Message Delay: {formData.messageDelay}ms
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="3000"
+                  step="100"
+                  value={formData.messageDelay}
+                  onChange={(e) => handleInputChange('messageDelay', parseInt(e.target.value))}
+                  className="w-full accent-red-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Delay between character responses for realistic pacing
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* AI Provider Keys Section */}
+          <div className="pt-6 border-t border-white/10">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <Key size={18} className="text-red-500" />
               AI Provider API Keys
@@ -625,35 +805,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
             </div>
           </div>
           
-          {/* Group Chat Settings */}
-          <div className="pt-6 border-t border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Zap size={18} className="text-red-500" />
-              Group Chat Settings
-            </h3>
-            
-            <div className="space-y-4">
-              {/* Message Delay */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Message Delay: {formData.messageDelay}ms
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="3000"
-                  step="100"
-                  value={formData.messageDelay}
-                  onChange={(e) => handleInputChange('messageDelay', parseInt(e.target.value))}
-                  className="w-full accent-red-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Delay between character responses for realistic pacing
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Admin Settings - Only show if user is admin */}
           {settings.isAdmin && (
             <div className="pt-6 border-t border-white/10">

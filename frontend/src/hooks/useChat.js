@@ -12,6 +12,7 @@ export const useChat = (apiRequest) => {
   const [error, setError] = useState(null);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [responseTimeouts, setResponseTimeouts] = useState([]);
+  const [editingMessageId, setEditingMessageId] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Scroll to bottom when messages change
@@ -248,6 +249,87 @@ export const useChat = (apiRequest) => {
     }
   };
 
+  const editMessage = async (messageId, newContent, activeCharacters, currentScenario, userPersona, onNewSession) => {
+    if (!newContent.trim() || isGenerating) {
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+    clearResponseTimeouts();
+    setEditingMessageId(null);
+
+    // Find the message index
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) {
+      setError('Message not found');
+      setIsGenerating(false);
+      return;
+    }
+
+    // Remove all messages after this one (both the edited message and all responses after it)
+    const newMessages = messages.slice(0, messageIndex);
+    setMessages(newMessages);
+
+    // Add the edited user message
+    const editedMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: newContent.trim(),
+      timestamp: new Date(),
+      userPersona: userPersona?.persona || null
+    };
+
+    setMessages(prev => [...prev, editedMessage]);
+
+    try {
+      // Send the edited message to regenerate responses
+      const response = await apiRequest('/api/chat/group-response', {
+        method: 'POST',
+        body: JSON.stringify({
+          userMessage: newContent.trim(),
+          activeCharacters: activeCharacters.map(c => c.id),
+          currentScene: currentScenario,
+          conversationHistory: newMessages,
+          sessionId: currentSessionId,
+          userPersona: userPersona?.persona || null
+        })
+      });
+
+      // Handle responses with delays
+      const newTimeouts = [];
+      response.responses.forEach((charResponse, index) => {
+        const delay = charResponse.delay || 0;
+        
+        const timeout = setTimeout(() => {
+          const fullCharacter = activeCharacters.find(c => c.id === charResponse.character);
+
+          setMessages(prev => [...prev, {
+            id: Date.now() + index,
+            type: 'character',
+            character: charResponse.character,
+            characterName: charResponse.characterName,
+            characterAvatar: fullCharacter?.avatar,
+            characterColor: fullCharacter?.color,
+            characterImageUrl: fullCharacter?.avatar_image_url,
+            characterUsesCustomImage: fullCharacter?.uses_custom_image,
+            content: charResponse.response,
+            timestamp: new Date()
+          }]);
+        }, delay);
+
+        newTimeouts.push(timeout);
+      });
+
+      setResponseTimeouts(newTimeouts);
+    } catch (error) {
+      console.error('Error editing message:', error);
+      setError(error.message || 'Failed to regenerate responses. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return {
     // State
     messages,
@@ -257,11 +339,14 @@ export const useChat = (apiRequest) => {
     error,
     currentSessionId,
     messagesEndRef,
+    editingMessageId,
 
     // Actions
     setUserInput,
     setError,
+    setEditingMessageId,
     sendMessage,
+    editMessage,
     clearChat,
     addSystemMessage,
     loadChatSession,

@@ -46,8 +46,8 @@ const CharacterEditorV15 = ({
     uses_custom_image: false,
 
     // AI Provider settings
-    ai_provider: 'openai',
-    ai_model: 'gpt-3.5-turbo',
+    ai_provider: null,
+    ai_model: '',
     localType: 'ollama' // For local provider sub-type
   });
   
@@ -92,19 +92,24 @@ const CharacterEditorV15 = ({
         ai_model: character.ai_model || '',  // Will be set by loadAvailableModels
         localType: character.ai_provider === 'local' ? (character.ai_model?.includes('lmstudio') ? 'lmstudio' : 'ollama') : 'ollama'
       });
+      // Models will be loaded by the useEffect that watches formData.ai_provider
     } else {
-      // Create mode - use defaults
+      // Create mode - use user's default settings
+      const defaultProvider = userSettings?.defaultProvider || 'token';
       setFormData(prev => ({
         ...prev,
-        ai_provider: 'openai',
-        ai_model: ''  // Will be set by loadAvailableModels
+        ai_provider: defaultProvider,
+        ai_model: userSettings?.defaultModel || ''  // Will be validated by loadAvailableModels
       }));
+      // Models will be loaded by the useEffect that watches formData.ai_provider
     }
-  }, [character]);
+  }, [character, userSettings]);
   
   // Load available models when provider changes or on initial mount
   useEffect(() => {
     if (formData.ai_provider) {
+      // Clear models first to show loading state
+      setAvailableModels([]);
       loadAvailableModels(formData.ai_provider);
     }
   }, [formData.ai_provider]);
@@ -131,8 +136,17 @@ const CharacterEditorV15 = ({
             tier: 'token'
           }));
           setAvailableModels(formattedModels);
-          // Always set the first token model when switching to token provider
-          setFormData(prev => ({ ...prev, ai_model: formattedModels[0].id }));
+          
+          // Only auto-select first model if:
+          // 1. We're creating a new character (not editing), OR
+          // 2. The current model is empty/not set, OR
+          // 3. The current model doesn't exist in the available token models list
+          const currentModelExists = formattedModels.find(m => m.id === formData.ai_model);
+          const shouldSetDefaultModel = !character || !formData.ai_model || !currentModelExists;
+          
+          if (shouldSetDefaultModel) {
+            setFormData(prev => ({ ...prev, ai_model: formattedModels[0].id }));
+          }
         } else {
           setAvailableModels([]);
           setError('No token models available. Contact admin.');
@@ -183,10 +197,18 @@ const CharacterEditorV15 = ({
       if (data.models && data.models.length > 0) {
         setAvailableModels(data.models);
 
-        // Auto-select first model if current model not in list or is empty
+        // Only auto-select first model if:
+        // 1. We're creating a new character (not editing), OR
+        // 2. The current model is empty/not set, OR
+        // 3. The current model doesn't exist in the available models list
         const currentModelExists = data.models.find(m => m.id === formData.ai_model);
-        if (!currentModelExists || !formData.ai_model) {
-          setFormData(prev => ({ ...prev, ai_model: data.models[0].id }));
+        const shouldSetDefaultModel = !character || !formData.ai_model || !currentModelExists;
+        
+        if (shouldSetDefaultModel) {
+          // Use user's default model preference if available, otherwise first model
+          const defaultModel = userSettings?.defaultModel || data.models[0].id;
+          const useDefaultModel = data.models.find(m => m.id === defaultModel) ? defaultModel : data.models[0].id;
+          setFormData(prev => ({ ...prev, ai_model: useDefaultModel }));
         }
         // Clear any previous errors since models loaded successfully
         setError(null);

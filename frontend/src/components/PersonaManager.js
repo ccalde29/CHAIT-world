@@ -274,97 +274,110 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
               </p>
             </div>
 
-            {/* Personas List */}
-            <div className="space-y-3">
-              {personas.map(persona => (
-                <div
-                  key={persona.id}
-                  className={`bg-white/5 border rounded-lg p-4 transition-all ${
-                    activePersona?.id === persona.id ? 'border-blue-400' : 'border-white/10'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${persona.color} flex items-center justify-center flex-shrink-0`}>
-                        {persona.uses_custom_image && persona.avatar_image_url ? (
-                          <img
-                            src={persona.avatar_image_url}
-                            alt={persona.name}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-2xl">{persona.avatar}</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-base font-medium text-white">{persona.name}</h3>
-                          {activePersona?.id === persona.id && (
-                            <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
-                              Active
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-400 mb-2 line-clamp-2">{persona.personality}</p>
-                        {persona.interests && persona.interests.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {persona.interests.slice(0, 5).map((interest, idx) => (
-                              <span key={idx} className="text-xs bg-white/10 text-gray-300 px-2 py-0.5 rounded">
-                                {interest}
-                              </span>
-                            ))}
-                            {persona.interests.length > 5 && (
-                              <span className="text-xs text-gray-400">+{persona.interests.length - 5} more</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-2 ml-3">
-                      {activePersona?.id !== persona.id && (
-                        <button
-                          onClick={() => handleActivate(persona)}
-                          className="p-2 text-blue-400 hover:text-blue-300 hover:bg-white/10 rounded transition-colors"
-                          title="Activate"
-                        >
-                          <User size={16} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleEdit(persona)}
-                        className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(persona)}
-                        className="p-2 text-red-400 hover:text-red-300 hover:bg-white/10 rounded transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {personas.length === 0 && (
-                <div className="text-center py-8 text-gray-400">
-                  <User size={48} className="mx-auto mb-3 opacity-50" />
-                  <p>No personas yet. Create your first one!</p>
-                </div>
-              )}
+            {/* Add Button */}
+            <div className="flex justify-center">
+              <button
+                onClick={handleNew}
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-4 py-2.5 rounded-lg transition-all font-medium text-sm"
+              >
+                <Plus size={16} />
+                Create New Persona
+              </button>
             </div>
 
-            {/* Add Button */}
-            <button
-              onClick={handleNew}
-              className="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white rounded-lg transition-all flex items-center justify-center gap-2"
-            >
-              <Plus size={18} />
-              Create New Persona
-            </button>
+            {/* Personas Grid */}
+            {personas.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <User size={48} className="mx-auto mb-3 opacity-50" />
+                <p>No personas yet. Create your first one!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {personas.map(persona => (
+                  <div
+                    key={persona.id}
+                    className={`relative bg-white/5 border rounded-lg overflow-hidden hover:bg-white/10 transition-all group ${
+                      activePersona?.id === persona.id ? 'border-blue-400 hover:border-blue-400/30' : 'border-white/10 hover:border-blue-400/30'
+                    }`}
+                  >
+                    {/* Delete button positioned inside the card (top-right) */}
+                    <button
+                      onClick={() => handleDelete(persona)}
+                      className="absolute right-2 top-2 z-10 flex items-center gap-1 text-xs text-red-400 hover:text-red-300 p-1.5 hover:bg-black/50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                      aria-label={`Delete ${persona.name}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+
+                    {/* Persona Avatar Header */}
+                    <div className="relative h-32 flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
+                      {persona.uses_custom_image && persona.avatar_image_url ? (
+                        <img
+                          src={persona.avatar_image_url}
+                          alt={persona.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className={`w-16 h-16 rounded-full bg-gradient-to-br ${
+                            persona.color || 'from-blue-500 to-indigo-500'
+                          } flex items-center justify-center text-3xl`}
+                        >
+                          <span>{persona.avatar || '👤'}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-3">
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <p className="font-bold text-white text-center">{persona.name}</p>
+                        {activePersona?.id === persona.id && (
+                          <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 line-clamp-2 text-center mb-3">
+                        {persona.personality?.substring(0, 80)}...
+                      </p>
+                      {persona.interests && persona.interests.length > 0 && (
+                        <div className="flex flex-wrap gap-1 justify-center mb-3">
+                          {persona.interests.slice(0, 3).map((interest, idx) => (
+                            <span key={idx} className="text-xs bg-white/10 text-gray-300 px-2 py-0.5 rounded">
+                              {interest}
+                            </span>
+                          ))}
+                          {persona.interests.length > 3 && (
+                            <span className="text-xs text-gray-400">+{persona.interests.length - 3}</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-center gap-1 flex-wrap">
+                        {activePersona?.id !== persona.id && (
+                          <button
+                            onClick={() => handleActivate(persona)}
+                            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
+                          >
+                            <User size={12} />
+                            Activate
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleEdit(persona)}
+                          className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
+                        >
+                          <Edit2 size={12} />
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

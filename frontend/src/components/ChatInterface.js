@@ -1,8 +1,8 @@
 // components/ChatInterface.js
 // Chat UI component - messages display and input
 
-import React from 'react';
-import { Send, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { Send, AlertCircle, Sparkles, Edit2, Check, X } from 'lucide-react';
 
 const ChatInterface = ({
   messages,
@@ -13,11 +13,16 @@ const ChatInterface = ({
   messagesEndRef,
   userPersona,
   findCharacterById,
+  editingMessageId,
   onInputChange,
   onSendMessage,
   onKeyPress,
-  onGeneratePersonaResponse
+  onGeneratePersonaResponse,
+  onEditMessage,
+  onStartEdit,
+  onCancelEdit
 }) => {
+  const [editContent, setEditContent] = useState('');
   return (
     <div className="flex-1 flex flex-col bg-gray-900 min-h-0">
       {/* Messages Area */}
@@ -126,15 +131,65 @@ const ChatInterface = ({
                       })}
                     </span>
                   </div>
-                  <div
-                    className={`inline-block max-w-[80%] rounded-2xl px-4 py-2 ${
-                      isUser
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white/5 text-gray-100'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                  </div>
+                  {editingMessageId === message.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-400"
+                        rows={3}
+                        autoFocus
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            onEditMessage(message.id, editContent);
+                            setEditContent('');
+                          }}
+                          disabled={!editContent.trim()}
+                          className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <Check size={14} />
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            onCancelEdit();
+                            setEditContent('');
+                          }}
+                          className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm flex items-center gap-1"
+                        >
+                          <X size={14} />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="inline-block">
+                      <div
+                        className={`rounded-2xl px-4 py-2 ${
+                          isUser
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white/5 text-gray-100'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      </div>
+                      {isUser && (
+                        <button
+                          onClick={() => {
+                            onStartEdit(message.id);
+                            setEditContent(message.content);
+                          }}
+                          disabled={isGenerating}
+                          className="mt-1 text-xs text-gray-400 hover:text-white flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <Edit2 size={12} />
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );

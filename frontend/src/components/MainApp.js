@@ -419,10 +419,27 @@ const MainApp = () => {
             generatingPersonaResponse={chat.generatingPersonaResponse}
             error={chat.error}
             messagesEndRef={chat.messagesEndRef}
+            editingMessageId={chat.editingMessageId}
             userPersona={personasState.activePersona ? { hasPersona: true, persona: personasState.activePersona } : null}
             findCharacterById={charactersState.findCharacterById}
             onInputChange={chat.setUserInput}
             onSendMessage={handleSendMessage}
+            onEditMessage={async (messageId, newContent) => {
+              await chat.editMessage(
+                messageId,
+                newContent,
+                charactersState.activeCharacters,
+                charactersState.currentScenario,
+                personasState.activePersona ? { hasPersona: true, persona: personasState.activePersona } : null,
+                (sessionId) => {
+                  setSessionRefreshTrigger(prev => prev + 1);
+                }
+              );
+              // Refresh token balance after editing message
+              tokens.refreshBalance();
+            }}
+            onStartEdit={chat.setEditingMessageId}
+            onCancelEdit={() => chat.setEditingMessageId(null)}
             onGeneratePersonaResponse={() => chat.generatePersonaResponse(
               personasState.activePersona ? { hasPersona: true, persona: personasState.activePersona } : null,
               charactersState.findScenarioById(charactersState.currentScenario)
