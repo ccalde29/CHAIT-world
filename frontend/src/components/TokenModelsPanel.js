@@ -1,65 +1,78 @@
 // ============================================================================
-// Custom Models Panel
-// Admin panel for managing custom AI model presets
+// Token Models Panel
+// Admin panel for managing token-based AI model presets
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Sparkles, X } from 'lucide-react';
 
-const CustomModelsPanel = ({ apiRequest }) => {
+const TokenModelsPanel = ({ apiRequest }) => {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null or model object
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [openRouterModels, setOpenRouterModels] = useState([]);
-  const [loadingORModels, setLoadingORModels] = useState(false);
+  const [providerModels, setProviderModels] = useState({
+    openai: [],
+    anthropic: [],
+    google: [],
+    openrouter: []
+  });
+  const [loadingProviderModels, setLoadingProviderModels] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
     display_name: '',
     description: '',
-    openrouter_model_id: '',
+    ai_provider: 'openai',
+    model_id: '',
+    token_cost: 10,
     custom_system_prompt: '',
-    temperature: 0.8,
+    temperature: 0.7,
     max_tokens: 150,
     tags: []
   });
 
   const [validationErrors, setValidationErrors] = useState({});
 
-  // Fetch custom models
+  // Fetch token models
   const fetchModels = async () => {
     setLoading(true);
     try {
-      const response = await apiRequest('/api/custom-models/admin');
+      const response = await apiRequest('/api/token-models/admin');
       setModels(response.models || []);
     } catch (error) {
-      console.error('[CustomModels] Error fetching models:', error);
+      console.error('[TokenModels] Error fetching models:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch OpenRouter models
-  const fetchOpenRouterModels = async () => {
-    setLoadingORModels(true);
+  // Fetch all provider models
+  const fetchProviderModels = async (provider) => {
+    setLoadingProviderModels(true);
     try {
       const response = await apiRequest('/api/providers/models', {
         method: 'POST',
-        body: JSON.stringify({ provider: 'openrouter' })
+        body: JSON.stringify({ provider })
       });
-      setOpenRouterModels(response.models || []);
+      setProviderModels(prev => ({
+        ...prev,
+        [provider]: response.models || []
+      }));
     } catch (error) {
-      console.error('[CustomModels] Error fetching OpenRouter models:', error);
+      console.error(`[TokenModels] Error fetching ${provider} models:`, error);
     } finally {
-      setLoadingORModels(false);
+      setLoadingProviderModels(false);
     }
   };
 
   useEffect(() => {
     fetchModels();
-    fetchOpenRouterModels();
+    // Fetch models for all providers
+    ['openai', 'anthropic', 'google', 'openrouter'].forEach(provider => {
+      fetchProviderModels(provider);
+    });
   }, []);
 
   const resetForm = () => {
@@ -67,9 +80,11 @@ const CustomModelsPanel = ({ apiRequest }) => {
       name: '',
       display_name: '',
       description: '',
-      openrouter_model_id: '',
+      ai_provider: 'openai',
+      model_id: '',
+      token_cost: 10,
       custom_system_prompt: '',
-      temperature: 0.8,
+      temperature: 0.7,
       max_tokens: 150,
       tags: []
     });
@@ -89,7 +104,9 @@ const CustomModelsPanel = ({ apiRequest }) => {
       name: model.name,
       display_name: model.display_name,
       description: model.description || '',
-      openrouter_model_id: model.openrouter_model_id,
+      ai_provider: model.ai_provider,
+      model_id: model.model_id,
+      token_cost: model.token_cost,
       custom_system_prompt: model.custom_system_prompt || '',
       temperature: model.temperature,
       max_tokens: model.max_tokens,
@@ -107,8 +124,14 @@ const CustomModelsPanel = ({ apiRequest }) => {
     if (!formData.display_name.trim()) {
       errors.display_name = 'Display name is required';
     }
-    if (!formData.openrouter_model_id) {
-      errors.openrouter_model_id = 'OpenRouter model is required';
+    if (!formData.ai_provider) {
+      errors.ai_provider = 'AI Provider is required';
+    }
+    if (!formData.model_id) {
+      errors.model_id = 'Model is required';
+    }
+    if (!formData.token_cost || formData.token_cost < 1) {
+      errors.token_cost = 'Token cost must be at least 1';
     }
     if (formData.temperature < 0 || formData.temperature > 2.0) {
       errors.temperature = 'Temperature must be between 0.0 and 2.0';
@@ -127,12 +150,12 @@ const CustomModelsPanel = ({ apiRequest }) => {
     setSaving(true);
     try {
       if (editing) {
-        await apiRequest(`/api/custom-models/${editing.id}`, {
+        await apiRequest(`/api/token-models/${editing.id}`, {
           method: 'PUT',
           body: JSON.stringify(formData)
         });
       } else {
-        await apiRequest('/api/custom-models', {
+        await apiRequest('/api/token-models', {
           method: 'POST',
           body: JSON.stringify(formData)
         });
@@ -141,8 +164,8 @@ const CustomModelsPanel = ({ apiRequest }) => {
       await fetchModels();
       resetForm();
     } catch (error) {
-      console.error('[CustomModels] Error saving model:', error);
-      alert(error.message || 'Failed to save custom model');
+      console.error('[TokenModels] Error saving model:', error);
+      alert(error.message || 'Failed to save token model');
     } finally {
       setSaving(false);
     }
@@ -154,14 +177,14 @@ const CustomModelsPanel = ({ apiRequest }) => {
     }
 
     try {
-      await apiRequest(`/api/custom-models/${model.id}`, {
+      await apiRequest(`/api/token-models/${model.id}`, {
         method: 'DELETE'
       });
       await fetchModels();
       alert(`Successfully deleted "${model.display_name}"`);
     } catch (error) {
-      console.error('[CustomModels] Error deleting model:', error);
-      alert(error.message || 'Failed to delete custom model. Make sure you have admin permissions.');
+      console.error('[TokenModels] Error deleting model:', error);
+      alert(error.message || 'Failed to delete token model. Make sure you have admin permissions.');
     }
   };
 
@@ -178,7 +201,7 @@ const CustomModelsPanel = ({ apiRequest }) => {
         <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold text-white">
-              {editing ? 'Edit Custom Model' : 'Create Custom Model'}
+              {editing ? 'Edit Token Model' : 'Create Token Model'}
             </h3>
             <button
               onClick={resetForm}
@@ -242,31 +265,77 @@ const CustomModelsPanel = ({ apiRequest }) => {
               />
             </div>
 
-            {/* OpenRouter Model */}
+            {/* AI Provider */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                OpenRouter Model *
+                AI Provider *
               </label>
               <select
-                value={formData.openrouter_model_id}
-                onChange={(e) => handleInputChange('openrouter_model_id', e.target.value)}
-                disabled={loadingORModels}
+                value={formData.ai_provider}
+                onChange={(e) => {
+                  handleInputChange('ai_provider', e.target.value);
+                  handleInputChange('model_id', ''); // Reset model when provider changes
+                }}
                 className={`w-full bg-white/5 border rounded-lg p-3 text-white focus:outline-none ${
-                  validationErrors.openrouter_model_id ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                  validationErrors.ai_provider ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                }`}
+              >
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="google">Google AI</option>
+                <option value="openrouter">OpenRouter</option>
+              </select>
+              {validationErrors.ai_provider && (
+                <p className="text-red-400 text-xs mt-1">{validationErrors.ai_provider}</p>
+              )}
+            </div>
+
+            {/* Model Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Model *
+              </label>
+              <select
+                value={formData.model_id}
+                onChange={(e) => handleInputChange('model_id', e.target.value)}
+                disabled={loadingProviderModels}
+                className={`w-full bg-white/5 border rounded-lg p-3 text-white focus:outline-none ${
+                  validationErrors.model_id ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
                 } disabled:opacity-50`}
               >
                 <option value="">
-                  {loadingORModels ? 'Loading models...' : 'Select a model'}
+                  {loadingProviderModels ? 'Loading models...' : 'Select a model'}
                 </option>
-                {openRouterModels.map(model => (
+                {providerModels[formData.ai_provider]?.map(model => (
                   <option key={model.id} value={model.id}>
                     {model.name}
                   </option>
                 ))}
               </select>
-              {validationErrors.openrouter_model_id && (
-                <p className="text-red-400 text-xs mt-1">{validationErrors.openrouter_model_id}</p>
+              {validationErrors.model_id && (
+                <p className="text-red-400 text-xs mt-1">{validationErrors.model_id}</p>
               )}
+            </div>
+
+            {/* Token Cost */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Token Cost per Message *
+              </label>
+              <input
+                type="number"
+                value={formData.token_cost}
+                onChange={(e) => handleInputChange('token_cost', parseInt(e.target.value) || 1)}
+                min="1"
+                placeholder="10"
+                className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
+                  validationErrors.token_cost ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                }`}
+              />
+              {validationErrors.token_cost && (
+                <p className="text-red-400 text-xs mt-1">{validationErrors.token_cost}</p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">How many tokens users pay per message</p>
             </div>
 
             {/* Custom System Prompt */}
@@ -348,9 +417,9 @@ const CustomModelsPanel = ({ apiRequest }) => {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-xl font-bold text-white">Custom Models</h3>
+          <h3 className="text-xl font-bold text-white">Token Models</h3>
           <p className="text-sm text-gray-400 mt-1">
-            Create custom AI model presets with predefined system prompts
+            Create AI model presets that users can access with tokens
           </p>
         </div>
         <button
@@ -369,8 +438,8 @@ const CustomModelsPanel = ({ apiRequest }) => {
       ) : models.length === 0 ? (
         <div className="text-center py-12 bg-gray-800 border border-white/10 rounded-lg">
           <Sparkles className="mx-auto mb-4 text-purple-400" size={48} />
-          <p className="text-gray-400">No custom models yet</p>
-          <p className="text-sm text-gray-500 mt-2">Create your first custom model preset</p>
+          <p className="text-gray-400">No token models yet</p>
+          <p className="text-sm text-gray-500 mt-2">Create your first token model preset</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -399,11 +468,14 @@ const CustomModelsPanel = ({ apiRequest }) => {
 
               <div className="space-y-1 mb-3">
                 <div className="text-xs text-gray-500">
-                  <span className="font-medium">Model:</span> {model.openrouter_model_id}
+                  <span className="font-medium">Provider:</span> {model.ai_provider.toUpperCase()}
                 </div>
                 <div className="text-xs text-gray-500">
-                  <span className="font-medium">Temp:</span> {model.temperature} |
-                  <span className="font-medium"> Tokens:</span> {model.max_tokens}
+                  <span className="font-medium">Model:</span> {model.model_id}
+                </div>
+                <div className="text-xs text-gray-500">
+                  <span className="font-medium">Cost:</span> {model.token_cost} tokens/msg |
+                  <span className="font-medium"> Temp:</span> {model.temperature}
                 </div>
               </div>
 
@@ -441,4 +513,4 @@ const CustomModelsPanel = ({ apiRequest }) => {
   );
 };
 
-export default CustomModelsPanel;
+export default TokenModelsPanel;

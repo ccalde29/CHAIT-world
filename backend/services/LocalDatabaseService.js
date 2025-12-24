@@ -122,6 +122,71 @@ class LocalDatabaseService {
                 this.db.exec("ALTER TABLE user_settings_local ADD COLUMN auto_approve_characters INTEGER DEFAULT 0");
             }
 
+            // Create token system tables if they don't exist
+            const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
+            const tableNames = tables.map(t => t.name);
+
+            if (!tableNames.includes('user_tokens')) {
+                console.log('Creating user_tokens table');
+                this.db.exec(`
+                    CREATE TABLE user_tokens (
+                        user_id TEXT PRIMARY KEY,
+                        balance INTEGER DEFAULT 100,
+                        lifetime_earned INTEGER DEFAULT 100,
+                        lifetime_purchased INTEGER DEFAULT 0,
+                        last_weekly_refill DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX idx_user_tokens_balance ON user_tokens(balance);
+                    CREATE INDEX idx_user_tokens_refill ON user_tokens(last_weekly_refill);
+                `);
+            }
+
+            if (!tableNames.includes('token_transactions')) {
+                console.log('Creating token_transactions table');
+                this.db.exec(`
+                    CREATE TABLE token_transactions (
+                        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+                        user_id TEXT NOT NULL,
+                        amount INTEGER NOT NULL,
+                        type TEXT NOT NULL CHECK(type IN ('weekly_refill', 'purchase', 'admin_grant', 'admin_deduct', 'usage')),
+                        reference TEXT,
+                        balance_after INTEGER NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES user_tokens(user_id) ON DELETE CASCADE
+                    );
+                    CREATE INDEX idx_token_transactions_user ON token_transactions(user_id);
+                    CREATE INDEX idx_token_transactions_type ON token_transactions(type);
+                    CREATE INDEX idx_token_transactions_created ON token_transactions(created_at);
+                `);
+            }
+
+            if (!tableNames.includes('token_models')) {
+                console.log('Creating token_models table');
+                this.db.exec(`
+                    CREATE TABLE token_models (
+                        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+                        name TEXT NOT NULL UNIQUE,
+                        display_name TEXT NOT NULL,
+                        description TEXT,
+                        ai_provider TEXT NOT NULL CHECK(ai_provider IN ('openai', 'anthropic', 'google', 'openrouter')),
+                        model_id TEXT NOT NULL,
+                        token_cost INTEGER NOT NULL DEFAULT 1 CHECK(token_cost >= 0),
+                        custom_system_prompt TEXT,
+                        temperature REAL DEFAULT 0.7 CHECK(temperature >= 0 AND temperature <= 2.0),
+                        max_tokens INTEGER DEFAULT 150 CHECK(max_tokens >= 50 AND max_tokens <= 1000),
+                        tags TEXT,
+                        is_active INTEGER DEFAULT 1,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX idx_token_models_active ON token_models(is_active);
+                    CREATE INDEX idx_token_models_provider ON token_models(ai_provider);
+                    CREATE INDEX idx_token_models_cost ON token_models(token_cost);
+                `);
+            }
+
             console.log('Database migrations completed');
         } catch (error) {
             console.error('Failed to run migrations:', error);

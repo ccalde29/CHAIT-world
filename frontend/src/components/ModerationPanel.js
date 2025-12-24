@@ -5,8 +5,8 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, TrendingUp, Sparkles, DollarSign } from 'lucide-react';
-import CustomModelsPanel from './CustomModelsPanel';
+import { Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, TrendingUp, Sparkles, DollarSign, Coins } from 'lucide-react';
+import TokenModelsPanel from './TokenModelsPanel';
 
 const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   const [activeTab, setActiveTab] = useState('pending');
@@ -22,6 +22,11 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   const [processing, setProcessing] = useState(null);
   const [pricing, setPricing] = useState({});
   const [loadingPricing, setLoadingPricing] = useState(false);
+  
+  // User tokens state
+  const [userBalances, setUserBalances] = useState([]);
+  const [loadingBalances, setLoadingBalances] = useState(false);
+  const [tokenAction, setTokenAction] = useState({ userId: null, type: null, amount: 0, reason: '' });
 
   // Fetch moderation queue
   const fetchQueue = async () => {
@@ -74,7 +79,61 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
     if (activeTab === 'pricing' && Object.keys(pricing).length === 0) {
       fetchPricing();
     }
+    if (activeTab === 'user-tokens' && userBalances.length === 0) {
+      fetchUserBalances();
+    }
   }, [activeTab]);
+
+  // Fetch user token balances
+  const fetchUserBalances = async () => {
+    setLoadingBalances(true);
+    try {
+      const response = await apiRequest('/api/tokens/admin/all-balances');
+      setUserBalances(response.balances || []);
+    } catch (error) {
+      console.error('Failed to fetch user balances:', error);
+    } finally {
+      setLoadingBalances(false);
+    }
+  };
+
+  // Handle token operations (grant, deduct, set)
+  const handleTokenOperation = async (operation, userId, amount, reason) => {
+    try {
+      let endpoint = '';
+      let body = {};
+      
+      switch (operation) {
+        case 'grant':
+          endpoint = '/api/tokens/admin/grant';
+          body = { userId, amount: parseInt(amount), reason };
+          break;
+        case 'deduct':
+          endpoint = '/api/tokens/admin/deduct';
+          body = { userId, amount: parseInt(amount), reason };
+          break;
+        case 'set':
+          endpoint = '/api/tokens/admin/set-balance';
+          body = { userId, balance: parseInt(amount) };
+          break;
+        default:
+          return;
+      }
+
+      await apiRequest(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+
+      // Refresh balances
+      await fetchUserBalances();
+      setTokenAction({ userId: null, type: null, amount: 0, reason: '' });
+      alert(`Token operation completed successfully`);
+    } catch (error) {
+      console.error('Token operation failed:', error);
+      alert(error.message || 'Failed to perform token operation');
+    }
+  };
 
   // Load initial data
   useEffect(() => {
@@ -226,15 +285,26 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             Stats
           </button>
           <button
-            onClick={() => setActiveTab('custom-models')}
+            onClick={() => setActiveTab('token-models')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
-              activeTab === 'custom-models'
+              activeTab === 'token-models'
                 ? 'text-purple-400 border-b-2 border-purple-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
             <Sparkles size={18} />
-            Custom Models
+            Token Models
+          </button>
+          <button
+            onClick={() => setActiveTab('user-tokens')}
+            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'user-tokens'
+                ? 'text-purple-400 border-b-2 border-purple-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Coins size={18} />
+            User Tokens
           </button>
           <button
             onClick={() => setActiveTab('pricing')}
@@ -513,9 +583,115 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
               </div>
             )}
 
-            {/* Custom Models Tab */}
-            {activeTab === 'custom-models' && (
-              <CustomModelsPanel apiRequest={apiRequest} />
+            {/* Token Models Tab */}
+            {activeTab === 'token-models' && (
+              <TokenModelsPanel apiRequest={apiRequest} />
+            )}
+
+            {/* User Tokens Tab */}
+            {activeTab === 'user-tokens' && (
+              <div>
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-white mb-2">Manage User Tokens</h3>
+                  <p className="text-sm text-gray-400">
+                    View and manage token balances for all users
+                  </p>
+                </div>
+
+                {loadingBalances ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-gray-400">Loading user balances...</div>
+                  </div>
+                ) : userBalances.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-800 border border-white/10 rounded-lg">
+                    <Coins className="mx-auto mb-4 text-purple-400" size={48} />
+                    <p className="text-gray-400">No users with token balances yet</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-800 border border-white/10 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-900/50">
+                          <tr className="border-b border-white/10">
+                            <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">User ID</th>
+                            <th className="text-right py-3 px-4 text-sm font-medium text-gray-300">Balance</th>
+                            <th className="text-right py-3 px-4 text-sm font-medium text-gray-300">Lifetime Earned</th>
+                            <th className="text-right py-3 px-4 text-sm font-medium text-gray-300">Lifetime Purchased</th>
+                            <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Last Refill</th>
+                            <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {userBalances.map((user) => (
+                            <tr key={user.user_id} className="border-b border-white/5 hover:bg-white/5">
+                              <td className="py-3 px-4">
+                                <span className="text-white font-mono text-sm">{user.user_id.slice(0, 8)}...</span>
+                              </td>
+                              <td className="text-right py-3 px-4">
+                                <span className={`font-semibold ${
+                                  user.balance < 50 ? 'text-red-400' : 
+                                  user.balance < 200 ? 'text-amber-400' : 
+                                  'text-green-400'
+                                }`}>
+                                  {user.balance.toLocaleString()}
+                                </span>
+                              </td>
+                              <td className="text-right py-3 px-4 text-gray-300">
+                                {user.lifetime_earned?.toLocaleString() || 0}
+                              </td>
+                              <td className="text-right py-3 px-4 text-gray-300">
+                                {user.lifetime_purchased?.toLocaleString() || 0}
+                              </td>
+                              <td className="text-center py-3 px-4 text-gray-400 text-xs">
+                                {user.last_weekly_refill ? new Date(user.last_weekly_refill).toLocaleDateString() : 'Never'}
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex justify-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      const amount = prompt('Enter amount to grant:');
+                                      const reason = prompt('Enter reason:');
+                                      if (amount && reason) {
+                                        handleTokenOperation('grant', user.user_id, amount, reason);
+                                      }
+                                    }}
+                                    className="px-3 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded text-sm transition-colors"
+                                  >
+                                    Grant
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const amount = prompt('Enter amount to deduct:');
+                                      const reason = prompt('Enter reason:');
+                                      if (amount && reason) {
+                                        handleTokenOperation('deduct', user.user_id, amount, reason);
+                                      }
+                                    }}
+                                    className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-sm transition-colors"
+                                  >
+                                    Deduct
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const balance = prompt('Set balance to:');
+                                      if (balance !== null) {
+                                        handleTokenOperation('set', user.user_id, balance, '');
+                                      }
+                                    }}
+                                    className="px-3 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded text-sm transition-colors"
+                                  >
+                                    Set
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Pricing Tab */}

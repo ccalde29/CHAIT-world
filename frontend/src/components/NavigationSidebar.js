@@ -15,7 +15,8 @@ import {
   ChevronRight,
   Lock,
   Shield,
-  Trash2
+  Trash2,
+  Coins
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -29,7 +30,9 @@ const NavigationSidebar = ({
   isAdmin,
   onDeleteSession,
   refreshTrigger, // Add refresh trigger prop
-  onSessionsLoad // Callback to expose loadSessions function
+  onSessionsLoad, // Callback to expose loadSessions function
+  tokenBalance, // Token balance passed from parent
+  tokensLoading // Token loading state passed from parent
 }) => {
   const { user, signOut } = useAuth();
   const [sessions, setSessions] = useState([]);
@@ -233,6 +236,17 @@ const NavigationSidebar = ({
       {/* User Profile Section */}
       <div className="border-t border-white/10 p-4">
         <div className="space-y-2">
+          {/* Token Balance */}
+          {tokenBalance !== null && (
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <Coins size={16} className="text-amber-400" />
+              <div className="flex-1">
+                <div className="text-xs text-gray-400">Token Balance</div>
+                <div className="text-sm font-bold text-amber-400">{tokenBalance} tokens</div>
+              </div>
+            </div>
+          )}
+          
           <div className="flex items-center gap-3 px-2">
             <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
               <User size={18} className="text-white" />

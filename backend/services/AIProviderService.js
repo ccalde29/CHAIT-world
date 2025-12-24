@@ -15,11 +15,12 @@ class AIProviderService {
    * Main entry point - calls AI based on character's configured provider
    * @param {Object} character - Character object with ai_provider and ai_model
    * @param {Array} messages - Conversation messages in OpenAI format
-   * @param {Object} apiKeys - User's API keys for various providers
+   * @param {Object} apiKeys - User's API keys for various providers (or server keys for token models)
    * @param {Object} ollamaSettings - Ollama configuration
+   * @param {Object} options - Additional options like useServerKeys
    * @returns {Promise<string>} - AI response text
    */
-  static async generateResponse(character, messages, apiKeys = {}, ollamaSettings = {}) {
+  static async generateResponse(character, messages, apiKeys = {}, ollamaSettings = {}, options = {}) {
     const provider = character.ai_provider || 'openai';
     const model = character.ai_model || 'gpt-3.5-turbo';
     
@@ -705,6 +706,10 @@ class AIProviderService {
       return [];
     }
   }
+
+  /**
+   * Get server API keys from environment (for token models)
+   */
 }
 
 module.exports = AIProviderService;

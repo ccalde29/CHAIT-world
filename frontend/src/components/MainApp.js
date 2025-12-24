@@ -9,6 +9,7 @@ import { useChat } from '../hooks/useChat';
 import { useCharacters } from '../hooks/useCharacters';
 import { useSettings } from '../hooks/useSettings';
 import { usePersonas } from '../hooks/usePersonas';
+import { useTokens } from '../hooks/useTokens';
 import { createUnifiedApiClient } from '../utils/unifiedApiClient';
 import { isNativePlatform } from '../utils/platform';
 
@@ -45,6 +46,7 @@ const MainApp = () => {
   const charactersState = useCharacters(apiRequest);
   const settings = useSettings(apiRequest);
   const personasState = usePersonas(apiRequest);
+  const tokens = useTokens(apiRequest);
 
   // ============================================================================
   // UI STATE
@@ -163,6 +165,9 @@ const MainApp = () => {
         }
       }
     );
+    // Refresh token balance after sending message
+    console.log('[MainApp] Refreshing token balance after message sent');
+    await tokens.refreshBalance();
   };
 
   const handlePersonaSwitch = async (personaId) => {
@@ -350,6 +355,8 @@ const MainApp = () => {
         currentSessionId={chat.currentSessionId}
         refreshTrigger={sessionRefreshTrigger}
         onSessionsLoad={(loadFn) => { loadSessionsRef.current = loadFn; }}
+        tokenBalance={tokens.balance}
+        tokensLoading={tokens.loading}
         onSessionSelect={async (session) => {
           try {
             // First, restore the active characters from the session

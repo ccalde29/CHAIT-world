@@ -100,8 +100,9 @@ const sceneCommentRoutes = require('./routes/sceneComments')(db.supabase);
 const personasRoutes = require('./routes/personas')(db);
 const relationshipsRoutes = require('./routes/relationships')(db);
 const moderationRoutes = require('./routes/moderation');
-const customModelsRoutes = require('./routes/custom-models');
+const tokenModelsRoutes = require('./routes/token-models')(db);
 const pricingRoutes = require('./routes/pricing');
+const tokenRoutes = require('./routes/tokens')(db);
 
 // Mount routes
 app.use('/api/providers', providerRoutes);
@@ -128,8 +129,11 @@ app.use('/api/scene-comments', requireAuth, sceneCommentRoutes); // Needs online
 app.use('/api/personas', requireAuth, offlineCapable, personasRoutes); // Offline-capable
 app.use('/api/characters', requireAuth, offlineCapable, relationshipsRoutes); // Offline-capable
 app.use('/api/moderation', requireAuth, moderationRoutes); // Admin-only, needs online
-app.use('/api/custom-models', requireAuth, offlineCapable, customModelsRoutes); // Offline-capable
+app.use('/api/token-models', requireAuth, offlineCapable, tokenModelsRoutes); // Offline-capable (renamed from custom-models)
+app.use('/api/custom-models', requireAuth, offlineCapable, tokenModelsRoutes); // Backward compatibility alias
 app.use('/api/pricing', requireAuth, pricingRoutes); // Needs online
+app.use('/api/tokens', requireAuth, offlineCapable, tokenRoutes); // Offline-capable
+app.use('/api/admin-keys', requireAuth, offlineCapable, require('./routes/admin-keys')(db)); // Admin API keys management
 // Image routes
 app.use('/api/images', requireAuth, offlineCapable, imageRoutes); // Offline-capable
 

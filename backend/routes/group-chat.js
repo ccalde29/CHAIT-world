@@ -11,6 +11,7 @@ const { createClient } = require('@supabase/supabase-js');
 // Core services
 const MemoryService = require('../services/MemoryService');
 const CharacterLearningService = require('../services/CharacterLearningService');
+const TokenService = require('../services/TokenService');
 
 // New consistency services
 const PromptBuilder = require('../services/PromptBuilder');
@@ -32,6 +33,7 @@ module.exports = (db) => {
   
   const memoryService = new MemoryService(db);
   const learningService = new CharacterLearningService(db);
+  const tokenService = new TokenService(db);
   const promptBuilder = new PromptBuilder();
   const conversationTracker = new ConversationStateTracker();
   const sessionContinuity = new SessionContinuityService(db);
@@ -308,19 +310,71 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
         console.log(`[Response] ${char.name} - Temp: ${dynamicTemp.toFixed(2)}, Tokens: ${tokenBudget}`);
 
-        // Generate response with adjusted character settings
-        const adjustedChar = {
-          ...char,
-          temperature: dynamicTemp,
-          max_tokens: tokenBudget
-        };
+        // Check if this is a token model and resolve it
+        let resolvedChar = { ...char, temperature: dynamicTemp, max_tokens: tokenBudget };
+        let modelCost = null;
+        let useServerKeys = false;
+        let adminApiKeys = {};
+        
+        if (char.ai_provider === 'token') {
+          // Resolve token model to get actual provider and model details
+          const tokenModel = db.localDb.get('SELECT * FROM token_models WHERE id = ?', [char.ai_model]);
+          
+          if (!tokenModel) {
+            throw new Error(`Token model not found: ${char.ai_model}`);
+          }
+          
+          modelCost = tokenModel.token_cost;
+          useServerKeys = true;
+          
+          // Get admin API keys from database (the admin who created the token model)
+          const AdminKeysService = require('../services/AdminKeysService');
+          const adminKeys = AdminKeysService.getAdminKeys(db, userId); // Use the requesting user's ID (they should be admin)
+          
+          adminApiKeys = {
+            openai: adminKeys.openai_key,
+            anthropic: adminKeys.anthropic_key,
+            google: adminKeys.google_key,
+            openrouter: adminKeys.openrouter_key
+          };
+          
+          // Verify admin has the required key for this provider
+          if (!adminApiKeys[tokenModel.ai_provider]) {
+            throw new Error(`Admin API key not configured for ${tokenModel.ai_provider}. Please add it in Admin Settings.`);
+          }
+          
+          // Check balance before generating
+          if (!tokenService.hasEnoughTokens(userId, modelCost)) {
+            throw new Error(`Insufficient tokens. Need ${modelCost} tokens, please refill or choose a cheaper model.`);
+          }
+          
+          // Update character with actual provider and model
+          resolvedChar = {
+            ...resolvedChar,
+            ai_provider: tokenModel.ai_provider,
+            ai_model: tokenModel.model_id,
+            temperature: tokenModel.temperature,
+            max_tokens: tokenModel.max_tokens
+          };
+          
+          console.log(`[Token] Using token model: ${tokenModel.display_name}`);
+          console.log(`[Token] Provider: ${tokenModel.ai_provider}, Model: ${tokenModel.model_id}`);
+          console.log(`[Token] Cost: ${modelCost} tokens, using admin keys`);
+        }
 
         const rawResponse = await AIProviderService.generateResponse(
-          adjustedChar,
+          resolvedChar,
           messages,
-          apiKeys,
-          ollamaSettings
+          useServerKeys ? adminApiKeys : apiKeys,
+          ollamaSettings,
+          { useServerKeys: false } // Don't use getServerApiKeys, we're passing admin keys directly
         );
+
+        // Deduct tokens if it was a token model
+        if (useServerKeys && modelCost > 0) {
+          const newBalance = tokenService.deductTokens(userId, modelCost, char.ai_model);
+          console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${newBalance}`);
+        }
 
         // Normalize response
         const response = ProviderAdapter.normalizeResponse(

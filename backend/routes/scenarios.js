@@ -3,8 +3,11 @@
 
 const express = require('express');
 const router = express.Router();
+const TokenService = require('../services/TokenService');
 
 module.exports = (db) => {
+    const tokenService = new TokenService(db);
+    
     /**
      * Get all scenarios
      * GET /api/scenarios
@@ -207,6 +210,73 @@ module.exports = (db) => {
             const AIProviderService = require('../services/AIProviderService');
             const userSettings = await db.getUserSettings(req.userId);
 
+            // Check if narrator model is a token model and resolve it
+            let narratorAsCharacter = {
+                name: 'Narrator',
+                ai_provider: scene.narrator_ai_provider,
+                ai_model: scene.narrator_ai_model,
+                temperature: scene.narrator_temperature || 0.7,
+                max_tokens: scene.narrator_max_tokens || 100
+            };
+            
+            let modelCost = null;
+            let useServerKeys = false;
+            let adminApiKeys = {};
+            
+            if (scene.narrator_ai_provider === 'token') {
+              // Resolve token model to get actual provider and model details
+              const tokenModel = db.localDb.get('SELECT * FROM token_models WHERE id = ?', [scene.narrator_ai_model]);
+              
+              if (!tokenModel) {
+                return res.status(404).json({ 
+                  triggered: false,
+                  error: `Token model not found: ${scene.narrator_ai_model}`
+                });
+              }
+              
+              modelCost = tokenModel.token_cost;
+              useServerKeys = true;
+              
+              // Get admin API keys from database
+              const AdminKeysService = require('../services/AdminKeysService');
+              const adminKeys = AdminKeysService.getAdminKeys(db, req.userId);
+              
+              adminApiKeys = {
+                openai: adminKeys.openai_key,
+                anthropic: adminKeys.anthropic_key,
+                google: adminKeys.google_key,
+                openrouter: adminKeys.openrouter_key
+              };
+              
+              // Verify admin has the required key
+              if (!adminApiKeys[tokenModel.ai_provider]) {
+                return res.status(400).json({ 
+                  triggered: false,
+                  error: `Admin API key not configured for ${tokenModel.ai_provider}. Please add it in Admin Settings.`
+                });
+              }
+              
+              // Check balance before generating
+              if (!tokenService.hasEnoughTokens(req.userId, modelCost)) {
+                return res.status(402).json({ 
+                  triggered: false,
+                  error: `Insufficient tokens for narrator. Need ${modelCost} tokens.`,
+                  requiredTokens: modelCost
+                });
+              }
+              
+              // Update narrator with actual provider and model
+              narratorAsCharacter = {
+                ...narratorAsCharacter,
+                ai_provider: tokenModel.ai_provider,
+                ai_model: tokenModel.model_id,
+                temperature: tokenModel.temperature,
+                max_tokens: tokenModel.max_tokens
+              };
+              
+              console.log(`[Narrator Token] Using token model: ${tokenModel.display_name} (${tokenModel.ai_provider}/${tokenModel.model_id}) - Cost: ${modelCost} tokens`);
+            }
+
             let narratorPrompt = `You are the narrator for this scene: ${scene.name}
 
 SCENE DESCRIPTION:
@@ -228,20 +298,19 @@ ${scene.atmosphere || 'neutral'}`;
 
 Keep responses brief (1-2 sentences). Focus on what's happening in the scene, not character dialogue.`;
 
-            const narratorAsCharacter = {
-                name: 'Narrator',
-                ai_provider: scene.narrator_ai_provider,
-                ai_model: scene.narrator_ai_model,
-                temperature: scene.narrator_temperature || 0.7,
-                max_tokens: scene.narrator_max_tokens || 100
-            };
-
             const response = await AIProviderService.generateResponse(
                 narratorAsCharacter,
                 [{ role: 'system', content: narratorPrompt }, ...(messages || []).slice(-10)],
-                userSettings?.apiKeys || {},
-                userSettings?.ollamaSettings || {}
+                useServerKeys ? adminApiKeys : (userSettings?.apiKeys || {}),
+                userSettings?.ollamaSettings || {},
+                { useServerKeys: false }
             );
+
+            // Deduct tokens if it was a token model
+            if (useServerKeys && modelCost > 0) {
+              const newBalance = tokenService.deductTokens(req.userId, modelCost, scene.narrator_ai_model);
+              console.log(`[Narrator Token] Deducted ${modelCost} tokens. New balance: ${newBalance}`);
+            }
 
             res.json({ triggered: true, response, scene: scene.name });
 

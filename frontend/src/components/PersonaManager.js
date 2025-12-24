@@ -632,7 +632,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                   <option value="google">Google</option>
                   <option value="ollama">Ollama (Local)</option>
                   <option value="lmstudio">LM Studio (Local)</option>
-                  <option value="custom">Custom Model</option>
+                  <option value="token">Token Model</option>
                 </select>
               </div>
 

@@ -47,7 +47,8 @@ const CharacterEditorV15 = ({
 
     // AI Provider settings
     ai_provider: 'openai',
-    ai_model: 'gpt-3.5-turbo'
+    ai_model: 'gpt-3.5-turbo',
+    localType: 'ollama' // For local provider sub-type
   });
   
   const [tagInput, setTagInput] = useState('');
@@ -88,7 +89,8 @@ const CharacterEditorV15 = ({
         avatar_image_filename: character.avatar_image_filename || null,
         uses_custom_image: character.uses_custom_image || false,
         ai_provider: character.ai_provider || 'openai',
-        ai_model: character.ai_model || ''  // Will be set by loadAvailableModels
+        ai_model: character.ai_model || '',  // Will be set by loadAvailableModels
+        localType: character.ai_provider === 'local' ? (character.ai_model?.includes('lmstudio') ? 'lmstudio' : 'ollama') : 'ollama'
       });
     } else {
       // Create mode - use defaults
@@ -116,6 +118,29 @@ const CharacterEditorV15 = ({
     setError(null);
 
     try {
+      // Handle token models - fetch from token-models endpoint
+      if (provider === 'token') {
+        const response = await fetch(`${API_BASE_URL}/api/token-models`, {
+          headers: { 'user-id': user.id }
+        });
+        const data = await response.json();
+        if (data.models && data.models.length > 0) {
+          const formattedModels = data.models.map(m => ({
+            id: m.id,
+            name: `${m.display_name} (${m.token_cost} tokens)`,
+            tier: 'token'
+          }));
+          setAvailableModels(formattedModels);
+          // Always set the first token model when switching to token provider
+          setFormData(prev => ({ ...prev, ai_model: formattedModels[0].id }));
+        } else {
+          setAvailableModels([]);
+          setError('No token models available. Contact admin.');
+        }
+        setLoadingModels(false);
+        return;
+      }
+
       // Get the appropriate API key from user settings
       let apiKey = null;
 
@@ -136,6 +161,9 @@ const CharacterEditorV15 = ({
         }
       }
 
+      // Determine actual provider for local
+      const actualProvider = provider === 'local' ? (formData.localType || 'ollama') : provider;
+
       const response = await fetch(`${API_BASE_URL}/api/providers/models`, {
         method: 'POST',
         headers: {
@@ -143,7 +171,7 @@ const CharacterEditorV15 = ({
           'user-id': user.id
         },
         body: JSON.stringify({
-          provider,
+          provider: actualProvider,
           apiKey,
           ollamaSettings: userSettings?.ollamaSettings,
           lmStudioSettings: userSettings?.lmStudioSettings || { baseUrl: 'http://localhost:1234' }
@@ -212,15 +240,18 @@ const CharacterEditorV15 = ({
       'anthropic': 'claude-3-5-haiku-20241022',
       'openrouter': 'openai/gpt-4o-mini',
       'google': 'gemini-1.5-flash-latest',
-      'ollama': 'llama2',
-      'lmstudio': 'local-model'
+      'local': 'llama2',
+      'token': '' // Will be set from token model selection
     };
 
     setFormData(prev => ({
       ...prev,
       ai_provider: provider,
-      ai_model: defaultModels[provider] || 'gpt-4o-mini' // Set default, will be updated when models load
+      ai_model: '' // Clear model first, will be set when models load
     }));
+    
+    // Load models for the new provider
+    loadAvailableModels(provider);
   };
   
   // ============================================================================
@@ -434,23 +465,17 @@ const CharacterEditorV15 = ({
         color: 'text-yellow-400',
         description: 'Gemini models - fast and efficient'
       },
-      ollama: {
-        name: 'Ollama',
+      local: {
+        name: 'Local',
         icon: '💻',
         color: 'text-cyan-400',
-        description: 'Local models - free and private'
+        description: 'Local models (Ollama/LM Studio) - free and private'
       },
-      lmstudio: {
-        name: 'LM Studio',
-        icon: '🖥️',
-        color: 'text-indigo-400',
-        description: 'Local GGUF models - high performance'
-      },
-      custom: {
-        name: 'Custom Model',
-        icon: '⚙️',
-        color: 'text-yellow-400',
-        description: 'Admin-created custom model presets'
+      token: {
+        name: 'Token Model',
+        icon: '🪙',
+        color: 'text-amber-400',
+        description: 'Server-powered models that use token credits'
       }
     };
 
@@ -830,52 +855,35 @@ const CharacterEditorV15 = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (formData.ai_provider !== 'ollama') {
-                      handleProviderChange('ollama');
+                    if (formData.ai_provider !== 'local') {
+                      handleProviderChange('local');
                     }
                   }}
                   className={`p-3 rounded-lg border transition-all ${
-                    formData.ai_provider === 'ollama'
+                    formData.ai_provider === 'local'
                       ? 'bg-cyan-500/20 border-cyan-500 text-white'
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
                 >
                   <div className="text-2xl mb-1">💻</div>
-                  <div className="text-xs font-medium">Ollama</div>
+                  <div className="text-xs font-medium">Local</div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
-                    if (formData.ai_provider !== 'lmstudio') {
-                      handleProviderChange('lmstudio');
+                    if (formData.ai_provider !== 'token') {
+                      handleProviderChange('token');
                     }
                   }}
                   className={`p-3 rounded-lg border transition-all ${
-                    formData.ai_provider === 'lmstudio'
-                      ? 'bg-indigo-500/20 border-indigo-500 text-white'
+                    formData.ai_provider === 'token'
+                      ? 'bg-amber-500/20 border-amber-500 text-white'
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
                 >
-                  <div className="text-2xl mb-1">🖥️</div>
-                  <div className="text-xs font-medium">LM Studio</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (formData.ai_provider !== 'custom') {
-                      handleProviderChange('custom');
-                    }
-                  }}
-                  className={`p-3 rounded-lg border transition-all ${
-                    formData.ai_provider === 'custom'
-                      ? 'bg-yellow-500/20 border-yellow-500 text-white'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">⚙️</div>
-                  <div className="text-xs font-medium">Custom</div>
+                  <div className="text-2xl mb-1">🪙</div>
+                  <div className="text-xs font-medium">Token Models</div>
                 </button>
               </div>
 
@@ -894,7 +902,26 @@ const CharacterEditorV15 = ({
                     <option value="anthropic" className="bg-gray-800">🧠 Anthropic - Claude Models</option>
                     <option value="openrouter" className="bg-gray-800">🌐 OpenRouter - 100+ Models</option>
                     <option value="google" className="bg-gray-800">✨ Google - Gemini Models</option>
-                    <option value="custom" className="bg-gray-800">⚙️ Custom Model</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Local Provider Sub-Type Selection */}
+              {formData.ai_provider === 'local' && (
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-400 mb-2">
+                    Select Local Provider
+                  </label>
+                  <select
+                    value={formData.localType || 'ollama'}
+                    onChange={(e) => {
+                      setFormData(prev => ({ ...prev, localType: e.target.value }));
+                      loadAvailableModels('local');
+                    }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="ollama" className="bg-gray-800">💻 Ollama</option>
+                    <option value="lmstudio" className="bg-gray-800">🖥️ LM Studio</option>
                   </select>
                 </div>
               )}

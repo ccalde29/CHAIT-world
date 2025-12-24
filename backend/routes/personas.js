@@ -5,8 +5,11 @@
 const express = require('express');
 const router = express.Router();
 const AIProviderService = require('../services/AIProviderService');
+const TokenService = require('../services/TokenService');
 
 module.exports = (db) => {
+
+  const tokenService = new TokenService(db);
 
 /**
  * GET /api/personas
@@ -477,7 +480,7 @@ ${persona.personality}`;
     personaPrompt += `\n\nRespond naturally in first person as ${persona.name}. Keep responses conversational and in-character.`;
 
     // Prepare character object for AIProviderService
-    const personaAsCharacter = {
+    let personaAsCharacter = {
       name: persona.name,
       ai_provider: persona.ai_provider,
       ai_model: persona.ai_model,
@@ -488,15 +491,76 @@ ${persona.personality}`;
     // Generate response using AIProviderService
     console.log(`[Personas] Generating auto-response for persona ${persona.name} (${persona.ai_provider}/${persona.ai_model})`);
 
+    // Check if this is a token model and resolve it
+    let modelCost = null;
+    let useServerKeys = false;
+    let adminApiKeys = {};
+    
+    if (persona.ai_provider === 'token') {
+      // Resolve token model to get actual provider and model details
+      const tokenModel = db.localDb.get('SELECT * FROM token_models WHERE id = ?', [persona.ai_model]);
+      
+      if (!tokenModel) {
+        return res.status(404).json({ error: `Token model not found: ${persona.ai_model}` });
+      }
+      
+      modelCost = tokenModel.token_cost;
+      useServerKeys = true;
+      
+      // Get admin API keys from database
+      const AdminKeysService = require('../services/AdminKeysService');
+      const adminKeys = AdminKeysService.getAdminKeys(db, userId);
+      
+      adminApiKeys = {
+        openai: adminKeys.openai_key,
+        anthropic: adminKeys.anthropic_key,
+        google: adminKeys.google_key,
+        openrouter: adminKeys.openrouter_key
+      };
+      
+      // Verify admin has the required key
+      if (!adminApiKeys[tokenModel.ai_provider]) {
+        return res.status(400).json({ 
+          error: `Admin API key not configured for ${tokenModel.ai_provider}. Please add it in Admin Settings.`
+        });
+      }
+      
+      // Check balance before generating
+      if (!tokenService.hasEnoughTokens(userId, modelCost)) {
+        return res.status(402).json({ 
+          error: `Insufficient tokens. Need ${modelCost} tokens, please refill or choose a cheaper model.`,
+          requiredTokens: modelCost
+        });
+      }
+      
+      // Update persona with actual provider and model
+      personaAsCharacter = {
+        ...personaAsCharacter,
+        ai_provider: tokenModel.ai_provider,
+        ai_model: tokenModel.model_id,
+        temperature: tokenModel.temperature,
+        max_tokens: tokenModel.max_tokens
+      };
+      
+      console.log(`[Token] Using token model: ${tokenModel.display_name} (${tokenModel.ai_provider}/${tokenModel.model_id}) - Cost: ${modelCost} tokens`);
+    }
+
     const response = await AIProviderService.generateResponse(
       personaAsCharacter,
       [
         { role: 'system', content: personaPrompt },
         ...messages.slice(-10) // Last 10 messages for context
       ],
-      settings?.apiKeys || {},
-      settings?.ollamaSettings || {}
+      useServerKeys ? adminApiKeys : (settings?.apiKeys || {}),
+      settings?.ollamaSettings || {},
+      { useServerKeys: false }
     );
+
+    // Deduct tokens if it was a token model
+    if (useServerKeys && modelCost > 0) {
+      const newBalance = tokenService.deductTokens(userId, modelCost, persona.ai_model);
+      console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${newBalance}`);
+    }
 
     console.log(`[Personas] Generated response for persona ${persona.name}: ${response.substring(0, 50)}...`);
 

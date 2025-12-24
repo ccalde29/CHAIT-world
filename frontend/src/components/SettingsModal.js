@@ -21,6 +21,12 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
     openrouterKey: '',
     googleKey: '',
 
+    // Admin API Keys (for token models)
+    adminOpenaiKey: '',
+    adminAnthropicKey: '',
+    adminGoogleKey: '',
+    adminOpenrouterKey: '',
+
     // Ollama settings
     ollamaUrl: 'http://localhost:11434',
     ollamaTestModel: 'llama2',
@@ -45,7 +51,11 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
     openai: false,
     anthropic: false,
     openrouter: false,
-    google: false
+    google: false,
+    adminOpenai: false,
+    adminAnthropic: false,
+    adminGoogle: false,
+    adminOpenrouter: false
   });
   
   const [testingKey, setTestingKey] = useState(null);
@@ -73,6 +83,10 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         anthropicKey: settings.apiKeys?.anthropic || '',
         openrouterKey: settings.apiKeys?.openrouter || '',
         googleKey: settings.apiKeys?.google || '',
+        adminOpenaiKey: '',
+        adminAnthropicKey: '',
+        adminGoogleKey: '',
+        adminOpenrouterKey: '',
         ollamaUrl: settings.ollamaSettings?.baseUrl || 'http://localhost:11434',
         lmStudioUrl: settings.lmStudioSettings?.baseUrl || 'http://127.0.0.1:1234',
         groupDynamicsMode: settings.groupDynamicsMode || 'natural',
@@ -80,6 +94,11 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         autoApproveCharacters: settings.autoApproveCharacters || false,
         adminSystemPrompt: settings.adminSystemPrompt || ''
       });
+      
+      // Load admin API keys if user is admin
+      if (settings.isAdmin) {
+        loadAdminKeys();
+      }
     }
   }, [settings]);
   
@@ -193,6 +212,116 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
   };
   
   // ============================================================================
+  // ADMIN API KEYS MANAGEMENT
+  // ============================================================================
+  
+  const loadAdminKeys = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin-keys`, {
+        headers: { 'user-id': user.id }
+      });
+      const data = await response.json();
+      
+      if (data.keys) {
+        // Keys are masked from server, we'll only show masked versions
+        // When user types a new key, it will replace the masked one
+        setFormData(prev => ({
+          ...prev,
+          adminOpenaiKey: data.keys.openai_key || '',
+          adminAnthropicKey: data.keys.anthropic_key || '',
+          adminGoogleKey: data.keys.google_key || '',
+          adminOpenrouterKey: data.keys.openrouter_key || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load admin keys:', error);
+    }
+  };
+  
+  const testAdminKey = async (provider) => {
+    const keyMap = {
+      openai: formData.adminOpenaiKey,
+      anthropic: formData.adminAnthropicKey,
+      google: formData.adminGoogleKey,
+      openrouter: formData.adminOpenrouterKey
+    };
+    
+    const apiKey = keyMap[provider];
+    
+    if (!apiKey || apiKey.includes('...')) {
+      setError('Please enter a valid API key first');
+      return;
+    }
+    
+    setTestingKey(`admin-${provider}`);
+    setKeyStatus(prev => ({ ...prev, [`admin-${provider}`]: null }));
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/providers/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'user-id': user.id
+        },
+        body: JSON.stringify({ provider, apiKey })
+      });
+      
+      const result = await response.json();
+      setKeyStatus(prev => ({ ...prev, [`admin-${provider}`]: result }));
+      
+      if (result.success) {
+        setSuccessMessage(`Admin ${provider.toUpperCase()} key verified!`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
+    } catch (err) {
+      setKeyStatus(prev => ({ 
+        ...prev, 
+        [`admin-${provider}`]: { success: false, error: err.message }
+      }));
+    } finally {
+      setTestingKey(null);
+    }
+  };
+  
+  const saveAdminKeys = async () => {
+    try {
+      const keysToSave = {};
+      
+      // Only send keys that look like full keys (not masked)
+      if (formData.adminOpenaiKey && !formData.adminOpenaiKey.includes('...')) {
+        keysToSave.openai_key = formData.adminOpenaiKey;
+      }
+      if (formData.adminAnthropicKey && !formData.adminAnthropicKey.includes('...')) {
+        keysToSave.anthropic_key = formData.adminAnthropicKey;
+      }
+      if (formData.adminGoogleKey && !formData.adminGoogleKey.includes('...')) {
+        keysToSave.google_key = formData.adminGoogleKey;
+      }
+      if (formData.adminOpenrouterKey && !formData.adminOpenrouterKey.includes('...')) {
+        keysToSave.openrouter_key = formData.adminOpenrouterKey;
+      }
+      
+      if (Object.keys(keysToSave).length === 0) {
+        return; // No new keys to save
+      }
+      
+      await fetch(`${API_BASE_URL}/api/admin-keys`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'user-id': user.id
+        },
+        body: JSON.stringify(keysToSave)
+      });
+      
+      console.log('[Settings] Admin API keys saved');
+    } catch (error) {
+      console.error('Failed to save admin keys:', error);
+      throw error;
+    }
+  };
+  
+  // ============================================================================
   // SAVE SETTINGS
   // ============================================================================
   
@@ -221,6 +350,11 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
       };
 
       await onSave(newSettings);
+      
+      // Save admin API keys if user is admin
+      if (settings.isAdmin) {
+        await saveAdminKeys();
+      }
       
       setSuccessMessage('Settings saved successfully!');
       setTimeout(() => {
@@ -528,7 +662,172 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                 Admin Settings
               </h3>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* Admin API Keys Section */}
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                  <h4 className="text-md font-semibold text-purple-400 mb-2 flex items-center gap-2">
+                    <Key size={16} />
+                    Admin API Keys for Token Models
+                  </h4>
+                  <p className="text-xs text-gray-400 mb-4">
+                    These API keys are used when users chat with token models. Your keys, their tokens.
+                  </p>
+
+                  <div className="space-y-3">
+                    {/* OpenAI Admin Key */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                        OpenAI API Key
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type={showKeys.adminOpenai ? 'text' : 'password'}
+                          value={formData.adminOpenaiKey}
+                          onChange={(e) => handleInputChange('adminOpenaiKey', e.target.value)}
+                          placeholder="sk-proj-..."
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
+                        />
+                        <button
+                          onClick={() => toggleShowKey('adminOpenai')}
+                          className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+                        >
+                          {showKeys.adminOpenai ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button
+                          onClick={() => testAdminKey('openai')}
+                          disabled={testingKey === 'admin-openai'}
+                          className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
+                        >
+                          {testingKey === 'admin-openai' ? <Loader size={16} className="animate-spin" /> : 'Test'}
+                        </button>
+                      </div>
+                      {keyStatus['admin-openai'] && (
+                        <div className={`flex items-center gap-2 mt-1 text-xs ${
+                          keyStatus['admin-openai'].success ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {keyStatus['admin-openai'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+                          {keyStatus['admin-openai'].success ? 'Valid' : keyStatus['admin-openai'].error}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Anthropic Admin Key */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                        Anthropic API Key
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type={showKeys.adminAnthropic ? 'text' : 'password'}
+                          value={formData.adminAnthropicKey}
+                          onChange={(e) => handleInputChange('adminAnthropicKey', e.target.value)}
+                          placeholder="sk-ant-..."
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
+                        />
+                        <button
+                          onClick={() => toggleShowKey('adminAnthropic')}
+                          className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+                        >
+                          {showKeys.adminAnthropic ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button
+                          onClick={() => testAdminKey('anthropic')}
+                          disabled={testingKey === 'admin-anthropic'}
+                          className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
+                        >
+                          {testingKey === 'admin-anthropic' ? <Loader size={16} className="animate-spin" /> : 'Test'}
+                        </button>
+                      </div>
+                      {keyStatus['admin-anthropic'] && (
+                        <div className={`flex items-center gap-2 mt-1 text-xs ${
+                          keyStatus['admin-anthropic'].success ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {keyStatus['admin-anthropic'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+                          {keyStatus['admin-anthropic'].success ? 'Valid' : keyStatus['admin-anthropic'].error}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Google Admin Key */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                        Google AI API Key
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type={showKeys.adminGoogle ? 'text' : 'password'}
+                          value={formData.adminGoogleKey}
+                          onChange={(e) => handleInputChange('adminGoogleKey', e.target.value)}
+                          placeholder="AIza..."
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
+                        />
+                        <button
+                          onClick={() => toggleShowKey('adminGoogle')}
+                          className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+                        >
+                          {showKeys.adminGoogle ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button
+                          onClick={() => testAdminKey('google')}
+                          disabled={testingKey === 'admin-google'}
+                          className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
+                        >
+                          {testingKey === 'admin-google' ? <Loader size={16} className="animate-spin" /> : 'Test'}
+                        </button>
+                      </div>
+                      {keyStatus['admin-google'] && (
+                        <div className={`flex items-center gap-2 mt-1 text-xs ${
+                          keyStatus['admin-google'].success ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {keyStatus['admin-google'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+                          {keyStatus['admin-google'].success ? 'Valid' : keyStatus['admin-google'].error}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* OpenRouter Admin Key */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                        OpenRouter API Key
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type={showKeys.adminOpenrouter ? 'text' : 'password'}
+                          value={formData.adminOpenrouterKey}
+                          onChange={(e) => handleInputChange('adminOpenrouterKey', e.target.value)}
+                          placeholder="sk-or-..."
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
+                        />
+                        <button
+                          onClick={() => toggleShowKey('adminOpenrouter')}
+                          className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+                        >
+                          {showKeys.adminOpenrouter ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button
+                          onClick={() => testAdminKey('openrouter')}
+                          disabled={testingKey === 'admin-openrouter'}
+                          className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
+                        >
+                          {testingKey === 'admin-openrouter' ? <Loader size={16} className="animate-spin" /> : 'Test'}
+                        </button>
+                      </div>
+                      {keyStatus['admin-openrouter'] && (
+                        <div className={`flex items-center gap-2 mt-1 text-xs ${
+                          keyStatus['admin-openrouter'].success ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {keyStatus['admin-openrouter'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+                          {keyStatus['admin-openrouter'].success ? 'Valid' : keyStatus['admin-openrouter'].error}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 mt-3">
+                    💡 These keys are encrypted and stored securely in the database. They're used only when users select token models you create.
+                  </p>
+                </div>
+
                 {/* Auto-Approve Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
