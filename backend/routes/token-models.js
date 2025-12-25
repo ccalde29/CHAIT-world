@@ -1,10 +1,12 @@
 // ============================================================================
 // Token Models Routes (Admin Only)
 // Manage admin-created AI model presets that use server API keys and cost tokens
+// NOW USING SUPABASE (secure, server-controlled)
 // ============================================================================
 
 const express = require('express');
 const { requireAdmin } = require('../middleware/adminAuth');
+const supabaseService = require('../services/SupabaseAdminTokenService');
 
 module.exports = (db) => {
   const router = express.Router();
@@ -15,18 +17,8 @@ module.exports = (db) => {
    */
   router.get('/', async (req, res) => {
     try {
-      const models = db.localDb.all(
-        'SELECT * FROM token_models WHERE is_active = 1 ORDER BY token_cost ASC, display_name ASC'
-      );
-
-      // Parse tags JSON string to array
-      const parsedModels = models.map(model => ({
-        ...model,
-        tags: model.tags ? JSON.parse(model.tags) : []
-      }));
-
-      res.json({ models: parsedModels || [] });
-
+      const models = await supabaseService.getTokenModels(true); // true = active only
+      res.json({ models: models || [] });
     } catch (error) {
       console.error('[TokenModels] Error fetching models:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -39,18 +31,8 @@ module.exports = (db) => {
    */
   router.get('/admin', requireAdmin, async (req, res) => {
     try {
-      const models = db.localDb.all(
-        'SELECT * FROM token_models ORDER BY created_at DESC'
-      );
-
-      // Parse tags JSON string to array
-      const parsedModels = models.map(model => ({
-        ...model,
-        tags: model.tags ? JSON.parse(model.tags) : []
-      }));
-
-      res.json({ models: parsedModels || [] });
-
+      const models = await supabaseService.getTokenModels(false); // false = all models
+      res.json({ models: models || [] });
     } catch (error) {
       console.error('[TokenModels] Error:', error);
       res.status(500).json({ error: 'Internal server error' });
@@ -108,38 +90,22 @@ module.exports = (db) => {
         });
       }
 
-      const result = db.localDb.run(
-        `INSERT INTO token_models (
-          name, display_name, description, ai_provider, model_id, token_cost,
-          custom_system_prompt, temperature, max_tokens, tags, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          name.trim(),
-          display_name.trim(),
-          description?.trim() || null,
-          ai_provider,
-          model_id.trim(),
-          token_cost || 1,
-          custom_system_prompt?.trim() || null,
-          temperature !== undefined ? temperature : 0.7,
-          max_tokens !== undefined ? max_tokens : 150,
-          tags ? JSON.stringify(tags) : null,
-          1
-        ]
-      );
+      const model = await supabaseService.createTokenModel({
+        name: name.trim(),
+        display_name: display_name.trim(),
+        description: description?.trim() || null,
+        ai_provider,
+        model_id: model_id.trim(),
+        token_cost: token_cost || 1,
+        custom_system_prompt: custom_system_prompt?.trim() || null,
+        temperature: temperature !== undefined ? temperature : 0.7,
+        max_tokens: max_tokens !== undefined ? max_tokens : 150,
+        tags: tags || [],
+        is_active: true
+      });
 
-      // Get the created model - convert rowid to string for TEXT PRIMARY KEY
-      const model = db.localDb.get('SELECT * FROM token_models WHERE rowid = ?', [result.lastInsertRowid]);
-      
-      if (model) {
-        // Parse tags back to array
-        model.tags = model.tags ? JSON.parse(model.tags) : [];
-        console.log(`[TokenModels] Created token model: ${model.name} (${ai_provider}/${model_id}) - ${token_cost} tokens`);
-        res.status(201).json({ model, message: 'Token model created successfully' });
-      } else {
-        console.error('[TokenModels] Model created but could not retrieve it');
-        res.status(500).json({ error: 'Model created but could not retrieve it' });
-      }
+      console.log(`[TokenModels] Created token model: ${model.name} (${ai_provider}/${model_id}) - ${token_cost || 1} tokens`);
+      res.status(201).json({ model, message: 'Token model created successfully' });
 
     } catch (error) {
       if (error.message.includes('UNIQUE constraint failed')) {
@@ -171,12 +137,6 @@ module.exports = (db) => {
         is_active
       } = req.body;
 
-      // Check if model exists
-      const existing = db.localDb.get('SELECT * FROM token_models WHERE id = ?', [id]);
-      if (!existing) {
-        return res.status(404).json({ error: 'Token model not found' });
-      }
-
       // Validate if provided
       if (ai_provider) {
         const validProviders = ['openai', 'anthropic', 'google', 'openrouter'];
@@ -199,39 +159,21 @@ module.exports = (db) => {
         return res.status(400).json({ error: 'Max tokens must be between 50 and 1000' });
       }
 
-      // Build update query
-      db.localDb.run(
-        `UPDATE token_models SET
-          name = COALESCE(?, name),
-          display_name = COALESCE(?, display_name),
-          description = COALESCE(?, description),
-          ai_provider = COALESCE(?, ai_provider),
-          model_id = COALESCE(?, model_id),
-          token_cost = COALESCE(?, token_cost),
-          custom_system_prompt = COALESCE(?, custom_system_prompt),
-          temperature = COALESCE(?, temperature),
-          max_tokens = COALESCE(?, max_tokens),
-          tags = COALESCE(?, tags),
-          is_active = COALESCE(?, is_active),
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?`,
-        [
-          name?.trim(),
-          display_name?.trim(),
-          description?.trim(),
-          ai_provider,
-          model_id?.trim(),
-          token_cost,
-          custom_system_prompt?.trim(),
-          temperature,
-          max_tokens,
-          tags ? JSON.stringify(tags) : undefined,
-          is_active,
-          id
-        ]
-      );
+      // Build update object
+      const updates = {};
+      if (name !== undefined) updates.name = name.trim();
+      if (display_name !== undefined) updates.display_name = display_name.trim();
+      if (description !== undefined) updates.description = description.trim();
+      if (ai_provider !== undefined) updates.ai_provider = ai_provider;
+      if (model_id !== undefined) updates.model_id = model_id.trim();
+      if (token_cost !== undefined) updates.token_cost = token_cost;
+      if (custom_system_prompt !== undefined) updates.custom_system_prompt = custom_system_prompt.trim();
+      if (temperature !== undefined) updates.temperature = temperature;
+      if (max_tokens !== undefined) updates.max_tokens = max_tokens;
+      if (tags !== undefined) updates.tags = tags;
+      if (is_active !== undefined) updates.is_active = is_active;
 
-      const model = db.localDb.get('SELECT * FROM token_models WHERE id = ?', [id]);
+      const model = await supabaseService.updateTokenModel(id, updates);
 
       console.log(`[TokenModels] Updated token model: ${model.name}`);
       res.json({ model, message: 'Token model updated successfully' });
@@ -252,20 +194,13 @@ module.exports = (db) => {
   router.delete('/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-
-      // Check if model exists first
-      const existing = db.localDb.get('SELECT name FROM token_models WHERE id = ?', [id]);
-
-      if (!existing) {
+      await supabaseService.deleteTokenModel(id);
+      console.log(`[TokenModels] Deleted token model: ${id}`);
+      res.json({ success: true, message: 'Token model deleted successfully' });
+    } catch (error) {
+      if (error.message.includes('not found')) {
         return res.status(404).json({ error: 'Token model not found' });
       }
-
-      db.localDb.run('DELETE FROM token_models WHERE id = ?', [id]);
-
-      console.log(`[TokenModels] Deleted token model: ${existing.name}`);
-      res.json({ success: true, message: 'Token model deleted successfully' });
-
-    } catch (error) {
       console.error('[TokenModels] Error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }

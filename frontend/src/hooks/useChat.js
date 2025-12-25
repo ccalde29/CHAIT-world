@@ -181,6 +181,7 @@ export const useChat = (apiRequest) => {
           if (char) {
             return {
               ...msg,
+              character: char.id,
               characterName: char.name,
               characterAvatar: char.avatar,
               characterColor: char.color,

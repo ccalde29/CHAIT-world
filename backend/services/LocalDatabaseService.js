@@ -431,9 +431,8 @@ class LocalDatabaseService {
                 defaultProvider: localSettings.default_provider || 'openai',
                 defaultModel: localSettings.default_model,
                 activePersonaId: localSettings.active_persona_id,
-                isAdmin: localSettings.is_admin === 1,
-                autoApproveCharacters: localSettings.auto_approve_characters === 1,
-                adminSystemPrompt: localSettings.admin_system_prompt
+                isAdmin: localSettings.is_admin === 1
+                // autoApproveCharacters and adminSystemPrompt now fetched from Supabase in database.js
             };
         }
 
@@ -447,9 +446,8 @@ class LocalDatabaseService {
             messageDelay: 1200,
             defaultProvider: 'openai',
             defaultModel: null,
-            isAdmin: false,
-            autoApproveCharacters: false,
-            adminSystemPrompt: null
+            isAdmin: false
+            // autoApproveCharacters and adminSystemPrompt now fetched from Supabase in database.js
         };
     }
 
@@ -457,6 +455,7 @@ class LocalDatabaseService {
         this.ensureInitialized();
         
         // Normalize keys (handle both camelCase from frontend and snake_case from DB)
+        // Note: autoApproveCharacters and adminSystemPrompt are now handled in database.js via Supabase
         const normalized = {
             api_keys: updates.apiKeys || updates.api_keys || {},
             ollama_settings: updates.ollamaSettings || updates.ollama_settings || { baseUrl: 'http://localhost:11434' },
@@ -465,9 +464,7 @@ class LocalDatabaseService {
             default_provider: updates.defaultProvider || updates.default_provider || 'openai',
             default_model: updates.defaultModel || updates.default_model || null,
             group_dynamics_mode: updates.groupDynamicsMode || updates.group_dynamics_mode || 'natural',
-            message_delay: updates.messageDelay || updates.message_delay || 1200,
-            auto_approve_characters: updates.autoApproveCharacters || updates.auto_approve_characters || false,
-            admin_system_prompt: updates.adminSystemPrompt || updates.admin_system_prompt || null
+            message_delay: updates.messageDelay || updates.message_delay || 1200
         };
 
         // Check if settings exist

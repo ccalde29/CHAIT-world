@@ -250,9 +250,19 @@ CREATE TABLE IF NOT EXISTS user_personas (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     user_id TEXT,
     name TEXT NOT NULL,
-    description TEXT,
-    avatar TEXT,
+    personality TEXT,
+    interests TEXT,
+    communication_style TEXT,
+    avatar TEXT DEFAULT '👤',
+    color TEXT DEFAULT 'from-blue-500 to-indigo-500',
+    avatar_image_url TEXT,
+    avatar_image_filename TEXT,
+    uses_custom_image INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 0,
+    ai_provider TEXT DEFAULT 'openai',
+    ai_model TEXT,
+    temperature REAL DEFAULT 0.8,
+    max_tokens INTEGER DEFAULT 150,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -347,9 +357,6 @@ CREATE TABLE IF NOT EXISTS user_settings_local (
     default_provider TEXT DEFAULT 'openai',
     default_model TEXT,
     active_persona_id TEXT,
-    is_admin INTEGER DEFAULT 0,
-    auto_approve_characters INTEGER DEFAULT 0,
-    admin_system_prompt TEXT,
     group_dynamics_mode TEXT DEFAULT 'natural',
     message_delay INTEGER DEFAULT 1200,
     preferences TEXT DEFAULT '{"responseDelay": true, "showTypingIndicator": true, "maxCharactersInGroup": 5, "theme": "dark", "fontSize": "medium"}', -- JSON
@@ -465,95 +472,10 @@ BEGIN
 END;
 
 -- =============================================================================
--- TOKEN SYSTEM TABLES
+-- TOKEN SYSTEM TABLES - MOVED TO SUPABASE
 -- =============================================================================
-
--- User token balances
-CREATE TABLE IF NOT EXISTS user_tokens (
-    user_id TEXT PRIMARY KEY,
-    balance INTEGER DEFAULT 100,
-    lifetime_earned INTEGER DEFAULT 100,
-    lifetime_purchased INTEGER DEFAULT 0,
-    last_weekly_refill DATETIME DEFAULT CURRENT_TIMESTAMP,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_user_tokens_balance ON user_tokens(balance);
-CREATE INDEX idx_user_tokens_refill ON user_tokens(last_weekly_refill);
-
--- Token transaction history
-CREATE TABLE IF NOT EXISTS token_transactions (
-    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-    user_id TEXT NOT NULL,
-    amount INTEGER NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('weekly_refill', 'purchase', 'admin_grant', 'admin_deduct', 'usage')),
-    reference TEXT,
-    balance_after INTEGER NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES user_tokens(user_id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_token_transactions_user ON token_transactions(user_id);
-CREATE INDEX idx_token_transactions_type ON token_transactions(type);
-CREATE INDEX idx_token_transactions_created ON token_transactions(created_at);
-
--- Token Models (renamed from custom_models)
-CREATE TABLE IF NOT EXISTS token_models (
-    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-    name TEXT NOT NULL UNIQUE,
-    display_name TEXT NOT NULL,
-    description TEXT,
-    ai_provider TEXT NOT NULL CHECK(ai_provider IN ('openai', 'anthropic', 'google', 'openrouter')),
-    model_id TEXT NOT NULL,
-    token_cost INTEGER NOT NULL DEFAULT 1 CHECK(token_cost >= 0),
-    custom_system_prompt TEXT,
-    temperature REAL DEFAULT 0.7 CHECK(temperature >= 0 AND temperature <= 2.0),
-    max_tokens INTEGER DEFAULT 150 CHECK(max_tokens >= 50 AND max_tokens <= 1000),
-    tags TEXT,
-    is_active INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_token_models_active ON token_models(is_active);
-CREATE INDEX idx_token_models_provider ON token_models(ai_provider);
-CREATE INDEX idx_token_models_cost ON token_models(token_cost);
-
--- =============================================================================
--- ADMIN API CREDENTIALS TABLE
--- =============================================================================
-CREATE TABLE IF NOT EXISTS admin_api_keys (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT NOT NULL UNIQUE,
-    openai_key TEXT,
-    anthropic_key TEXT,
-    google_key TEXT,
-    openrouter_key TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_admin_api_keys_user ON admin_api_keys(user_id);
-
-CREATE TRIGGER update_token_models_timestamp 
-AFTER UPDATE ON token_models 
-BEGIN
-    UPDATE token_models SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-END;
-
-CREATE TRIGGER update_admin_api_keys_timestamp 
-AFTER UPDATE ON admin_api_keys 
-BEGIN
-    UPDATE admin_api_keys SET updated_at = CURRENT_TIMESTAMP WHERE user_id = NEW.user_id;
-END;
-
-CREATE TRIGGER update_user_tokens_timestamp 
-AFTER UPDATE ON user_tokens 
-BEGIN
-    UPDATE user_tokens SET updated_at = CURRENT_TIMESTAMP WHERE user_id = NEW.user_id;
-END;
+-- Admin/token tables have been moved to Supabase for security
+-- See: supabase/migrations/20251225_admin_token_security.sql
 
 -- =============================================================================
 -- DATABASE VERSION TABLE

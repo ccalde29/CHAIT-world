@@ -19,6 +19,10 @@ class DatabaseService {
             try {
                 this.supabase = createClient(supabaseUrl, supabaseServiceKey);
                 this.supabaseAvailable = true;
+                
+                // Load Supabase admin/token service only if env vars are set
+                this.supabaseService = require('./SupabaseAdminTokenService');
+                
                 console.log('[Database] Supabase initialized for community features');
             } catch (error) {
                 console.error('[Database] Failed to initialize Supabase:', error);
@@ -140,11 +144,47 @@ class DatabaseService {
     // ============================================================================
 
     async getUserSettings(userId) {
-        return this.localDb.getUserSettings(userId);
+        const localSettings = this.localDb.getUserSettings(userId);
+        
+        // If user is admin and Supabase is available, fetch admin-specific settings from Supabase
+        if (localSettings.isAdmin && this.supabaseAvailable && this.supabaseService) {
+            try {
+                const adminSettings = await this.supabaseService.getAdminSettings(userId);
+                localSettings.autoApproveCharacters = adminSettings.auto_approve_characters;
+                localSettings.adminSystemPrompt = adminSettings.admin_system_prompt;
+            } catch (error) {
+                console.error('[Database] Error fetching admin settings:', error);
+                // Keep local defaults if Supabase fetch fails
+                localSettings.autoApproveCharacters = false;
+                localSettings.adminSystemPrompt = null;
+            }
+        }
+        
+        return localSettings;
     }
 
     async updateUserSettings(userId, updates) {
-        return this.localDb.updateUserSettings(userId, updates);
+        // Save local settings (API keys, preferences, etc.)
+        const result = this.localDb.updateUserSettings(userId, updates);
+        
+        // If updating admin settings and Supabase is available, save them to Supabase
+        if ((updates.autoApproveCharacters !== undefined || updates.adminSystemPrompt !== undefined) 
+            && this.supabaseAvailable && this.supabaseService) {
+            try {
+                const isAdmin = await this.supabaseService.isAdmin(userId);
+                if (isAdmin) {
+                    await this.supabaseService.updateAdminSettings(userId, {
+                        auto_approve_characters: updates.autoApproveCharacters,
+                        admin_system_prompt: updates.adminSystemPrompt
+                    });
+                }
+            } catch (error) {
+                console.error('[Database] Error updating admin settings:', error);
+                // Continue even if Supabase update fails
+            }
+        }
+        
+        return result;
     }
 
     // ============================================================================

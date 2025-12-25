@@ -5,7 +5,7 @@
 // ============================================================================
 
 const express = require('express');
-const AdminKeysService = require('../services/AdminKeysService');
+const supabaseService = require('../services/SupabaseAdminTokenService');
 const { requireAdmin } = require('../middleware/adminAuth');
 
 module.exports = function(db) {
@@ -18,7 +18,14 @@ module.exports = function(db) {
   router.get('/', requireAdmin, async (req, res) => {
     try {
       const userId = req.headers['user-id'];
-      const keys = AdminKeysService.getAdminKeys(db, userId);
+      const keysData = await supabaseService.getAdminApiKeys(userId);
+      
+      const keys = {
+        openai: keysData?.openai_key,
+        anthropic: keysData?.anthropic_key,
+        google: keysData?.google_key,
+        openrouter: keysData?.openrouter_key
+      };
 
       // Mask keys for security (show first 7 and last 4 chars)
       const maskedKeys = {};
@@ -51,11 +58,11 @@ module.exports = function(db) {
         return res.status(400).json({ error: 'At least one API key is required' });
       }
 
-      AdminKeysService.saveAdminKeys(db, userId, {
-        openai_key,
-        anthropic_key,
-        google_key,
-        openrouter_key
+      await supabaseService.saveAdminApiKeys(userId, {
+        openai: openai_key,
+        anthropic: anthropic_key,
+        google: google_key,
+        openrouter: openrouter_key
       });
 
       res.json({ message: 'Admin API keys saved successfully' });
@@ -72,7 +79,7 @@ module.exports = function(db) {
   router.delete('/', requireAdmin, async (req, res) => {
     try {
       const userId = req.headers['user-id'];
-      AdminKeysService.deleteAdminKeys(db, userId);
+      await supabaseService.deleteAdminApiKeys(userId);
       res.json({ message: 'Admin API keys deleted successfully' });
     } catch (error) {
       console.error('[AdminKeys] Error:', error);

@@ -11,7 +11,7 @@ const { createClient } = require('@supabase/supabase-js');
 // Core services
 const MemoryService = require('../services/MemoryService');
 const CharacterLearningService = require('../services/CharacterLearningService');
-const TokenService = require('../services/TokenService');
+const supabaseTokenService = require('../services/SupabaseAdminTokenService');
 
 // New consistency services
 const PromptBuilder = require('../services/PromptBuilder');
@@ -33,7 +33,6 @@ module.exports = (db) => {
   
   const memoryService = new MemoryService(db);
   const learningService = new CharacterLearningService(db);
-  const tokenService = new TokenService(db);
   const promptBuilder = new PromptBuilder();
   const conversationTracker = new ConversationStateTracker();
   const sessionContinuity = new SessionContinuityService(db);
@@ -317,8 +316,9 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         let adminApiKeys = {};
         
         if (char.ai_provider === 'token') {
-          // Resolve token model to get actual provider and model details
-          const tokenModel = db.localDb.get('SELECT * FROM token_models WHERE id = ?', [char.ai_model]);
+          // Resolve token model from Supabase
+          const allTokenModels = await supabaseTokenService.getTokenModels(true);
+          const tokenModel = allTokenModels.find(m => m.id === char.ai_model || m.name === char.ai_model);
           
           if (!tokenModel) {
             throw new Error(`Token model not found: ${char.ai_model}`);
@@ -327,9 +327,8 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           modelCost = tokenModel.token_cost;
           useServerKeys = true;
           
-          // Get admin API keys from database (the admin who created the token model)
-          const AdminKeysService = require('../services/AdminKeysService');
-          const adminKeys = AdminKeysService.getAdminKeys(db, userId); // Use the requesting user's ID (they should be admin)
+          // Get admin API keys from Supabase
+          const adminKeys = await supabaseTokenService.getAdminApiKeys(userId);
           
           adminApiKeys = {
             openai: adminKeys.openai_key,
@@ -344,8 +343,9 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           }
           
           // Check balance before generating
-          if (!tokenService.hasEnoughTokens(userId, modelCost)) {
-            throw new Error(`Insufficient tokens. Need ${modelCost} tokens, please refill or choose a cheaper model.`);
+          const userBalance = await supabaseTokenService.getUserTokens(userId);
+          if (userBalance.balance < modelCost) {
+            throw new Error(`Insufficient tokens. Need ${modelCost} tokens, you have ${userBalance.balance}. Please refill or choose a cheaper model.`);
           }
           
           // Update character with actual provider and model
@@ -372,8 +372,13 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
         // Deduct tokens if it was a token model
         if (useServerKeys && modelCost > 0) {
-          const newBalance = tokenService.deductTokens(userId, modelCost, char.ai_model);
-          console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${newBalance}`);
+          const result = await supabaseTokenService.deductTokens(
+            userId,
+            modelCost,
+            'chat_response',
+            `Chat with ${char.name}`
+          );
+          console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${result.new_balance}`);
         }
 
         // Normalize response

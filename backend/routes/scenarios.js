@@ -3,10 +3,9 @@
 
 const express = require('express');
 const router = express.Router();
-const TokenService = require('../services/TokenService');
+const supabaseTokenService = require('../services/SupabaseAdminTokenService');
 
 module.exports = (db) => {
-    const tokenService = new TokenService(db);
     
     /**
      * Get all scenarios
@@ -224,8 +223,9 @@ module.exports = (db) => {
             let adminApiKeys = {};
             
             if (scene.narrator_ai_provider === 'token') {
-              // Resolve token model to get actual provider and model details
-              const tokenModel = db.localDb.get('SELECT * FROM token_models WHERE id = ?', [scene.narrator_ai_model]);
+              // Resolve token model from Supabase
+              const allTokenModels = await supabaseTokenService.getTokenModels(true);
+              const tokenModel = allTokenModels.find(m => m.id === scene.narrator_ai_model || m.name === scene.narrator_ai_model);
               
               if (!tokenModel) {
                 return res.status(404).json({ 
@@ -237,9 +237,8 @@ module.exports = (db) => {
               modelCost = tokenModel.token_cost;
               useServerKeys = true;
               
-              // Get admin API keys from database
-              const AdminKeysService = require('../services/AdminKeysService');
-              const adminKeys = AdminKeysService.getAdminKeys(db, req.userId);
+              // Get admin API keys from Supabase
+              const adminKeys = await supabaseTokenService.getAdminApiKeys(req.userId);
               
               adminApiKeys = {
                 openai: adminKeys.openai_key,
@@ -257,10 +256,11 @@ module.exports = (db) => {
               }
               
               // Check balance before generating
-              if (!tokenService.hasEnoughTokens(req.userId, modelCost)) {
+              const userBalance = await supabaseTokenService.getUserTokens(req.userId);
+              if (userBalance.balance < modelCost) {
                 return res.status(402).json({ 
                   triggered: false,
-                  error: `Insufficient tokens for narrator. Need ${modelCost} tokens.`,
+                  error: `Insufficient tokens for narrator. Need ${modelCost} tokens, you have ${userBalance.balance}.`,
                   requiredTokens: modelCost
                 });
               }
@@ -308,8 +308,13 @@ Keep responses brief (1-2 sentences). Focus on what's happening in the scene, no
 
             // Deduct tokens if it was a token model
             if (useServerKeys && modelCost > 0) {
-              const newBalance = tokenService.deductTokens(req.userId, modelCost, scene.narrator_ai_model);
-              console.log(`[Narrator Token] Deducted ${modelCost} tokens. New balance: ${newBalance}`);
+              const result = await supabaseTokenService.deductTokens(
+                req.userId,
+                modelCost,
+                'narrator_response',
+                `Narrator in ${scene.name}`
+              );
+              console.log(`[Narrator Token] Deducted ${modelCost} tokens. New balance: ${result.new_balance}`);
             }
 
             res.json({ triggered: true, response, scene: scene.name });

@@ -5,11 +5,9 @@
 const express = require('express');
 const router = express.Router();
 const AIProviderService = require('../services/AIProviderService');
-const TokenService = require('../services/TokenService');
+const supabaseTokenService = require('../services/SupabaseAdminTokenService');
 
 module.exports = (db) => {
-
-  const tokenService = new TokenService(db);
 
 /**
  * GET /api/personas
@@ -126,6 +124,18 @@ router.post('/:personaId/activate', async (req, res) => {
       return res.status(404).json({ error: 'Persona not found' });
     }
 
+    // First, set all personas for this user to inactive
+    db.localDb.run(
+      'UPDATE user_personas SET is_active = 0 WHERE user_id = ?',
+      [userId]
+    );
+
+    // Then set the selected persona to active
+    db.localDb.run(
+      'UPDATE user_personas SET is_active = 1 WHERE id = ? AND user_id = ?',
+      [personaId, userId]
+    );
+
     // Update user_settings to set active_persona_id
     const existing = db.localDb.get(
       'SELECT id FROM user_settings_local WHERE user_id = ?',
@@ -218,6 +228,15 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Check if user has any existing personas
+    const existingPersonas = db.localDb.all(
+      'SELECT id FROM user_personas WHERE user_id = ?',
+      [userId]
+    );
+    
+    // Only set as active if this is the user's first persona
+    const isActive = existingPersonas.length === 0 ? 1 : 0;
+
     // Insert into local database
     const stmt = db.localDb.db.prepare(`
       INSERT INTO user_personas (
@@ -238,7 +257,7 @@ router.post('/', async (req, res) => {
       avatar_image_url || null,
       avatar_image_filename || null,
       uses_custom_image ? 1 : 0,
-      1, // is_active
+      isActive,
       ai_provider || 'openai',
       ai_model || null,
       temperature !== undefined ? temperature : 0.8,
@@ -497,8 +516,9 @@ ${persona.personality}`;
     let adminApiKeys = {};
     
     if (persona.ai_provider === 'token') {
-      // Resolve token model to get actual provider and model details
-      const tokenModel = db.localDb.get('SELECT * FROM token_models WHERE id = ?', [persona.ai_model]);
+      // Resolve token model from Supabase
+      const allTokenModels = await supabaseTokenService.getTokenModels(true);
+      const tokenModel = allTokenModels.find(m => m.id === persona.ai_model || m.name === persona.ai_model);
       
       if (!tokenModel) {
         return res.status(404).json({ error: `Token model not found: ${persona.ai_model}` });
@@ -507,9 +527,8 @@ ${persona.personality}`;
       modelCost = tokenModel.token_cost;
       useServerKeys = true;
       
-      // Get admin API keys from database
-      const AdminKeysService = require('../services/AdminKeysService');
-      const adminKeys = AdminKeysService.getAdminKeys(db, userId);
+      // Get admin API keys from Supabase
+      const adminKeys = await supabaseTokenService.getAdminApiKeys(userId);
       
       adminApiKeys = {
         openai: adminKeys.openai_key,
@@ -526,9 +545,10 @@ ${persona.personality}`;
       }
       
       // Check balance before generating
-      if (!tokenService.hasEnoughTokens(userId, modelCost)) {
+      const userBalance = await supabaseTokenService.getUserTokens(userId);
+      if (userBalance.balance < modelCost) {
         return res.status(402).json({ 
-          error: `Insufficient tokens. Need ${modelCost} tokens, please refill or choose a cheaper model.`,
+          error: `Insufficient tokens. Need ${modelCost} tokens, you have ${userBalance.balance}. Please refill or choose a cheaper model.`,
           requiredTokens: modelCost
         });
       }
@@ -558,8 +578,13 @@ ${persona.personality}`;
 
     // Deduct tokens if it was a token model
     if (useServerKeys && modelCost > 0) {
-      const newBalance = tokenService.deductTokens(userId, modelCost, persona.ai_model);
-      console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${newBalance}`);
+      const result = await supabaseTokenService.deductTokens(
+        userId,
+        modelCost,
+        'persona_response',
+        `Persona ${persona.name}`
+      );
+      console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${result.new_balance}`);
     }
 
     console.log(`[Personas] Generated response for persona ${persona.name}: ${response.substring(0, 50)}...`);

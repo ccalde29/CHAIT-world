@@ -79,6 +79,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
   const [loadingModels, setLoadingModels] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState('token');
   
+  // Track which admin keys are saved
+  const [hasSavedAdminKeys, setHasSavedAdminKeys] = useState({
+    openai: false,
+    anthropic: false,
+    google: false,
+    openrouter: false
+  });
+  
   // ============================================================================
   // INITIALIZE FROM SETTINGS
   // ============================================================================
@@ -313,14 +321,22 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
       const data = await response.json();
       
       if (data.keys) {
+        // Store which keys are saved
+        setHasSavedAdminKeys({
+          openai: !!data.hasKeys?.openai,
+          anthropic: !!data.hasKeys?.anthropic,
+          google: !!data.hasKeys?.google,
+          openrouter: !!data.hasKeys?.openrouter
+        });
+        
         // Keys are masked from server, we'll only show masked versions
         // When user types a new key, it will replace the masked one
         setFormData(prev => ({
           ...prev,
-          adminOpenaiKey: data.keys.openai_key || '',
-          adminAnthropicKey: data.keys.anthropic_key || '',
-          adminGoogleKey: data.keys.google_key || '',
-          adminOpenrouterKey: data.keys.openrouter_key || ''
+          adminOpenaiKey: data.keys.openai || '',
+          adminAnthropicKey: data.keys.anthropic || '',
+          adminGoogleKey: data.keys.google || '',
+          adminOpenrouterKey: data.keys.openrouter || ''
         }));
       }
     } catch (error) {
@@ -827,8 +843,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                   <div className="space-y-3">
                     {/* OpenAI Admin Key */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                        OpenAI API Key
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
+                        <span>OpenAI API Key</span>
+                        {hasSavedAdminKeys.openai && (
+                          <span className="text-green-400 text-xs flex items-center gap-1">
+                            <CheckCircle size={12} />
+                            Saved
+                          </span>
+                        )}
                       </label>
                       <div className="flex gap-2">
                         <input
@@ -864,8 +886,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
 
                     {/* Anthropic Admin Key */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                        Anthropic API Key
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
+                        <span>Anthropic API Key</span>
+                        {hasSavedAdminKeys.anthropic && (
+                          <span className="text-green-400 text-xs flex items-center gap-1">
+                            <CheckCircle size={12} />
+                            Saved
+                          </span>
+                        )}
                       </label>
                       <div className="flex gap-2">
                         <input
@@ -901,8 +929,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
 
                     {/* Google Admin Key */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                        Google AI API Key
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
+                        <span>Google AI API Key</span>
+                        {hasSavedAdminKeys.google && (
+                          <span className="text-green-400 text-xs flex items-center gap-1">
+                            <CheckCircle size={12} />
+                            Saved
+                          </span>
+                        )}
                       </label>
                       <div className="flex gap-2">
                         <input
@@ -938,8 +972,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
 
                     {/* OpenRouter Admin Key */}
                     <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                        OpenRouter API Key
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
+                        <span>OpenRouter API Key</span>
+                        {hasSavedAdminKeys.openrouter && (
+                          <span className="text-green-400 text-xs flex items-center gap-1">
+                            <CheckCircle size={12} />
+                            Saved
+                          </span>
+                        )}
                       </label>
                       <div className="flex gap-2">
                         <input

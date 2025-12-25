@@ -1,9 +1,8 @@
 const { createClient } = require('@supabase/supabase-js');
-const DatabaseService = require('../services/database');
+const supabaseService = require('../services/SupabaseAdminTokenService');
 
 // Lazy-load Supabase client to ensure environment variables are loaded
 let supabase = null;
-let db = null;
 
 function getSupabase() {
   if (!supabase) {
@@ -20,16 +19,9 @@ function getSupabase() {
   return supabase;
 }
 
-function getDB() {
-  if (!db) {
-    db = new DatabaseService();
-  }
-  return db;
-}
-
 /**
  * Middleware to check if user has admin privileges
- * Uses the is_admin flag from local user_settings_local table
+ * Uses Supabase admin_users table (secure, server-controlled)
  *
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -46,14 +38,11 @@ async function requireAdmin(req, res, next) {
       });
     }
 
-    // Check if user has admin privileges from local database
-    const userSettings = await getDB().getUserSettings(userId);
+    // Check if user has admin privileges from Supabase (secure)
+    const isAdmin = await supabaseService.isAdmin(userId);
 
-    if (!userSettings || !userSettings.isAdmin) {
-      console.warn(`[AdminAuth] Unauthorized admin access attempt by user: ${userId}`, { 
-        settingsFound: !!userSettings,
-        isAdmin: userSettings?.isAdmin 
-      });
+    if (!isAdmin) {
+      console.warn(`[AdminAuth] Unauthorized admin access attempt by user: ${userId}`);
       return res.status(403).json({
         error: 'Forbidden',
         message: 'Admin privileges required for this action'
@@ -90,10 +79,8 @@ async function checkAdmin(req, res, next) {
       return next();
     }
 
-    // Check if user has admin privileges from local database
-    const userSettings = await getDB().getUserSettings(userId);
-
-    req.isAdmin = userSettings?.isAdmin || false;
+    // Check admin status from Supabase
+    req.isAdmin = await supabaseService.isAdmin(userId);
     next();
 
   } catch (error) {

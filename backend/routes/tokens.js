@@ -1,15 +1,15 @@
 // ============================================================================
 // Token Routes
 // Manage user token balances and transactions
+// NOW USING SUPABASE (secure, server-controlled)
 // ============================================================================
 
 const express = require('express');
 const { requireAdmin } = require('../middleware/adminAuth');
-const TokenService = require('../services/TokenService');
+const supabaseService = require('../services/SupabaseAdminTokenService');
 
 module.exports = (db) => {
     const router = express.Router();
-    const tokenService = new TokenService(db);
 
     /**
      * GET /api/tokens/balance
@@ -23,18 +23,14 @@ module.exports = (db) => {
                 return res.status(401).json({ error: 'User ID required' });
             }
 
-            // Check for weekly refill
-            const refillResult = tokenService.processWeeklyRefill(userId, 100);
-            
-            // Get current balance
-            const balance = tokenService.getUserBalance(userId);
+            // Get current balance from Supabase
+            const balance = await supabaseService.getUserTokens(userId);
 
             res.json({
                 balance: balance.balance,
                 lifetime_earned: balance.lifetime_earned,
                 lifetime_purchased: balance.lifetime_purchased,
-                last_weekly_refill: balance.last_weekly_refill,
-                refill_info: refillResult
+                last_weekly_refill: balance.last_weekly_refill
             });
         } catch (error) {
             console.error('[Tokens] Error getting balance:', error);
@@ -55,7 +51,7 @@ module.exports = (db) => {
             }
 
             const limit = parseInt(req.query.limit) || 50;
-            const transactions = tokenService.getTransactions(userId, limit);
+            const transactions = await supabaseService.getUserTransactions(userId, limit);
 
             res.json({ transactions });
         } catch (error) {
@@ -70,19 +66,22 @@ module.exports = (db) => {
      */
     router.post('/admin/grant', requireAdmin, async (req, res) => {
         try {
-            const adminId = req.headers['user-id'];
             const { userId, amount } = req.body;
 
             if (!userId || !amount || amount <= 0) {
                 return res.status(400).json({ error: 'Valid userId and positive amount required' });
             }
 
-            const newBalance = tokenService.adminGrantTokens(userId, amount, adminId);
+            const result = await supabaseService.grantTokens(
+                userId,
+                amount,
+                'admin_grant',
+                `Granted by admin`
+            );
 
             res.json({
-                success: true,
-                message: `Granted ${amount} tokens to user ${userId}`,
-                newBalance
+                message: 'Tokens granted successfully',
+                newBalance: result.new_balance
             });
         } catch (error) {
             console.error('[Tokens] Error granting tokens:', error);
@@ -96,51 +95,30 @@ module.exports = (db) => {
      */
     router.post('/admin/deduct', requireAdmin, async (req, res) => {
         try {
-            const adminId = req.headers['user-id'];
             const { userId, amount } = req.body;
 
             if (!userId || !amount || amount <= 0) {
                 return res.status(400).json({ error: 'Valid userId and positive amount required' });
             }
 
-            const newBalance = tokenService.adminDeductTokens(userId, amount, adminId);
+            const result = await supabaseService.deductTokens(
+                userId,
+                amount,
+                'admin_deduct',
+                `Deducted by admin`
+            );
 
             res.json({
-                success: true,
-                message: `Deducted ${amount} tokens from user ${userId}`,
-                newBalance
+                message: 'Tokens deducted successfully',
+                newBalance: result.new_balance
             });
         } catch (error) {
             console.error('[Tokens] Error deducting tokens:', error);
-            res.status(500).json({ error: 'Failed to deduct tokens' });
+            res.status(500).json({ error: error.message || 'Failed to deduct tokens' });
         }
     });
 
-    /**
-     * POST /api/tokens/admin/set-balance
-     * Set exact balance for a user (admin only)
-     */
-    router.post('/admin/set-balance', requireAdmin, async (req, res) => {
-        try {
-            const adminId = req.headers['user-id'];
-            const { userId, balance } = req.body;
 
-            if (!userId || balance === undefined || balance < 0) {
-                return res.status(400).json({ error: 'Valid userId and non-negative balance required' });
-            }
-
-            const newBalance = tokenService.adminSetBalance(userId, balance, adminId);
-
-            res.json({
-                success: true,
-                message: `Set balance for user ${userId} to ${balance}`,
-                newBalance
-            });
-        } catch (error) {
-            console.error('[Tokens] Error setting balance:', error);
-            res.status(500).json({ error: 'Failed to set balance' });
-        }
-    });
 
     /**
      * GET /api/tokens/admin/all-balances
@@ -148,8 +126,7 @@ module.exports = (db) => {
      */
     router.get('/admin/all-balances', requireAdmin, async (req, res) => {
         try {
-            const balances = tokenService.getAllBalances();
-
+            const balances = await supabaseService.getAllUserBalances();
             res.json({ balances });
         } catch (error) {
             console.error('[Tokens] Error getting all balances:', error);
@@ -164,13 +141,14 @@ module.exports = (db) => {
     router.get('/model-cost/:modelId', async (req, res) => {
         try {
             const { modelId } = req.params;
-            const cost = tokenService.getModelCost(modelId);
+            const models = await supabaseService.getTokenModels(true);
+            const model = models.find(m => m.name === modelId);
 
-            if (cost === null) {
+            if (!model) {
                 return res.json({ isTokenModel: false, cost: 0 });
             }
 
-            res.json({ isTokenModel: true, cost });
+            res.json({ isTokenModel: true, cost: model.token_cost });
         } catch (error) {
             console.error('[Tokens] Error getting model cost:', error);
             res.status(500).json({ error: 'Failed to get model cost' });
