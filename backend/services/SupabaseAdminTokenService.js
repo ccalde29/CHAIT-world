@@ -370,51 +370,89 @@ class SupabaseAdminTokenService {
      * Deduct tokens from user
      */
     async deductTokens(userId, amount, reference = null) {
-        // Use the Supabase function for atomic deduction
-        const { data, error } = await this.supabase
-            .rpc('deduct_tokens', {
-                p_user_id: userId,
-                p_amount: amount,
-                p_reference: reference
-            });
+        try {
+            // Get current balance
+            const { data: currentTokens, error: fetchError } = await this.supabase
+                .from('user_tokens')
+                .select('balance')
+                .eq('user_id', userId)
+                .single();
 
-        if (error) throw error;
+            if (fetchError) throw fetchError;
 
-        const result = data[0];
-        if (!result.success) {
-            throw new Error(result.error || 'Failed to deduct tokens');
+            const currentBalance = currentTokens?.balance || 0;
+            
+            if (currentBalance < amount) {
+                throw new Error('Insufficient token balance');
+            }
+
+            const newBalance = currentBalance - amount;
+
+            // Update balance
+            const { error: updateError } = await this.supabase
+                .from('user_tokens')
+                .update({
+                    balance: newBalance,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('user_id', userId);
+
+            if (updateError) throw updateError;
+
+            // Log transaction (negative amount for deduction)
+            await this.logTransaction(userId, -amount, 'deduction', reference, newBalance);
+
+            return {
+                success: true,
+                new_balance: newBalance
+            };
+        } catch (error) {
+            console.error('[SupabaseAdminTokenService] Error deducting tokens:', error);
+            throw error;
         }
-
-        return {
-            success: true,
-            new_balance: result.new_balance
-        };
     }
 
     /**
      * Grant tokens to user
      */
     async grantTokens(userId, amount, type = 'admin_grant', reference = null) {
-        // Use the Supabase function for atomic grant
-        const { data, error } = await this.supabase
-            .rpc('grant_tokens', {
-                p_user_id: userId,
-                p_amount: amount,
-                p_type: type,
-                p_reference: reference
-            });
+        try {
+            // Get current balance
+            const { data: currentTokens, error: fetchError } = await this.supabase
+                .from('user_tokens')
+                .select('balance')
+                .eq('user_id', userId)
+                .single();
 
-        if (error) throw error;
+            if (fetchError && fetchError.code !== 'PGRST116') {
+                throw fetchError;
+            }
 
-        const result = data[0];
-        if (!result.success) {
-            throw new Error(result.error || 'Failed to grant tokens');
+            const currentBalance = currentTokens?.balance || 0;
+            const newBalance = currentBalance + amount;
+
+            // Update or insert balance
+            const { error: upsertError } = await this.supabase
+                .from('user_tokens')
+                .upsert({
+                    user_id: userId,
+                    balance: newBalance,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+            if (upsertError) throw upsertError;
+
+            // Log transaction
+            await this.logTransaction(userId, amount, type, reference, newBalance);
+
+            return {
+                success: true,
+                new_balance: newBalance
+            };
+        } catch (error) {
+            console.error('[SupabaseAdminTokenService] Error granting tokens:', error);
+            throw error;
         }
-
-        return {
-            success: true,
-            new_balance: result.new_balance
-        };
     }
 
     /**
@@ -437,7 +475,7 @@ class SupabaseAdminTokenService {
     /**
      * Log a token transaction
      */
-    async logTransaction(userId, amount, type, reference, balanceAfter) {
+    async logTransaction(userId, amount, type, reference, balanceAfter, modelId = null, apiCost = null, providerCostPer500 = null) {
         const { data, error } = await this.supabase
             .from('token_transactions')
             .insert({
@@ -445,10 +483,87 @@ class SupabaseAdminTokenService {
                 amount: amount,
                 type: type,
                 reference: reference,
-                balance_after: balanceAfter
+                balance_after: balanceAfter,
+                model_id: modelId,
+                api_cost_usd: apiCost,
+                provider_cost_per_500_tokens: providerCostPer500
             })
             .select()
             .single();
+
+        if (error) throw error;
+        return data;
+    }
+
+    /**
+     * Refund credits to user
+     */
+    async refundCredits(userId, amount, reason) {
+        const currentBalance = await this.getUserTokens(userId);
+        const newBalance = currentBalance.balance + amount;
+
+        const { data, error } = await this.supabase
+            .from('user_tokens')
+            .update({ 
+                balance: newBalance,
+                updated_at: new Date().toISOString()
+            })
+            .eq('user_id', userId);
+
+        if (error) throw error;
+
+        // Log refund transaction
+        await this.logTransaction(userId, amount, 'refund', reason, newBalance);
+
+        return { balance: newBalance, refunded: amount };
+    }
+
+    /**
+     * Log a failed transaction for admin review
+     */
+    async logFailedTransaction(userId, modelId, errorMessage, refundedCredits) {
+        const { data, error } = await this.supabase
+            .from('failed_transactions')
+            .insert({
+                user_id: userId,
+                model_id: modelId,
+                error_message: errorMessage,
+                refunded_credits: refundedCredits
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    }
+
+    /**
+     * Get failed transactions for admin review
+     */
+    async getFailedTransactions(reviewedOnly = false) {
+        let query = this.supabase
+            .from('failed_transactions')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (reviewedOnly !== null) {
+            query = query.eq('reviewed', reviewedOnly);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+        return data || [];
+    }
+
+    /**
+     * Mark failed transaction as reviewed
+     */
+    async markFailedTransactionReviewed(transactionId) {
+        const { data, error } = await this.supabase
+            .from('failed_transactions')
+            .update({ reviewed: true })
+            .eq('id', transactionId);
 
         if (error) throw error;
         return data;

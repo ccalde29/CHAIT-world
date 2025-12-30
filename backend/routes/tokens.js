@@ -155,5 +155,38 @@ module.exports = (db) => {
         }
     });
 
+    /**
+     * GET /api/tokens/failed
+     * Get failed transactions for admin review
+     * Query params: ?reviewed=true|false (optional)
+     */
+    router.get('/failed', requireAdmin, async (req, res) => {
+        try {
+            const { reviewed } = req.query;
+            const reviewedOnly = reviewed === 'true' ? true : reviewed === 'false' ? false : null;
+            
+            const transactions = await supabaseService.getFailedTransactions(reviewedOnly);
+            res.json({ failed_transactions: transactions });
+        } catch (error) {
+            console.error('[Tokens] Error getting failed transactions:', error);
+            res.status(500).json({ error: 'Failed to get failed transactions' });
+        }
+    });
+
+    /**
+     * POST /api/tokens/failed/:id/review
+     * Mark a failed transaction as reviewed
+     */
+    router.post('/failed/:id/review', requireAdmin, async (req, res) => {
+        try {
+            const { id } = req.params;
+            await supabaseService.markFailedTransactionReviewed(id);
+            res.json({ success: true, message: 'Transaction marked as reviewed' });
+        } catch (error) {
+            console.error('[Tokens] Error marking transaction as reviewed:', error);
+            res.status(500).json({ error: 'Failed to mark transaction as reviewed' });
+        }
+    });
+
     return router;
 };

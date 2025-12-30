@@ -5,8 +5,10 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, TrendingUp, Sparkles, DollarSign, Coins } from 'lucide-react';
+import { Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, TrendingUp, Sparkles, DollarSign, Coins, BarChart3, AlertCircle } from 'lucide-react';
 import TokenModelsPanel from './TokenModelsPanel';
+import TokenAnalyticsDashboard from './TokenAnalyticsDashboard';
+import FailedTransactionsPanel from './FailedTransactionsPanel';
 
 const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   const [activeTab, setActiveTab] = useState('pending');
@@ -316,6 +318,28 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
           >
             <DollarSign size={18} />
             Pricing
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'analytics'
+                ? 'text-purple-400 border-b-2 border-purple-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <BarChart3 size={18} />
+            Analytics
+          </button>
+          <button
+            onClick={() => setActiveTab('failed-transactions')}
+            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'failed-transactions'
+                ? 'text-purple-400 border-b-2 border-purple-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <AlertCircle size={18} />
+            Failed Txns
           </button>
         </div>
       </div>
@@ -747,6 +771,16 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                   ))}
                 </div>
               )
+            )}
+
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <TokenAnalyticsDashboard apiRequest={apiRequest} />
+            )}
+
+            {/* Failed Transactions Tab */}
+            {activeTab === 'failed-transactions' && (
+              <FailedTransactionsPanel apiRequest={apiRequest} />
             )}
           </>
         )}

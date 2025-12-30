@@ -206,5 +206,161 @@ module.exports = (db) => {
     }
   });
 
+  /**
+   * GET /api/token-models/analytics
+   * Get usage analytics for all token models (admin only)
+   */
+  router.get('/analytics', requireAdmin, async (req, res) => {
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+      );
+
+      // Get all token models
+      const models = await supabaseService.getTokenModels(false); // Include inactive
+
+      // Get transactions from last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { data: transactions } = await supabase
+        .from('token_transactions')
+        .select('model_id, amount, api_cost_usd, provider_cost_per_500_tokens')
+        .gte('created_at', thirtyDaysAgo.toISOString())
+        .not('model_id', 'is', null);
+
+      // Group by provider and tier
+      const analyticsData = {};
+
+      for (const model of models) {
+        const provider = model.ai_provider;
+        const tier = model.token_cost; // Will be credit tier once migrated
+
+        if (!analyticsData[provider]) {
+          analyticsData[provider] = {};
+        }
+
+        if (!analyticsData[provider][tier]) {
+          analyticsData[provider][tier] = [];
+        }
+
+        // Calculate stats for this model
+        const modelTransactions = transactions?.filter(t => t.model_id === model.id) || [];
+        const totalMessages = modelTransactions.length;
+        const totalCreditsCollected = modelTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const totalApiCost = modelTransactions.reduce((sum, t) => sum + (t.api_cost_usd || 0), 0);
+        const netProfit = (totalCreditsCollected * 0.005) - totalApiCost; // $0.005 per credit
+        const avgCostPer500 = modelTransactions.length > 0 
+          ? modelTransactions.reduce((sum, t) => sum + (t.provider_cost_per_500_tokens || 0), 0) / modelTransactions.length
+          : 0;
+
+        analyticsData[provider][tier].push({
+          id: model.id,
+          name: model.display_name,
+          model_id: model.model_id,
+          tier: model.token_cost,
+          is_active: model.is_active,
+          total_messages: totalMessages,
+          total_credits_collected: totalCreditsCollected,
+          total_api_cost_usd: totalApiCost,
+          net_profit_usd: netProfit,
+          avg_cost_per_500_tokens: avgCostPer500,
+          is_profitable: netProfit >= 0
+        });
+      }
+
+      res.json({ analytics: analyticsData });
+
+    } catch (error) {
+      console.error('[TokenModels] Analytics error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  /**
+   * GET /api/token-models/analytics/export
+   * Export analytics as CSV (admin only)
+   */
+  router.get('/analytics/export', requireAdmin, async (req, res) => {
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+      );
+
+      const models = await supabaseService.getTokenModels(false);
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const { data: transactions } = await supabase
+        .from('token_transactions')
+        .select('model_id, amount, api_cost_usd, provider_cost_per_500_tokens')
+        .gte('created_at', thirtyDaysAgo.toISOString())
+        .not('model_id', 'is', null);
+
+      // Build CSV
+      let csv = 'Provider,Tier,Model Name,Model ID,Total Messages,Credits Collected,API Cost (USD),Net Profit (USD),Avg Cost Per 500 Tokens,Profitable\n';
+
+      for (const model of models) {
+        const modelTransactions = transactions?.filter(t => t.model_id === model.id) || [];
+        const totalMessages = modelTransactions.length;
+        const totalCreditsCollected = modelTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const totalApiCost = modelTransactions.reduce((sum, t) => sum + (t.api_cost_usd || 0), 0);
+        const netProfit = (totalCreditsCollected * 0.005) - totalApiCost;
+        const avgCostPer500 = modelTransactions.length > 0 
+          ? modelTransactions.reduce((sum, t) => sum + (t.provider_cost_per_500_tokens || 0), 0) / modelTransactions.length
+          : 0;
+
+        csv += `${model.ai_provider},${model.token_cost},"${model.display_name}",${model.model_id},${totalMessages},${totalCreditsCollected},${totalApiCost.toFixed(6)},${netProfit.toFixed(6)},${avgCostPer500.toFixed(6)},${netProfit >= 0 ? 'Yes' : 'No'}\n`;
+      }
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="token-analytics-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+
+    } catch (error) {
+      console.error('[TokenModels] Export error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  /**
+   * POST /api/token-models/refresh-pricing
+   * Force refresh all pricing from provider APIs (admin only)
+   */
+  router.post('/refresh-pricing', requireAdmin, async (req, res) => {
+    try {
+      const userId = req.headers['user-id'];
+      
+      // Get admin API keys
+      const adminKeys = await supabaseService.getAdminApiKeys(userId);
+      const apiKeys = {
+        openai: adminKeys.openai_key,
+        anthropic: adminKeys.anthropic_key,
+        google: adminKeys.google_key,
+        openrouter: adminKeys.openrouter_key
+      };
+
+      const LivePricingService = require('../services/LivePricingService');
+      const pricingService = LivePricingService.getInstance();
+      
+      const results = await pricingService.refreshAllPricing(apiKeys);
+
+      res.json({ 
+        success: true, 
+        message: 'Pricing refresh completed',
+        results 
+      });
+
+    } catch (error) {
+      console.error('[TokenModels] Pricing refresh error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   return router;
 };
