@@ -16,7 +16,7 @@ module.exports = (db) => {
             const settings = await db.getUserSettings(req.userId);
             
             // Check admin status from Supabase (server-controlled)
-            const isAdmin = await supabaseService.isUserAdmin(req.userId);
+            const isAdmin = await supabaseService.isAdmin(req.userId);
             
             res.json({ ...settings, isAdmin });
         } catch (error) {

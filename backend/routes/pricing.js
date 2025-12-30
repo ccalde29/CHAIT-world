@@ -7,6 +7,8 @@ const express = require('express');
 const router = express.Router();
 const fetch = require('node-fetch');
 const { requireAdmin } = require('../middleware/adminAuth');
+const supabaseService = require('../services/SupabaseAdminTokenService');
+const LivePricingService = require('../services/LivePricingService');
 
 // Static pricing data for major providers (per 1M tokens, as of Dec 2024)
 const STATIC_PRICING = {
@@ -96,6 +98,102 @@ router.get('/', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('[Pricing] Error:', error);
     res.status(500).json({ error: 'Failed to fetch pricing data' });
+  }
+});
+
+/**
+ * GET /api/pricing/recommendations
+ * Get pricing recommendations for model tiers (admin only)
+ */
+router.get('/recommendations', requireAdmin, async (req, res) => {
+  try {
+    // Get all token models
+    const tokenModels = await supabaseService.getTokenModels(false); // include inactive
+    
+    // Get admin API keys for live pricing
+    const adminKeys = await supabaseService.getAdminApiKeys();
+    
+    // Calculate recommendations for each provider
+    const recommendations = {};
+    
+    for (const [provider, models] of Object.entries(STATIC_PRICING)) {
+      recommendations[provider] = await Promise.all(
+        models.map(async (model) => {
+          // Get live pricing (cached for 24hrs)
+          let costPer500 = null;
+          const apiKey = adminKeys[provider];
+          
+          if (apiKey && provider !== 'ollama' && provider !== 'lmstudio') {
+            try {
+              costPer500 = await LivePricingService.getPricingFor500Tokens(provider, model.id, apiKey);
+            } catch (error) {
+              // Fall back to static calculation
+              costPer500 = ((model.input + model.output) / 2) / 2000; // per 1M tokens to per 500 tokens
+            }
+          } else if (provider === 'ollama' || provider === 'lmstudio') {
+            costPer500 = 0; // Local models are free
+          } else {
+            // No API key, use static calculation
+            costPer500 = ((model.input + model.output) / 2) / 2000;
+          }
+          
+          // Calculate recommended tier (2-3x markup for profit)
+          let recommendedTier = 1;
+          if (costPer500 > 0) {
+            const targetRevenue = costPer500 * 2.5; // 2.5x markup
+            if (targetRevenue <= 0.005) recommendedTier = 1;
+            else if (targetRevenue <= 0.015) recommendedTier = 3;
+            else if (targetRevenue <= 0.025) recommendedTier = 5;
+            else recommendedTier = Math.ceil(targetRevenue / 0.005);
+          }
+          
+          // Check if this model is in your token models
+          const yourModel = tokenModels.find(tm => 
+            tm.provider === provider && 
+            (tm.model_id === model.id || tm.name.toLowerCase().includes(model.name.toLowerCase()))
+          );
+          
+          const result = {
+            ...model,
+            costPer500Tokens: costPer500,
+            recommendedTier,
+            recommendedPrice: recommendedTier * 0.005,
+            status: yourModel ? 'active' : 'available',
+            profitMargin: null
+          };
+          
+          if (yourModel) {
+            const yourPrice = yourModel.tier * 0.005;
+            const profit = yourPrice - costPer500;
+            result.yourTier = yourModel.tier;
+            result.yourPrice = yourPrice;
+            result.profit = profit;
+            result.profitMargin = costPer500 > 0 ? (profit / yourPrice) * 100 : 100;
+            result.isProfitable = profit >= 0;
+            result.modelId = yourModel.id;
+            result.isActive = yourModel.is_active;
+          }
+          
+          return result;
+        })
+      );
+    }
+    
+    res.json({
+      recommendations,
+      tierPricing: {
+        1: 0.005,
+        3: 0.015,
+        5: 0.025,
+        7: 0.035,
+        10: 0.050
+      },
+      lastUpdated: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('[Pricing] Error getting recommendations:', error);
+    res.status(500).json({ error: 'Failed to get pricing recommendations' });
   }
 });
 
