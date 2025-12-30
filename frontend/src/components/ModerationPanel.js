@@ -24,6 +24,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   const [processing, setProcessing] = useState(null);
   const [pricing, setPricing] = useState({});
   const [loadingPricing, setLoadingPricing] = useState(false);
+  const [recommendations, setRecommendations] = useState({});
   
   // User tokens state
   const [userBalances, setUserBalances] = useState([]);
@@ -63,12 +64,13 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
     }
   };
 
-  // Fetch pricing
+  // Fetch pricing recommendations
   const fetchPricing = async () => {
     setLoadingPricing(true);
     try {
-      const response = await apiRequest('/api/pricing');
-      setPricing(response.pricing || {});
+      const response = await apiRequest('/api/pricing/recommendations');
+      setRecommendations(response.recommendations || {});
+      setPricing(response.tierPricing || {});
     } catch (error) {
       console.error('Failed to fetch pricing:', error);
     } finally {
