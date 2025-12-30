@@ -4,6 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const { STRING_LIMITS } = require('../constants/defaults');
+const supabaseService = require('../services/SupabaseAdminTokenService');
 
 module.exports = (db) => {
     /**
@@ -13,7 +14,11 @@ module.exports = (db) => {
     router.get('/settings', async (req, res) => {
         try {
             const settings = await db.getUserSettings(req.userId);
-            res.json(settings);
+            
+            // Check admin status from Supabase (server-controlled)
+            const isAdmin = await supabaseService.isUserAdmin(req.userId);
+            
+            res.json({ ...settings, isAdmin });
         } catch (error) {
             console.error('Error fetching user settings:', error);
             res.status(500).json({ error: 'Failed to fetch user settings' });
