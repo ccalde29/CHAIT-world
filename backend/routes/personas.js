@@ -565,6 +565,16 @@ ${persona.personality}`;
       console.log(`[Token] Using token model: ${tokenModel.display_name} (${tokenModel.ai_provider}/${tokenModel.model_id}) - Cost: ${modelCost} tokens`);
     }
 
+    // Prepare settings object with both ollama and lmstudio configurations
+    const localProviderSettings = {
+      ...settings?.ollamaSettings,
+      baseUrl: settings?.ollamaSettings?.baseUrl || 'http://localhost:11434',
+      lmStudioSettings: {
+        ...settings?.lmStudioSettings,
+        baseUrl: settings?.lmStudioSettings?.baseUrl || 'http://127.0.0.1:1234'
+      }
+    };
+
     const response = await AIProviderService.generateResponse(
       personaAsCharacter,
       [
@@ -572,7 +582,7 @@ ${persona.personality}`;
         ...messages.slice(-10) // Last 10 messages for context
       ],
       useServerKeys ? adminApiKeys : (settings?.apiKeys || {}),
-      settings?.ollamaSettings || {},
+      localProviderSettings,
       { useServerKeys: false }
     );
 

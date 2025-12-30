@@ -448,6 +448,9 @@ class AIProviderService {
         case 'lmstudio':
           return await this.getLMStudioModels(lmStudioSettings);
 
+        case 'token':
+          return await this.getTokenModels();
+
         case 'custom':
           return await this.getCustomModels();
 
@@ -710,6 +713,23 @@ class AIProviderService {
   /**
    * Get server API keys from environment (for token models)
    */
+  
+  static async getTokenModels() {
+    try {
+      const SupabaseAdminTokenService = require('./SupabaseAdminTokenService');
+      
+      const models = await SupabaseAdminTokenService.getTokenModels(true); // true = active only
+      
+      return (models || []).map(m => ({
+        id: m.id,
+        name: `${m.display_name} (${m.token_cost} tokens)`,
+        description: m.description
+      }));
+    } catch (error) {
+      console.error('Error fetching token models:', error);
+      return [];
+    }
+  }
 }
 
 module.exports = AIProviderService;
