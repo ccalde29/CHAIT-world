@@ -727,16 +727,16 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             {activeTab === 'pricing' && (
               loadingPricing ? (
                 <div className="flex items-center justify-center h-64">
-                  <div className="text-gray-400">Loading pricing recommendations...</div>
+                  <div className="text-gray-400">Loading pricing data...</div>
                 </div>
               ) : (
                 <div className="space-y-6">
                   {/* Header */}
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start mb-2">
                     <div>
-                      <h3 className="text-xl font-bold text-white mb-2">Model Pricing & Tier Recommendations</h3>
+                      <h3 className="text-xl font-bold text-white mb-2">Model Pricing Calculator</h3>
                       <p className="text-sm text-gray-400">
-                        Live API costs with profitability analysis for each model
+                        Based on 500 tokens per message, 100 messages per session
                       </p>
                     </div>
                     <button
@@ -747,19 +747,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                     </button>
                   </div>
 
-                  {/* Tier Reference */}
-                  <div className="bg-gray-800/50 border border-white/10 rounded-lg p-4">
-                    <h4 className="text-sm font-semibold text-white mb-2">Tier Pricing Reference</h4>
-                    <div className="flex gap-4 text-xs">
-                      <span className="text-gray-400">1x = $0.005</span>
-                      <span className="text-gray-400">3x = $0.015</span>
-                      <span className="text-gray-400">5x = $0.025</span>
-                      <span className="text-gray-400">7x = $0.035</span>
-                      <span className="text-gray-400">10x = $0.050</span>
-                    </div>
-                  </div>
-
-                  {/* Provider Sections */}
+                  {/* Provider Tables */}
                   {Object.entries(recommendations).map(([provider, models]) => {
                     const providerLabel = {
                       'openrouter': 'OpenRouter',
@@ -768,166 +756,53 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                       'google': 'Google AI'
                     }[provider] || provider;
 
-                    // Separate active and available models
-                    const activeModels = models.filter(m => m.status === 'active');
-                    const availableModels = models.filter(m => m.status === 'available');
-
                     return (
                       <div key={provider} className="bg-gray-800 border border-white/10 rounded-lg overflow-hidden">
-                        <div className="bg-gray-800/50 px-4 py-3 border-b border-white/10">
+                        <div className="bg-gray-900/50 px-4 py-3 border-b border-white/10">
                           <h4 className="text-lg font-semibold text-white">{providerLabel}</h4>
+                          <p className="text-xs text-gray-500 mt-1">{models.length} models</p>
                         </div>
 
-                        <div className="p-4 space-y-4">
-                          {/* Your Active Models */}
-                          {activeModels.length > 0 && (
-                            <div>
-                              <h5 className="text-sm font-semibold text-purple-400 mb-3">Your Active Models</h5>
-                              <div className="space-y-2">
-                                {activeModels.map((model, idx) => (
-                                  <div
-                                    key={idx}
-                                    className={`bg-gray-900/50 rounded-lg p-3 border ${
-                                      model.isProfitable ? 'border-green-500/30' : 'border-red-500/30'
-                                    }`}
-                                  >
-                                    <div className="flex justify-between items-start mb-2">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-white font-medium">{model.name}</span>
-                                          <span className={`text-xs px-2 py-0.5 rounded ${
-                                            model.isProfitable ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                                          }`}>
-                                            Tier {model.yourTier}x
-                                          </span>
-                                          {!model.isActive && (
-                                            <span className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-400">
-                                              Inactive
-                                            </span>
-                                          )}
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1">{model.id}</p>
-                                      </div>
-                                      <div className={`text-right ${model.isProfitable ? 'text-green-400' : 'text-red-400'}`}>
-                                        <div className="text-lg font-bold">
-                                          {model.profit >= 0 ? '+' : ''}{(model.profit * 1000).toFixed(2)}¢
-                                        </div>
-                                        <div className="text-xs">profit/msg</div>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-3 gap-3 text-xs">
-                                      <div>
-                                        <p className="text-gray-400">API Cost</p>
-                                        <p className="text-white font-medium">${model.costPer500Tokens.toFixed(4)}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-gray-400">You Charge</p>
-                                        <p className="text-white font-medium">${model.yourPrice.toFixed(4)}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-gray-400">Margin</p>
-                                        <p className={`font-medium ${model.profitMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                          {model.profitMargin.toFixed(0)}%
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    {/* Volume Projection - 100 messages */}
-                                    <div className="mt-3 pt-3 border-t border-white/10">
-                                      <p className="text-xs text-gray-400 mb-2">At 100 messages:</p>
-                                      <div className="grid grid-cols-2 gap-3 text-xs">
-                                        <div>
-                                          <p className="text-gray-500">User Pays</p>
-                                          <p className="text-white font-medium">${(model.yourPrice * 100).toFixed(2)}</p>
-                                        </div>
-                                        <div>
-                                          <p className="text-gray-500">Your Profit</p>
-                                          <p className={`font-bold ${model.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                            ${(model.profit * 100).toFixed(2)}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {!model.isProfitable && (
-                                      <div className="mt-2 pt-2 border-t border-red-500/20">
-                                        <p className="text-xs text-red-400">
-                                          ⚠️ Suggestion: Increase to Tier {model.recommendedTier}x or higher
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Available Models */}
-                          {availableModels.length > 0 && (
-                            <div>
-                              <h5 className="text-sm font-semibold text-gray-400 mb-3">
-                                Available Models {activeModels.length > 0 ? '(Not Created Yet)' : ''}
-                              </h5>
-                              <div className="space-y-2">
-                                {availableModels.map((model, idx) => (
-                                  <div key={idx} className="bg-gray-900/30 rounded-lg p-3 border border-white/5">
-                                    <div className="flex justify-between items-start mb-2">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-white">{model.name}</span>
-                                          <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                                            Recommended: Tier {model.recommendedTier}x
-                                          </span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1">{model.id}</p>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="grid grid-cols-2 gap-3 text-xs">
-                                      <div>
-                                        <p className="text-gray-400">API Cost (per 500 tokens)</p>
-                                        <p className="text-white font-medium">
-                                          {model.costPer500Tokens === 0 ? 'FREE' : `$${model.costPer500Tokens.toFixed(4)}`}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <p className="text-gray-400">Recommended Price</p>
-                                        <p className="text-blue-400 font-medium">
-                                          {model.recommendedPrice === 0 ? 'FREE' : `$${model.recommendedPrice.toFixed(4)}`}
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    {model.costPer500Tokens > 0 && (
-                                      <div className="mt-3 pt-3 border-t border-white/10">
-                                        <p className="text-xs text-gray-400 mb-2">Profit at 100 messages:</p>
-                                        <div className="grid grid-cols-2 gap-3 text-xs">
-                                          <div>
-                                            <p className="text-gray-500">User Pays</p>
-                                            <p className="text-white font-medium">${(model.recommendedPrice * 100).toFixed(2)}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-gray-500">Your Profit</p>
-                                            <p className="text-green-400 font-bold">
-                                              ${((model.recommendedPrice - model.costPer500Tokens) * 100).toFixed(2)}
-                                            </p>
-                                          </div>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-2">
-                                          (2.5x markup: ~{(((model.recommendedPrice - model.costPer500Tokens) / model.recommendedPrice) * 100).toFixed(0)}% profit margin)
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-900/50 border-b border-white/10">
+                              <tr>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400">Model Name</th>
+                                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400">Per Message<br/><span className="text-gray-600">(500 tokens)</span></th>
+                                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400">Per 100 Messages<br/><span className="text-gray-600">(50K tokens)</span></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {models.map((model, idx) => (
+                                <tr key={idx} className="border-b border-white/5 hover:bg-white/5">
+                                  <td className="py-3 px-4">
+                                    <span className="text-sm text-white">{model.name}</span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <span className="text-sm text-gray-300">
+                                      ${model.costPer500Tokens.toFixed(4)}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <span className="text-sm font-medium text-white">
+                                      ${(model.costPer500Tokens * 100).toFixed(2)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     );
                   })}
+
+                  {Object.keys(recommendations).length === 0 && (
+                    <div className="text-center py-12 text-gray-400">
+                      <DollarSign size={48} className="mx-auto mb-4 opacity-50" />
+                      <p>No pricing data available</p>
+                    </div>
+                  )}
                 </div>
               )
             )}

@@ -37,6 +37,20 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
   const [currentInterest, setCurrentInterest] = useState('');
   const [availableModels, setAvailableModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [userSettings, setUserSettings] = useState(null);
+
+  // Load user settings for Ollama/LM Studio configuration
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await apiRequest('/api/user/settings');
+        setUserSettings(settings);
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    };
+    loadSettings();
+  }, [apiRequest]);
 
   const colorOptions = [
     { name: 'Blue Indigo', value: 'from-blue-500 to-indigo-500' },
@@ -223,9 +237,19 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
 
       setLoadingModels(true);
       try {
+        const requestBody = { provider: formData.ai_provider };
+        
+        // Add settings for Ollama and LM Studio
+        if (formData.ai_provider === 'ollama' && userSettings?.ollamaSettings) {
+          requestBody.ollamaSettings = userSettings.ollamaSettings;
+        }
+        if (formData.ai_provider === 'lmstudio' && userSettings?.lmStudioSettings) {
+          requestBody.lmStudioSettings = userSettings.lmStudioSettings;
+        }
+
         const data = await apiRequest('/api/providers/models', {
           method: 'POST',
-          body: JSON.stringify({ provider: formData.ai_provider })
+          body: JSON.stringify(requestBody)
         });
 
         setAvailableModels(data.models || []);
@@ -238,7 +262,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
     };
 
     loadModels();
-  }, [formData.ai_provider, apiRequest]);
+  }, [formData.ai_provider, apiRequest, userSettings]);
 
   if (view === 'list') {
     const containerClass = fullScreen 
@@ -415,7 +439,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6" style={{ maxHeight: 'calc(100vh - 150px)' }}>
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
