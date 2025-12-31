@@ -241,15 +241,17 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
   }, [formData.ai_provider, apiRequest]);
 
   if (view === 'list') {
+    const containerClass = fullScreen 
+      ? "flex-1 bg-gray-900 flex flex-col overflow-hidden" 
+      : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4";
+    
+    const innerClass = fullScreen 
+      ? "flex-1 flex flex-col overflow-hidden" 
+      : "bg-slate-800 rounded-2xl border border-white/10 w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col";
+
     return (
-      <div className={fullScreen 
-        ? "h-full bg-gray-900 overflow-y-auto" 
-        : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      }>
-        <div className={fullScreen 
-          ? "h-full" 
-          : "bg-slate-800 rounded-2xl border border-white/10 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
-        }>
+      <div className={containerClass}>
+        <div className={innerClass}>
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/10">
             <div className="flex items-center gap-3">
@@ -265,7 +267,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {/* Info Box */}
             <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
               <h4 className="text-sm font-medium text-blue-300 mb-2">💡 What are Personas?</h4>
@@ -385,15 +387,17 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
   }
 
   // Edit View
+  const containerClass = fullScreen 
+    ? "flex-1 bg-gray-900 flex flex-col overflow-hidden" 
+    : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4";
+  
+  const innerClass = fullScreen 
+    ? "flex-1 flex flex-col overflow-hidden" 
+    : "bg-slate-800 rounded-2xl border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col";
+
   return (
-    <div className={fullScreen 
-      ? "h-full bg-gray-900 overflow-y-auto" 
-      : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-    }>
-      <div className={fullScreen 
-        ? "h-full" 
-        : "bg-slate-800 rounded-2xl border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
-      }>
+    <div className={containerClass}>
+      <div className={innerClass}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
@@ -411,7 +415,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">

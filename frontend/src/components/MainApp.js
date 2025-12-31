@@ -493,6 +493,8 @@ const MainApp = () => {
               fullScreen={true}
               characters={charactersState.characters}
               scenes={charactersState.scenarios}
+              user={user}
+              apiRequest={apiRequest}
               onAddCharacter={() => {
                 setEditingCharacter(null);
                 setShowCharacterEditor(true);

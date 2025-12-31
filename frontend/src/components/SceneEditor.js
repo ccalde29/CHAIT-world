@@ -39,6 +39,20 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
   const [error, setError] = useState(null);
   const [narratorModels, setNarratorModels] = useState([]);
   const [loadingNarratorModels, setLoadingNarratorModels] = useState(false);
+  const [userSettings, setUserSettings] = useState(null);
+
+  // Load user settings for Ollama/LM Studio configuration
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await apiRequest('/api/user/settings');
+        setUserSettings(settings);
+      } catch (error) {
+        console.error('Error loading settings:', error);
+      }
+    };
+    loadSettings();
+  }, [apiRequest]);
 
   // Initialize form when editing scene is provided
   useEffect(() => {
@@ -70,9 +84,19 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
 
       setLoadingNarratorModels(true);
       try {
+        const requestBody = { provider: formData.narrator_ai_provider };
+        
+        // Add settings for Ollama and LM Studio
+        if (formData.narrator_ai_provider === 'ollama' && userSettings?.ollamaSettings) {
+          requestBody.ollamaSettings = userSettings.ollamaSettings;
+        }
+        if (formData.narrator_ai_provider === 'lmstudio' && userSettings?.lmStudioSettings) {
+          requestBody.lmStudioSettings = userSettings.lmStudioSettings;
+        }
+
         const data = await apiRequest('/api/providers/models', {
           method: 'POST',
-          body: JSON.stringify({ provider: formData.narrator_ai_provider })
+          body: JSON.stringify(requestBody)
         });
 
         setNarratorModels(data.models || []);
@@ -85,7 +109,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
     };
 
     loadModels();
-  }, [formData.narrator_ai_provider, apiRequest]);
+  }, [formData.narrator_ai_provider, apiRequest, userSettings]);
 
   // ============================================================================
   // FORM HANDLING
