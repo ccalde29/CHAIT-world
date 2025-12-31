@@ -369,7 +369,7 @@ class SupabaseAdminTokenService {
     /**
      * Deduct tokens from user
      */
-    async deductTokens(userId, amount, reference = null) {
+    async deductTokens(userId, amount, reference = null, modelId = null, apiCost = null, providerCostPer500 = null) {
         try {
             // Get current balance
             const { data: currentTokens, error: fetchError } = await this.supabase
@@ -399,8 +399,8 @@ class SupabaseAdminTokenService {
 
             if (updateError) throw updateError;
 
-            // Log transaction (negative amount for deduction)
-            await this.logTransaction(userId, -amount, 'deduction', reference, newBalance);
+            // Log transaction (negative amount for deduction) with analytics data
+            await this.logTransaction(userId, -amount, 'usage', reference, newBalance, modelId, apiCost, providerCostPer500);
 
             return {
                 success: true,
@@ -476,6 +476,17 @@ class SupabaseAdminTokenService {
      * Log a token transaction
      */
     async logTransaction(userId, amount, type, reference, balanceAfter, modelId = null, apiCost = null, providerCostPer500 = null) {
+        console.log(`[SupabaseAdminTokenService] Logging transaction:`, {
+            userId,
+            amount,
+            type,
+            reference,
+            balanceAfter,
+            modelId,
+            apiCost,
+            providerCostPer500
+        });
+        
         const { data, error } = await this.supabase
             .from('token_transactions')
             .insert({
@@ -491,7 +502,12 @@ class SupabaseAdminTokenService {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error('[SupabaseAdminTokenService] Error logging transaction:', error);
+            throw error;
+        }
+        
+        console.log(`[SupabaseAdminTokenService] Transaction logged successfully:`, data.id);
         return data;
     }
 

@@ -314,11 +314,12 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         let modelCost = null;
         let useServerKeys = false;
         let adminApiKeys = {};
+        let tokenModel = null; // Declare tokenModel in outer scope for analytics
         
         if (char.ai_provider === 'token') {
           // Resolve token model from Supabase
           const allTokenModels = await supabaseTokenService.getTokenModels(true);
-          const tokenModel = allTokenModels.find(m => m.id === char.ai_model || m.name === char.ai_model);
+          tokenModel = allTokenModels.find(m => m.id === char.ai_model || m.name === char.ai_model);
           
           if (!tokenModel) {
             throw new Error(`Token model not found: ${char.ai_model}`);
@@ -372,11 +373,16 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
         // Deduct tokens if it was a token model
         if (useServerKeys && modelCost > 0) {
+          // Calculate estimated API cost (very rough estimate: $0.005 per credit = $0.001 per 100 tokens)
+          const estimatedApiCost = (modelCost / 500) * (tokenModel.provider_cost_per_500_tokens || 0);
+          
           const result = await supabaseTokenService.deductTokens(
             userId,
             modelCost,
-            'chat_response',
-            `Chat with ${char.name}`
+            `Chat with ${char.name}`,
+            tokenModel.id, // model_id for analytics
+            estimatedApiCost, // api_cost_usd
+            tokenModel.provider_cost_per_500_tokens // provider_cost_per_500_tokens
           );
           console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${result.new_balance}`);
         }

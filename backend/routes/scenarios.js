@@ -39,7 +39,7 @@ module.exports = (db) => {
 
             // Validate narrator settings if enabled
             if (narrator_enabled) {
-                const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom'];
+                const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom', 'token'];
                 if (!narrator_ai_provider || !validProviders.includes(narrator_ai_provider)) {
                     return res.status(400).json({ error: 'Valid narrator AI provider is required when narrator is enabled' });
                 }
@@ -106,7 +106,7 @@ module.exports = (db) => {
 
             // Validate narrator settings if enabled
             if (narrator_enabled) {
-                const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom'];
+                const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom', 'token'];
                 if (!narrator_ai_provider || !validProviders.includes(narrator_ai_provider)) {
                     return res.status(400).json({ error: 'Valid narrator AI provider is required when narrator is enabled' });
                 }
@@ -221,11 +221,12 @@ module.exports = (db) => {
             let modelCost = null;
             let useServerKeys = false;
             let adminApiKeys = {};
+            let tokenModel = null; // Declare tokenModel in outer scope for analytics
             
             if (scene.narrator_ai_provider === 'token') {
               // Resolve token model from Supabase
               const allTokenModels = await supabaseTokenService.getTokenModels(true);
-              const tokenModel = allTokenModels.find(m => m.id === scene.narrator_ai_model || m.name === scene.narrator_ai_model);
+              tokenModel = allTokenModels.find(m => m.id === scene.narrator_ai_model || m.name === scene.narrator_ai_model);
               
               if (!tokenModel) {
                 return res.status(404).json({ 
@@ -308,11 +309,16 @@ Keep responses brief (1-2 sentences). Focus on what's happening in the scene, no
 
             // Deduct tokens if it was a token model
             if (useServerKeys && modelCost > 0) {
+              // Calculate estimated API cost
+              const estimatedApiCost = (modelCost / 500) * (tokenModel.provider_cost_per_500_tokens || 0);
+              
               const result = await supabaseTokenService.deductTokens(
                 req.userId,
                 modelCost,
-                'narrator_response',
-                `Narrator in ${scene.name}`
+                `Narrator in ${scene.name}`,
+                tokenModel.id, // model_id for analytics
+                estimatedApiCost, // api_cost_usd
+                tokenModel.provider_cost_per_500_tokens // provider_cost_per_500_tokens
               );
               console.log(`[Narrator Token] Deducted ${modelCost} tokens. New balance: ${result.new_balance}`);
             }

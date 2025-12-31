@@ -225,12 +225,19 @@ module.exports = (db) => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const { data: transactions } = await supabase
+      const { data: transactions, error: txError } = await supabase
         .from('token_transactions')
-        .select('model_id, amount, api_cost_usd, provider_cost_per_500_tokens')
+        .select('model_id, amount, api_cost_usd, provider_cost_per_500_tokens, type, created_at')
+        .eq('type', 'usage')
         .gte('created_at', thirtyDaysAgo.toISOString())
         .not('model_id', 'is', null);
 
+      if (txError) {
+        console.error('[TokenModels] Error fetching transactions:', txError);
+      }
+
+      console.log(`[TokenModels] Found ${transactions?.length || 0} usage transactions with model_id in last 30 days`);
+      
       // Group by provider and tier
       const analyticsData = {};
 

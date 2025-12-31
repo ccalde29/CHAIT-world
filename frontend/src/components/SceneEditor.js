@@ -193,6 +193,12 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
     setError(null);
 
     try {
+      // Convert 'local' provider to 'ollama' if somehow present
+      let narratorProvider = formData.narrator_ai_provider;
+      if (narratorProvider === 'local') {
+        narratorProvider = 'ollama';
+      }
+      
       const sceneData = {
         ...formData,
         name: formData.name.trim(),
@@ -200,7 +206,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
         initial_message: formData.initial_message.trim(),
         atmosphere: formData.atmosphere.trim() || 'neutral',
         narrator_enabled: formData.narrator_enabled,
-        narrator_ai_provider: formData.narrator_ai_provider,
+        narrator_ai_provider: narratorProvider,
         narrator_ai_model: formData.narrator_ai_model,
         narrator_temperature: formData.narrator_temperature,
         narrator_max_tokens: formData.narrator_max_tokens,
@@ -227,6 +233,13 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
 
   const startEdit = (scene) => {
     setEditingScene(scene);
+    
+    // Convert legacy 'local' provider to 'ollama'
+    let narratorProvider = scene.narrator_ai_provider || 'openai';
+    if (narratorProvider === 'local') {
+      narratorProvider = 'ollama';
+    }
+    
     setFormData({
       name: scene.name || '',
       description: scene.description || '',
@@ -236,7 +249,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
       background_image_filename: scene.background_image_filename || null,
       uses_custom_background: scene.uses_custom_background || false,
       narrator_enabled: scene.narrator_enabled || false,
-      narrator_ai_provider: scene.narrator_ai_provider || 'openai',
+      narrator_ai_provider: narratorProvider,
       narrator_ai_model: scene.narrator_ai_model || 'gpt-4o-mini',
       narrator_temperature: scene.narrator_temperature !== undefined ? scene.narrator_temperature : 0.7,
       narrator_max_tokens: scene.narrator_max_tokens !== undefined ? scene.narrator_max_tokens : 100,

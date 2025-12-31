@@ -514,11 +514,12 @@ ${persona.personality}`;
     let modelCost = null;
     let useServerKeys = false;
     let adminApiKeys = {};
+    let tokenModel = null; // Declare tokenModel in outer scope for analytics
     
     if (persona.ai_provider === 'token') {
       // Resolve token model from Supabase
       const allTokenModels = await supabaseTokenService.getTokenModels(true);
-      const tokenModel = allTokenModels.find(m => m.id === persona.ai_model || m.name === persona.ai_model);
+      tokenModel = allTokenModels.find(m => m.id === persona.ai_model || m.name === persona.ai_model);
       
       if (!tokenModel) {
         return res.status(404).json({ error: `Token model not found: ${persona.ai_model}` });
@@ -588,11 +589,16 @@ ${persona.personality}`;
 
     // Deduct tokens if it was a token model
     if (useServerKeys && modelCost > 0) {
+      // Calculate estimated API cost
+      const estimatedApiCost = (modelCost / 500) * (tokenModel.provider_cost_per_500_tokens || 0);
+      
       const result = await supabaseTokenService.deductTokens(
         userId,
         modelCost,
-        'persona_response',
-        `Persona ${persona.name}`
+        `Persona ${persona.name}`,
+        tokenModel.id, // model_id for analytics
+        estimatedApiCost, // api_cost_usd
+        tokenModel.provider_cost_per_500_tokens // provider_cost_per_500_tokens
       );
       console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${result.new_balance}`);
     }

@@ -442,8 +442,14 @@ const CharacterEditorV15 = ({
     setError(null);
     
     try {
+      // Convert 'local' provider to actual provider (ollama or lmstudio)
+      const actualProvider = formData.ai_provider === 'local' 
+        ? (formData.localType || 'ollama') 
+        : formData.ai_provider;
+
       const characterData = {
         ...formData,
+        ai_provider: actualProvider,
         tags: formData.tags.length > 0 ? formData.tags : ['custom']
       };
       
