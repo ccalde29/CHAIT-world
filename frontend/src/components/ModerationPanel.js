@@ -833,6 +833,23 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                                       </div>
                                     </div>
 
+                                    {/* Volume Projection - 100 messages */}
+                                    <div className="mt-3 pt-3 border-t border-white/10">
+                                      <p className="text-xs text-gray-400 mb-2">At 100 messages:</p>
+                                      <div className="grid grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                          <p className="text-gray-500">User Pays</p>
+                                          <p className="text-white font-medium">${(model.yourPrice * 100).toFixed(2)}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-gray-500">Your Profit</p>
+                                          <p className={`font-bold ${model.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            ${(model.profit * 100).toFixed(2)}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+
                                     {!model.isProfitable && (
                                       <div className="mt-2 pt-2 border-t border-red-500/20">
                                         <p className="text-xs text-red-400">
@@ -883,8 +900,23 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                                     </div>
 
                                     {model.costPer500Tokens > 0 && (
-                                      <div className="mt-2 text-xs text-gray-400">
-                                        Expected profit: ~{((model.recommendedPrice - model.costPer500Tokens) * 1000).toFixed(1)}¢ per message (2.5x markup)
+                                      <div className="mt-3 pt-3 border-t border-white/10">
+                                        <p className="text-xs text-gray-400 mb-2">Profit at 100 messages:</p>
+                                        <div className="grid grid-cols-2 gap-3 text-xs">
+                                          <div>
+                                            <p className="text-gray-500">User Pays</p>
+                                            <p className="text-white font-medium">${(model.recommendedPrice * 100).toFixed(2)}</p>
+                                          </div>
+                                          <div>
+                                            <p className="text-gray-500">Your Profit</p>
+                                            <p className="text-green-400 font-bold">
+                                              ${((model.recommendedPrice - model.costPer500Tokens) * 100).toFixed(2)}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-2">
+                                          (2.5x markup: ~{(((model.recommendedPrice - model.costPer500Tokens) / model.recommendedPrice) * 100).toFixed(0)}% profit margin)
+                                        </p>
                                       </div>
                                     )}
                                   </div>
