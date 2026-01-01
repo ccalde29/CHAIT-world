@@ -176,10 +176,13 @@ class MobileDatabaseService {
         user_id TEXT NOT NULL,
         memory_type TEXT,
         content TEXT NOT NULL,
-        importance REAL DEFAULT 0.5,
+        importance_score REAL DEFAULT 0.5,
         access_count INTEGER DEFAULT 0,
-        last_accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        last_accessed DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        target_type TEXT DEFAULT 'user',
+        target_entity TEXT,
+        related_session_id TEXT
       );
 
       CREATE TABLE IF NOT EXISTS character_relationships (
@@ -188,14 +191,59 @@ class MobileDatabaseService {
         user_id TEXT NOT NULL,
         target_type TEXT NOT NULL,
         target_id TEXT NOT NULL,
-        relationship_type TEXT,
+        relationship_type TEXT DEFAULT 'neutral',
         trust_level REAL DEFAULT 0.5,
-        familiarity_level REAL DEFAULT 0.5,
+        familiarity_level REAL DEFAULT 0.1,
         emotional_bond REAL DEFAULT 0.0,
+        last_interaction DATETIME DEFAULT CURRENT_TIMESTAMP,
+        interaction_count INTEGER DEFAULT 1,
         custom_context TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(character_id, target_type, target_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS character_learning (
+        id TEXT PRIMARY KEY,
+        character_id TEXT NOT NULL,
+        learning_type TEXT CHECK(learning_type IN ('communication_style', 'topic_preference', 'emotional_response', 'humor_style')),
+        pattern_data TEXT NOT NULL,
+        confidence_score REAL DEFAULT 0.5,
+        usage_count INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(character_id, user_id, target_id)
+        UNIQUE(character_id, learning_type)
+      );
+
+      CREATE TABLE IF NOT EXISTS character_topic_engagement (
+        id TEXT PRIMARY KEY,
+        character_id TEXT NOT NULL,
+        topic TEXT NOT NULL,
+        interest_level REAL DEFAULT 0.5,
+        times_discussed INTEGER DEFAULT 1,
+        last_discussed DATETIME DEFAULT CURRENT_TIMESTAMP,
+        emotional_association REAL DEFAULT 0.0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(character_id, topic)
+      );
+
+      CREATE TABLE IF NOT EXISTS user_settings_local (
+        id TEXT PRIMARY KEY,
+        user_id TEXT UNIQUE,
+        api_keys TEXT,
+        ollama_settings TEXT DEFAULT '{"baseUrl": "http://localhost:11434"}',
+        lmstudio_settings TEXT DEFAULT '{"baseUrl": "http://localhost:1234"}',
+        default_provider TEXT DEFAULT 'openai',
+        default_model TEXT,
+        active_persona_id TEXT,
+        is_admin INTEGER DEFAULT 0,
+        auto_approve_characters INTEGER DEFAULT 0,
+        admin_system_prompt TEXT,
+        group_dynamics_mode TEXT DEFAULT 'natural',
+        message_delay INTEGER DEFAULT 1200,
+        use_ai_memory_extraction INTEGER DEFAULT 0,
+        preferences TEXT DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `;
   }
