@@ -13,12 +13,15 @@ import {
   LogOut,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Lock,
   Shield,
   Trash2,
-  Coins
+  Coins,
+  Menu
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { Capacitor } from '@capacitor/core';
 
 const NavigationSidebar = ({
   apiRequest,
@@ -38,6 +41,10 @@ const NavigationSidebar = ({
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showChatHistory, setShowChatHistory] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    // Auto-collapse on mobile by default
+    return Capacitor.isNativePlatform() || window.innerWidth < 768;
+  });
 
   // Load chat sessions function
   const loadSessions = async () => {
@@ -116,14 +123,58 @@ const NavigationSidebar = ({
     } else {
       onNavigate(item.id);
     }
+    // Auto-collapse on mobile after navigation
+    if (Capacitor.isNativePlatform() || window.innerWidth < 768) {
+      setIsCollapsed(true);
+    }
   };
+
+  // Collapsed view
+  if (isCollapsed) {
+    return (
+      <div className="w-12 bg-slate-900 border-r border-white/10 flex flex-col h-screen items-center py-4">
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="p-2 text-gray-400 hover:text-white transition-colors mb-4"
+          title="Expand sidebar"
+        >
+          <Menu size={20} />
+        </button>
+        
+        <button
+          onClick={onNewChat}
+          className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors mb-4"
+          title="New Chat"
+        >
+          <Plus size={20} />
+        </button>
+        
+        {sessions.length > 0 && (
+          <div className="mt-2 bg-red-500/20 text-red-300 text-xs px-2 py-1 rounded-full">
+            {sessions.length}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="w-64 bg-slate-900 border-r border-white/10 flex flex-col h-screen">
       {/* Header */}
       <div className="p-4 border-b border-white/10">
-        <h1 className="text-xl font-bold text-white">CHAIT World</h1>
-        <p className="text-xs text-gray-400">Local AI Chat</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-white">CHAIT World</h1>
+            <p className="text-xs text-gray-400">Local AI Chat</p>
+          </div>
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="p-1 text-gray-400 hover:text-white transition-colors md:hidden"
+            title="Collapse sidebar"
+          >
+            <ChevronLeft size={20} />
+          </button>
+        </div>
       </div>
 
       {/* New Chat Button */}

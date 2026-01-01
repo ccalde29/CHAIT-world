@@ -84,6 +84,7 @@ const CommunityHub = ({
   const loadCommunityCharacters = async (reset = false) => {
     try {
       setLoading(true);
+      setOfflineError(null);
 
       const params = new URLSearchParams({
         limit: LIMIT,
@@ -121,6 +122,7 @@ const CommunityHub = ({
   const loadCommunityScenes = async (reset = false) => {
     try {
       setLoading(true);
+      setOfflineError(null);
 
       const params = new URLSearchParams({
         limit: LIMIT,
