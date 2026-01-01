@@ -4,6 +4,10 @@ const config: CapacitorConfig = {
   appId: 'com.chaitworld.app',
   appName: 'CHAIT World',
   webDir: 'build',
+  server: {
+    iosScheme: 'chaitworld',
+    androidScheme: 'chaitworld'
+  },
   plugins: {
     CapacitorSQLite: {
       iosDatabaseLocation: 'Library/CapacitorDatabase',

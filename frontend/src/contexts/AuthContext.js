@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { Capacitor } from '@capacitor/core';
 
 const AuthContext = createContext();
 
@@ -57,10 +58,17 @@ export const AuthProvider = ({ children }) => {
   const signInWithGoogle = async () => {
     try {
       setError(null);
+      
+      // Detect platform and set appropriate redirect URL
+      const isNative = Capacitor.isNativePlatform();
+      const redirectTo = isNative 
+        ? 'chaitworld://auth/callback'
+        : window.location.origin;
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo
         }
       });
       if (error) throw error;
