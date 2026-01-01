@@ -122,9 +122,78 @@ class LocalDatabaseService {
                 this.db.exec("ALTER TABLE user_settings_local ADD COLUMN auto_approve_characters INTEGER DEFAULT 0");
             }
 
-            // Create token system tables if they don't exist
+            if (!columnNames.includes('use_ai_memory_extraction')) {
+                console.log('Adding use_ai_memory_extraction column to user_settings_local');
+                this.db.exec("ALTER TABLE user_settings_local ADD COLUMN use_ai_memory_extraction INTEGER DEFAULT 0");
+            }
+
+            // Add target tracking columns to character_memories table
+            const memTableInfo = this.db.prepare("PRAGMA table_info(character_memories)").all();
+            const memColumnNames = memTableInfo.map(col => col.name);
+
+            if (!memColumnNames.includes('target_type')) {
+                console.log('Adding target_type and target_entity to character_memories');
+                this.db.exec(`
+                    ALTER TABLE character_memories ADD COLUMN target_type TEXT DEFAULT 'user' CHECK(target_type IN ('user', 'character', 'general'));
+                `);
+            }
+
+            if (!memColumnNames.includes('target_entity')) {
+                this.db.exec(`
+                    ALTER TABLE character_memories ADD COLUMN target_entity TEXT;
+                `);
+            }
+
+            // Create index for character-to-character memories
+            if (!memColumnNames.includes('target_type')) {
+                this.db.exec(`
+                    CREATE INDEX IF NOT EXISTS idx_memories_target ON character_memories(target_type, target_entity);
+                `);
+            }
+
+            // Create memory system tables if they don't exist
             const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
             const tableNames = tables.map(t => t.name);
+
+            if (!tableNames.includes('character_learning')) {
+                console.log('Creating character_learning table');
+                this.db.exec(`
+                    CREATE TABLE character_learning (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        character_id TEXT NOT NULL,
+                        learning_type TEXT CHECK(learning_type IN ('communication_style', 'topic_preference', 'emotional_response', 'humor_style')),
+                        pattern_data TEXT NOT NULL,
+                        confidence_score REAL DEFAULT 0.5 CHECK(confidence_score >= 0 AND confidence_score <= 1),
+                        usage_count INTEGER DEFAULT 0,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+                        UNIQUE(character_id, learning_type)
+                    );
+                    CREATE INDEX idx_learning_character ON character_learning(character_id);
+                    CREATE INDEX idx_learning_type ON character_learning(learning_type);
+                `);
+            }
+
+            if (!tableNames.includes('character_topic_engagement')) {
+                console.log('Creating character_topic_engagement table');
+                this.db.exec(`
+                    CREATE TABLE character_topic_engagement (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        character_id TEXT NOT NULL,
+                        topic TEXT NOT NULL,
+                        interest_level REAL DEFAULT 0.5 CHECK(interest_level >= 0 AND interest_level <= 1),
+                        times_discussed INTEGER DEFAULT 1,
+                        last_discussed DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        emotional_association REAL DEFAULT 0.0 CHECK(emotional_association >= -1 AND emotional_association <= 1),
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+                        UNIQUE(character_id, topic)
+                    );
+                    CREATE INDEX idx_topic_engagement_character ON character_topic_engagement(character_id);
+                    CREATE INDEX idx_topic_engagement_interest ON character_topic_engagement(interest_level);
+                `);
+            }
 
             if (!tableNames.includes('user_tokens')) {
                 console.log('Creating user_tokens table');
@@ -834,8 +903,8 @@ class LocalDatabaseService {
         const stmt = this.db.prepare(`
             INSERT INTO character_memories (
                 character_id, user_id, memory_type, content, importance_score,
-                emotional_valence, related_session_id, tags
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                emotional_valence, related_session_id, tags, target_type, target_entity
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         const result = stmt.run(
@@ -846,18 +915,34 @@ class LocalDatabaseService {
             memoryData.importance_score || 0.5,
             memoryData.emotional_valence || 0.0,
             memoryData.related_session_id || null,
-            JSON.stringify(memoryData.tags || [])
+            JSON.stringify(memoryData.tags || []),
+            memoryData.target_type || 'user',
+            memoryData.target_entity || userId
         );
 
         return this.get('SELECT * FROM character_memories WHERE rowid = ?', [result.lastInsertRowid]);
     }
 
-    getMemoriesByCharacter(characterId, userId, limit = 10) {
+    getMemoriesByCharacter(characterId, userId, limit = 10, filters = {}) {
         this.ensureInitialized();
-        const memories = this.all(
-            'SELECT * FROM character_memories WHERE character_id = ? AND user_id = ? ORDER BY importance_score DESC, last_accessed DESC LIMIT ?',
-            [characterId, userId, limit]
-        );
+        
+        let query = 'SELECT * FROM character_memories WHERE character_id = ? AND user_id = ?';
+        const params = [characterId, userId];
+        
+        // Add filters for target_type and target_entity if provided
+        if (filters.target_type) {
+            query += ' AND target_type = ?';
+            params.push(filters.target_type);
+        }
+        if (filters.target_entity) {
+            query += ' AND target_entity = ?';
+            params.push(filters.target_entity);
+        }
+        
+        query += ' ORDER BY importance_score DESC, last_accessed DESC LIMIT ?';
+        params.push(limit);
+        
+        const memories = this.all(query, params);
         return memories.map(mem => this.parseMemoryJson(mem));
     }
 
@@ -883,6 +968,240 @@ class LocalDatabaseService {
             ...memory,
             tags: this.safeJsonParse(memory.tags, [])
         };
+    }
+
+    /**
+     * Get memories across all sessions with recency weighting
+     */
+    getMemoriesAcrossSessions(characterId, userId, limit = 15) {
+        this.ensureInitialized();
+        
+        const memories = this.all(
+            `SELECT * FROM (
+                SELECT *, 
+                    CASE 
+                      WHEN last_accessed > datetime('now', '-7 days') THEN 1.0
+                      WHEN last_accessed > datetime('now', '-30 days') THEN 0.7
+                      WHEN last_accessed > datetime('now', '-90 days') THEN 0.4
+                      ELSE 0.2
+                    END as recency_weight,
+                    importance_score * (
+                      CASE 
+                        WHEN last_accessed > datetime('now', '-7 days') THEN 1.0
+                        WHEN last_accessed > datetime('now', '-30 days') THEN 0.7
+                        WHEN last_accessed > datetime('now', '-90 days') THEN 0.4
+                        ELSE 0.2
+                      END
+                    ) as weighted_score
+                FROM character_memories
+                WHERE character_id = ? AND user_id = ?
+             ) ORDER BY weighted_score DESC, created_at DESC
+             LIMIT ?`,
+            [characterId, userId, limit]
+        );
+        
+        return memories.map(mem => this.parseMemoryJson(mem));
+    }
+
+    // ============================================================================
+    // CHARACTER LEARNING OPERATIONS
+    // ============================================================================
+
+    /**
+     * Get learning patterns for a character
+     */
+    getCharacterLearning(characterId, learningType = null) {
+        this.ensureInitialized();
+        
+        if (learningType) {
+            const result = this.get(
+                'SELECT * FROM character_learning WHERE character_id = ? AND learning_type = ?',
+                [characterId, learningType]
+            );
+            return result ? this.parseLearningJson(result) : null;
+        }
+        
+        const results = this.all(
+            'SELECT * FROM character_learning WHERE character_id = ?',
+            [characterId]
+        );
+        return results.map(r => this.parseLearningJson(r));
+    }
+
+    /**
+     * Create or update a learning pattern
+     */
+    createOrUpdateLearning(characterId, learningType, patternData, confidenceScore = 0.5) {
+        this.ensureInitialized();
+        
+        const existing = this.get(
+            'SELECT id FROM character_learning WHERE character_id = ? AND learning_type = ?',
+            [characterId, learningType]
+        );
+        
+        if (existing) {
+            // Update existing pattern
+            this.run(
+                `UPDATE character_learning 
+                 SET pattern_data = ?, 
+                     confidence_score = ?,
+                     usage_count = usage_count + 1,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+                [JSON.stringify(patternData), confidenceScore, existing.id]
+            );
+            
+            return this.parseLearningJson(
+                this.get('SELECT * FROM character_learning WHERE id = ?', [existing.id])
+            );
+        } else {
+            // Create new
+            const stmt = this.db.prepare(
+                `INSERT INTO character_learning (character_id, learning_type, pattern_data, confidence_score)
+                 VALUES (?, ?, ?, ?)`
+            );
+            
+            const result = stmt.run(characterId, learningType, JSON.stringify(patternData), confidenceScore);
+            return this.parseLearningJson(
+                this.get('SELECT * FROM character_learning WHERE rowid = ?', [result.lastInsertRowid])
+            );
+        }
+    }
+
+    /**
+     * Increment usage count for a learning pattern
+     */
+    incrementLearningUsage(learningId) {
+        this.ensureInitialized();
+        this.run(
+            'UPDATE character_learning SET usage_count = usage_count + 1 WHERE id = ?',
+            [learningId]
+        );
+    }
+
+    /**
+     * Delete learning patterns for a character
+     */
+    deleteLearningPatterns(characterId, learningType = null) {
+        this.ensureInitialized();
+        
+        if (learningType) {
+            return this.run(
+                'DELETE FROM character_learning WHERE character_id = ? AND learning_type = ?',
+                [characterId, learningType]
+            );
+        }
+        
+        return this.run(
+            'DELETE FROM character_learning WHERE character_id = ?',
+            [characterId]
+        );
+    }
+
+    /**
+     * Parse JSON in learning pattern
+     */
+    parseLearningJson(learning) {
+        if (!learning) return null;
+        return {
+            ...learning,
+            pattern_data: this.safeJsonParse(learning.pattern_data, {})
+        };
+    }
+
+    // ============================================================================
+    // TOPIC ENGAGEMENT OPERATIONS
+    // ============================================================================
+
+    /**
+     * Get topic engagement for a character
+     */
+    getTopicEngagement(characterId, topic = null) {
+        this.ensureInitialized();
+        
+        if (topic) {
+            return this.get(
+                'SELECT * FROM character_topic_engagement WHERE character_id = ? AND topic = ?',
+                [characterId, topic]
+            );
+        }
+        
+        return this.all(
+            'SELECT * FROM character_topic_engagement WHERE character_id = ? ORDER BY interest_level DESC, times_discussed DESC',
+            [characterId]
+        );
+    }
+
+    /**
+     * Get top interests for a character
+     */
+    getTopInterests(characterId, limit = 5) {
+        this.ensureInitialized();
+        
+        return this.all(
+            'SELECT * FROM character_topic_engagement WHERE character_id = ? ORDER BY interest_level DESC, times_discussed DESC LIMIT ?',
+            [characterId, limit]
+        );
+    }
+
+    /**
+     * Create or update topic engagement
+     */
+    createOrUpdateTopicEngagement(characterId, topic, interestDelta = 0.1, emotionalAssociation = 0.0) {
+        this.ensureInitialized();
+        
+        const existing = this.get(
+            'SELECT * FROM character_topic_engagement WHERE character_id = ? AND topic = ?',
+            [characterId, topic]
+        );
+        
+        if (existing) {
+            // Update: increase times_discussed, adjust interest_level
+            const newInterestLevel = Math.max(0, Math.min(1, existing.interest_level + interestDelta));
+            const newEmotionalAssoc = Math.max(-1, Math.min(1, 
+                (existing.emotional_association * 0.7 + emotionalAssociation * 0.3)
+            ));
+            
+            this.run(
+                `UPDATE character_topic_engagement 
+                 SET interest_level = ?,
+                     times_discussed = times_discussed + 1,
+                     last_discussed = CURRENT_TIMESTAMP,
+                     emotional_association = ?
+                 WHERE id = ?`,
+                [newInterestLevel, newEmotionalAssoc, existing.id]
+            );
+            
+            return this.get('SELECT * FROM character_topic_engagement WHERE id = ?', [existing.id]);
+        } else {
+            // Create new
+            const stmt = this.db.prepare(
+                `INSERT INTO character_topic_engagement (character_id, topic, interest_level, emotional_association)
+                 VALUES (?, ?, ?, ?)`
+            );
+            
+            const result = stmt.run(characterId, topic, 0.5 + interestDelta, emotionalAssociation);
+            return this.get('SELECT * FROM character_topic_engagement WHERE rowid = ?', [result.lastInsertRowid]);
+        }
+    }
+
+    /**
+     * Delete topic engagement
+     */
+    deleteTopicEngagement(characterId, topic = null) {
+        this.ensureInitialized();
+        
+        if (topic) {
+            return this.run(
+                'DELETE FROM character_topic_engagement WHERE character_id = ? AND topic = ?',
+                [characterId, topic]
+            );
+        }
+        
+        return this.run(
+            'DELETE FROM character_topic_engagement WHERE character_id = ?',
+            [characterId]
+        );
     }
 
     // ============================================================================

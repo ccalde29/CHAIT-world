@@ -260,7 +260,7 @@ const CharacterMemoryViewer = ({ character, onClose, apiRequest }) => {
                             </span>
                           </div>
                           
-                          <p className="text-sm text-white mb-2">{memory.memory_content}</p>
+                          <p className="text-sm text-white mb-2">{memory.content}</p>
                           
                           <div className="flex items-center justify-between text-xs text-gray-500">
                             <span>Accessed {memory.access_count || 1} times</span>

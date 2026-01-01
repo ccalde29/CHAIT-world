@@ -15,6 +15,7 @@ const NewChatModal = ({
   const [step, setStep] = useState(1); // 1 = scene, 2 = characters
   const [selectedScene, setSelectedScene] = useState(null);
   const [selectedCharacters, setSelectedCharacters] = useState([]);
+  const [customTitle, setCustomTitle] = useState('');
 
   const handleSceneSelect = (scene) => {
     setSelectedScene(scene);
@@ -34,7 +35,7 @@ const NewChatModal = ({
 
   const handleStart = () => {
     if (selectedScene && selectedCharacters.length > 0) {
-      onStart(selectedScene, selectedCharacters);
+      onStart(selectedScene, selectedCharacters, customTitle);
       onClose();
     }
   };
@@ -129,6 +130,23 @@ const NewChatModal = ({
                 </div>
                 <p className="text-white font-medium">{selectedScene?.name}</p>
                 <p className="text-sm text-gray-400 mt-1">{selectedScene?.description}</p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Chat Title (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder={`${selectedScene?.name} - ${new Date().toLocaleDateString()}`}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  maxLength={100}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty to use default format
+                </p>
               </div>
 
               <div className="mb-4">

@@ -125,6 +125,67 @@ class MemoryService {
     }
 
     /**
+     * Analyze character interactions for character-to-character memories
+     * @param {string} characterId - The character observing/learning
+     * @param {Array} otherCharacterMessages - Recent messages from other characters
+     * @param {Object} charactersMap - Map of character IDs to character objects
+     * @returns {Array} - Memories about other characters
+     */
+    analyzeCharacterInteractions(characterId, otherCharacterMessages, charactersMap) {
+        const memories = [];
+        
+        for (const msg of otherCharacterMessages) {
+            const otherCharId = msg.character;
+            const otherChar = charactersMap[otherCharId];
+            if (!otherChar || otherCharId === characterId) continue;
+            
+            const otherCharName = otherChar.name;
+            const content = msg.content.toLowerCase();
+            
+            // Pattern detection for character traits
+            const patterns = [
+                { pattern: /\*.*?(?:smiles|laughs|giggles|chuckles)\*/, type: 'relational', 
+                  content: `${otherCharName} tends to express joy and humor frequently`, importance: 0.6 },
+                { pattern: /\*.*?(?:frowns|sighs|looks away|crosses arms)\*/, type: 'emotional',
+                  content: `${otherCharName} showed signs of discomfort or disagreement`, importance: 0.6 },
+                { pattern: /(?:i think|i believe|in my opinion|personally)/i, type: 'relational',
+                  content: `${otherCharName} prefers expressing personal opinions`, importance: 0.5 },
+                { pattern: /(?:absolutely|definitely|clearly|obviously)/i, type: 'relational',
+                  content: `${otherCharName} communicates with strong conviction`, importance: 0.5 },
+                { pattern: /(?:maybe|perhaps|possibly|i guess)/i, type: 'relational',
+                  content: `${otherCharName} tends to be tentative in statements`, importance: 0.5 }
+            ];
+            
+            // Check for trait patterns
+            for (const {pattern, type, content: memContent, importance} of patterns) {
+                if (pattern.test(content)) {
+                    memories.push({
+                        type: type,
+                        content: memContent,
+                        importance_score: importance,
+                        target_type: 'character',
+                        target_entity: otherCharId
+                    });
+                }
+            }
+            
+            // Detect strong emotions/reactions in longer messages
+            if (content.length > 100 && /[!?]{2,}/.test(msg.content)) {
+                const preview = msg.content.replace(/\*/g, '').substring(0, 80);
+                memories.push({
+                    type: 'emotional',
+                    content: `${otherCharName} expressed strong emotions: "${preview}..."`,
+                    importance_score: 0.7,
+                    target_type: 'character',
+                    target_entity: otherCharId
+                });
+            }
+        }
+        
+        return memories;
+    }
+
+    /**
      * Build character context with all relevant data
      */
     async buildCharacterContext(characterId, userId, sessionId = null, otherCharacters = []) {
@@ -145,9 +206,27 @@ class MemoryService {
                     .slice(-5);
             }
 
+            // Load memories about other active characters
+            const characterMemories = {};
+            for (const otherCharId of otherCharacters) {
+                if (otherCharId === characterId) continue;
+                
+                const charMemories = await this.db.getMemoriesByCharacter(
+                    characterId,
+                    userId,
+                    3,
+                    { target_type: 'character', target_entity: otherCharId }
+                );
+                
+                if (charMemories.length > 0) {
+                    characterMemories[otherCharId] = charMemories;
+                }
+            }
+
             const context = {
                 memories,
                 relationship,
+                characterMemories,
                 otherCharacterMessages: recentCharacterMessages
             };
 
@@ -187,8 +266,10 @@ class MemoryService {
         // Enhanced pattern matching
         const patterns = [
             { pattern: /my name is (\w+)/i, type: 'identity', importance: 0.9 },
+            { pattern: /(?:call me|they call me|i go by) (\w+)/i, type: 'identity', importance: 0.9 },
             { pattern: /i'm (\d+) years? old/i, type: 'demographic', importance: 0.8 },
             { pattern: /i work (?:as|at) ([\w\s]+)/i, type: 'profession', importance: 0.8 },
+            { pattern: /(?:my job is|i'm employed as|i code|i teach) ([\w\s]+)/i, type: 'profession', importance: 0.8 },
             { pattern: /i live in ([\w\s]+)/i, type: 'location', importance: 0.7 },
             { pattern: /i'm from ([\w\s]+)/i, type: 'origin', importance: 0.7 },
             { pattern: /my favorite ([\w\s]+) is ([\w\s]+)/i, type: 'preference', importance: 0.6 },
@@ -244,6 +325,88 @@ class MemoryService {
 
         console.log(`Total memories found: ${memories.length}`);
         return memories;
+    }
+
+    /**
+     * Use AI to extract memories from conversation using character's selected model
+     */
+    async extractMemoriesWithAI(userMessage, characterResponse, character, userPersona, userId, apiConfig) {
+        const characterName = character.name;
+        const prompt = `You are analyzing a conversation to extract what a character should remember.
+
+CONVERSATION:
+User (${userPersona?.name || 'User'}): "${userMessage}"
+${characterName}: "${characterResponse}"
+
+TASK: Extract 0-3 important memories that ${characterName} should store about ${userPersona?.name || 'the user'}.
+
+RULES:
+1. Only extract FACTUAL information (preferences, background, emotions, goals, interests)
+2. Ignore casual small talk
+3. Paraphrase naturally - don't quote verbatim
+4. Return NOTHING if there's nothing worth remembering
+
+FORMAT YOUR RESPONSE AS JSON:
+[
+  {
+    "type": "identity|demographic|preference|emotion|goal|interest|personal_fact",
+    "content": "Clear, concise memory statement",
+    "importance": 0.0-1.0
+  }
+]
+
+Return ONLY the JSON array, nothing else.`;
+
+        try {
+            const AIProviderService = require('./AIProviderService');
+            
+            const messages = [
+                { role: 'system', content: 'You are a memory extraction system. Output only valid JSON.' },
+                { role: 'user', content: prompt }
+            ];
+            
+            // Use character's configured model with lower temperature and token limit for extraction
+            const memoryCharacter = {
+                ai_provider: character.ai_provider,
+                ai_model: character.ai_model,
+                temperature: 0.3,
+                max_tokens: 300
+            };
+            
+            let responseText;
+            
+            try {
+                responseText = await AIProviderService.generateResponse(
+                    memoryCharacter,
+                    messages,
+                    apiConfig,
+                    {},
+                    {}
+                );
+            } catch (error) {
+                console.log('[Memory] AI provider failed for memory extraction, using regex fallback:', error.message);
+                return this.analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId);
+            }
+            
+            const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) {
+                console.log('[Memory] AI did not return valid JSON, using regex fallback');
+                return this.analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId);
+            }
+            
+            const memories = JSON.parse(jsonMatch[0]);
+            
+            return memories.map(mem => ({
+                type: mem.type || 'semantic',
+                content: mem.content,
+                importance_score: mem.importance || 0.5,
+                target_entity: userId
+            }));
+            
+        } catch (error) {
+            console.error('[Memory] AI extraction failed:', error);
+            return this.analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId);
+        }
     }
 
     /**

@@ -381,6 +381,22 @@ class CommunityService {
       // Handle content locking options
       const { isLocked = false, hiddenFields = [] } = options;
 
+      // Upload avatar image to Supabase storage if custom image is used
+      let avatarImageUrl = character.avatar_image_url;
+      if (character.uses_custom_image && character.avatar_image_filename) {
+        const ImageService = require('./ImageService');
+        const imageService = new ImageService(this.supabase);
+        const publicUrl = await imageService.uploadLocalImageToSupabase(
+          character.avatar_image_filename,
+          'character-avatars',
+          userId
+        );
+        if (publicUrl) {
+          avatarImageUrl = publicUrl;
+          console.log(`✅ Character avatar uploaded to Supabase: ${publicUrl}`);
+        }
+      }
+
       // Create community copy with hidden fields set to NULL
       const communityData = {
         original_character_id: characterId,
@@ -399,7 +415,7 @@ class CommunityService {
         max_tokens: character.max_tokens,
         context_window: character.context_window,
         memory_enabled: character.memory_enabled,
-        avatar_image_url: character.avatar_image_url,
+        avatar_image_url: avatarImageUrl,
         avatar_image_filename: character.avatar_image_filename,
         uses_custom_image: character.uses_custom_image,
         is_locked: isLocked,
@@ -642,6 +658,22 @@ class CommunityService {
       // Handle content locking options
       const { isLocked = false, hiddenFields = [] } = options;
 
+      // Upload background image to Supabase storage if custom background is used
+      let backgroundImageUrl = scene.background_image_url;
+      if (scene.uses_custom_background && scene.background_image_filename) {
+        const ImageService = require('./ImageService');
+        const imageService = new ImageService(this.supabase);
+        const publicUrl = await imageService.uploadLocalImageToSupabase(
+          scene.background_image_filename,
+          'scene-backgrounds',
+          userId
+        );
+        if (publicUrl) {
+          backgroundImageUrl = publicUrl;
+          console.log(`✅ Scene background uploaded to Supabase: ${publicUrl}`);
+        }
+      }
+
       // Create community copy with hidden fields set to NULL
       const communityData = {
         original_scenario_id: sceneId,
@@ -650,7 +682,7 @@ class CommunityService {
         description: hiddenFields.includes('description') ? null : scene.description,
         initial_message: scene.initial_message,
         atmosphere: scene.atmosphere,
-        background_image_url: scene.background_image_url,
+        background_image_url: backgroundImageUrl,
         background_image_filename: scene.background_image_filename,
         uses_custom_background: scene.uses_custom_background,
         is_locked: isLocked,

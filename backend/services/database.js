@@ -30,7 +30,7 @@ class DatabaseService {
             }
         } else {
             this.supabaseAvailable = false;
-            console.warn('[Database] Supabase not configured - community features unavailable');
+            console.warn('[Database] Supabase not configured');
         }
 
         // Initialize local SQLite database
@@ -532,8 +532,16 @@ class DatabaseService {
         return this.localDb.getMemoriesByCharacter(characterId, userId, limit);
     }
 
+    async getMemoriesAcrossSessions(characterId, userId, limit = 15) {
+        return this.localDb.getMemoriesAcrossSessions(characterId, userId, limit);
+    }
+
     async createMemory(characterId, userId, memoryData) {
         return this.localDb.createMemory(characterId, userId, memoryData);
+    }
+
+    async updateMemoryAccess(memoryId) {
+        return this.localDb.updateMemoryAccess(memoryId);
     }
 
     async getCharacterRelationship(characterId, userId) {
@@ -551,6 +559,46 @@ class DatabaseService {
      */
     getStats() {
         return this.localDb.getStats();
+    }
+
+    // ============================================================================
+    // CHARACTER LEARNING OPERATIONS
+    // ============================================================================
+
+    getCharacterLearning(characterId, learningType = null) {
+        return this.localDb.getCharacterLearning(characterId, learningType);
+    }
+
+    createOrUpdateLearning(characterId, learningType, patternData, confidenceScore = 0.5) {
+        return this.localDb.createOrUpdateLearning(characterId, learningType, patternData, confidenceScore);
+    }
+
+    incrementLearningUsage(learningId) {
+        return this.localDb.incrementLearningUsage(learningId);
+    }
+
+    deleteLearningPatterns(characterId, learningType = null) {
+        return this.localDb.deleteLearningPatterns(characterId, learningType);
+    }
+
+    // ============================================================================
+    // TOPIC ENGAGEMENT OPERATIONS
+    // ============================================================================
+
+    getTopicEngagement(characterId, topic = null) {
+        return this.localDb.getTopicEngagement(characterId, topic);
+    }
+
+    getTopInterests(characterId, limit = 10) {
+        return this.localDb.getTopInterests(characterId, limit);
+    }
+
+    createOrUpdateTopicEngagement(characterId, topic, interestDelta = 0.1, emotionalAssociation = 0.0) {
+        return this.localDb.createOrUpdateTopicEngagement(characterId, topic, interestDelta, emotionalAssociation);
+    }
+
+    deleteTopicEngagement(characterId, topic = null) {
+        return this.localDb.deleteTopicEngagement(characterId, topic);
     }
 }
 

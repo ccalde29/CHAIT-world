@@ -13,10 +13,17 @@ module.exports = (db) => {
         try {
             const { scenario, activeCharacters, title } = req.body;
 
+            // Get scenario name for better default title
+            let defaultTitle = 'New Chat';
+            if (scenario) {
+                const scenarioData = db.getScenario(scenario);
+                defaultTitle = scenarioData ? `${scenarioData.name} - ${new Date().toLocaleDateString()}` : 'New Chat';
+            }
+
             const session = await db.createChatSession(req.userId, {
                 scenario,
                 activeCharacters,
-                title: title || `Chat in ${scenario}`,
+                title: title || defaultTitle,
                 groupMode: 'natural'
             });
 

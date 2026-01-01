@@ -37,6 +37,59 @@ module.exports = (db) => {
   const conversationTracker = new ConversationStateTracker();
   const sessionContinuity = new SessionContinuityService(db);
 
+  /**
+   * Extract topics from text using keyword and phrase detection
+   */
+  function extractTopicsFromText(text, limit = 3) {
+    const lower = text.toLowerCase();
+    
+    // Topic categories with keywords
+    const topicMap = {
+      'technology': ['computer', 'software', 'app', 'tech', 'code', 'program', 'ai', 'robot', 'internet', 'website'],
+      'sports': ['football', 'soccer', 'basketball', 'game', 'sport', 'team', 'player', 'match', 'compete'],
+      'music': ['song', 'music', 'band', 'concert', 'album', 'artist', 'sing', 'guitar', 'piano', 'listen'],
+      'food': ['food', 'eat', 'cook', 'restaurant', 'meal', 'dish', 'recipe', 'hungry', 'taste', 'delicious'],
+      'movies': ['movie', 'film', 'watch', 'cinema', 'actor', 'director', 'netflix', 'show', 'series'],
+      'books': ['book', 'read', 'novel', 'author', 'story', 'chapter', 'library', 'write', 'reading'],
+      'travel': ['travel', 'trip', 'vacation', 'visit', 'country', 'city', 'tourist', 'journey', 'explore'],
+      'work': ['work', 'job', 'career', 'office', 'boss', 'project', 'meeting', 'business', 'professional'],
+      'school': ['school', 'class', 'study', 'student', 'teacher', 'exam', 'homework', 'learn', 'education'],
+      'family': ['family', 'parent', 'mom', 'dad', 'sibling', 'child', 'relative', 'brother', 'sister'],
+      'relationships': ['love', 'relationship', 'boyfriend', 'girlfriend', 'date', 'partner', 'romance', 'friend'],
+      'health': ['health', 'doctor', 'sick', 'medicine', 'hospital', 'exercise', 'fitness', 'wellness'],
+      'politics': ['politics', 'government', 'election', 'president', 'vote', 'policy', 'law'],
+      'science': ['science', 'research', 'experiment', 'theory', 'discovery', 'study', 'lab'],
+      'art': ['art', 'paint', 'draw', 'artist', 'gallery', 'creative', 'design', 'sketch'],
+      'gaming': ['game', 'play', 'gamer', 'console', 'video game', 'esports', 'gaming'],
+      'fashion': ['fashion', 'clothes', 'style', 'outfit', 'wear', 'dress', 'shop', 'clothing'],
+      'nature': ['nature', 'animal', 'plant', 'tree', 'forest', 'outdoor', 'wildlife', 'environment']
+    };
+    
+    const detectedTopics = [];
+    
+    for (const [topic, keywords] of Object.entries(topicMap)) {
+      const matchCount = keywords.filter(kw => lower.includes(kw)).length;
+      if (matchCount > 0) {
+        detectedTopics.push({ topic, score: matchCount });
+      }
+    }
+    
+    // Sort by score and return top topics
+    return detectedTopics
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(t => t.topic);
+  }
+
+  /**
+   * Detect emotion in text for topic association
+   */
+  function detectEmotionInText(text) {
+    if (/\b(love|wonderful|amazing|great|excellent)\b/i.test(text)) return 0.5;
+    if (/\b(hate|terrible|awful|horrible)\b/i.test(text)) return -0.5;
+    return 0.0;
+  }
+
 /**
  * POST /api/chat/group-response
  * Simplified group chat with core decision logic
@@ -68,10 +121,17 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
     // If no session provided, create a new one
     if (!activeSessionId) {
+      // Get scenario name for better title
+      let scenarioName = 'New Chat';
+      if (currentScene) {
+        const scenario = db.getScenario(currentScene);
+        scenarioName = scenario ? `${scenario.name} - ${new Date().toLocaleDateString()}` : 'New Chat';
+      }
+
       const newSession = await db.createChatSession(userId, {
         scenario_id: currentScene || 'default',
         active_characters: activeCharacters,
-        title: currentScene ? `Chat in ${currentScene}` : 'New Chat',
+        title: scenarioName,
         group_mode: 'natural'
       });
 
@@ -210,6 +270,14 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           userId,
           activeSessionId
         );
+        
+        // Load memories about other characters (from buildCharacterContext)
+        if (charData.context && charData.context.characterMemories) {
+          charData.characterMemories = charData.context.characterMemories;
+        }
+        
+        // Load topic engagement
+        charData.topicEngagement = db.getTopInterests(char.id, 5);
 
         characterDataMap.set(char.id, charData);
 
@@ -286,7 +354,9 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           memories: charData.memories,
           learningData: charData.learningData,
           adminSystemPrompt,
-          sessionContinuity: charData.continuity
+          sessionContinuity: charData.continuity,
+          characterMemories: charData.characterMemories,
+          topicEngagement: charData.topicEngagement
         });
 
         // Adapt prompt for provider
@@ -426,12 +496,28 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
         // Process memories and relationships
         try {
-          const newMemories = memoryService.analyzeConversationForMemories(
-            userMessage,
-            response,
-            userPersona,
-            userId
-          );
+          // Check if AI memory extraction is enabled
+          const useAIMemories = userSettings?.use_ai_memory_extraction || false;
+          
+          let newMemories;
+          if (useAIMemories) {
+            newMemories = await memoryService.extractMemoriesWithAI(
+              userMessage,
+              response,
+              char,
+              userPersona,
+              userId,
+              apiKeys
+            );
+            console.log(`[Memory] AI extracted ${newMemories.length} memories for ${char.name}`);
+          } else {
+            newMemories = memoryService.analyzeConversationForMemories(
+              userMessage,
+              response,
+              userPersona,
+              userId
+            );
+          }
 
           for (const mem of newMemories) {
             await memoryService.addCharacterMemory(char.id, userId, mem);
@@ -445,17 +531,65 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           );
 
           await memoryService.updateCharacterRelationship(char.id, userId, relationshipUpdate);
+          
+          // Store character-to-character memories
+          const otherCharacterResponses = responses
+            .filter(r => r.character !== char.id)
+            .map(r => ({
+              character: r.character,
+              content: r.response
+            }));
+          
+          if (otherCharacterResponses.length > 0) {
+            const charactersMap = {};
+            characters.forEach(c => { charactersMap[c.id] = c; });
+            
+            const charToCharMemories = memoryService.analyzeCharacterInteractions(
+              char.id,
+              otherCharacterResponses,
+              charactersMap
+            );
+            
+            for (const mem of charToCharMemories) {
+              await memoryService.addCharacterMemory(char.id, userId, mem);
+            }
+            
+            if (charToCharMemories.length > 0) {
+              console.log(`[Memory] ${char.name} stored ${charToCharMemories.length} memories about other characters`);
+            }
+          }
         } catch (memErr) {
           console.error(`[Memory] Error for ${char.name}:`, memErr);
         }
 
         // Track learning
         try {
-          await learningService.recordInteraction(userId, char.id);
+          await learningService.recordInteraction(userId, char.id, {
+            userMessage,
+            characterResponse: response,
+            userPersona
+          });
           
+          // Track topics discussed
           const topicKeywords = extractTopicsFromText(userMessage + ' ' + response);
+          
           for (const topic of topicKeywords) {
-            await learningService.addTopicDiscussed(userId, char.id, topic);
+            // Determine interest delta based on message length and engagement
+            const interestDelta = response.length > 100 ? 0.15 : 0.05;
+            
+            // Determine emotional association
+            const emotionalAssociation = detectEmotionInText(response);
+            
+            await db.createOrUpdateTopicEngagement(
+              char.id,
+              topic,
+              interestDelta,
+              emotionalAssociation
+            );
+          }
+          
+          if (topicKeywords.length > 0) {
+            console.log(`[Topics] Updated ${topicKeywords.length} topics for ${char.name}: ${topicKeywords.join(', ')}`);
           }
         } catch (learnErr) {
           console.error(`[Learning] Error for ${char.name}:`, learnErr);
@@ -465,6 +599,30 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
       } catch (error) {
         console.error(`[Response] Error for ${char.name}:`, error);
+        
+        // If tokens were deducted and request failed, refund and log
+        if (useServerKeys && modelCost > 0) {
+          try {
+            console.log(`[Token] Request failed, refunding ${modelCost} tokens...`);
+            await supabaseTokenService.refundTokens(
+              userId, 
+              modelCost, 
+              `Refund: Failed request to ${char.name} - ${error.message}`
+            );
+            
+            // Log failed transaction for admin review (tokenModel was declared in outer scope)
+            await supabaseTokenService.logFailedTransaction(
+              userId,
+              tokenModel?.id || null,
+              error.message || 'Unknown error',
+              modelCost
+            );
+            console.log(`[Token] Refunded ${modelCost} tokens and logged failed transaction`);
+          } catch (refundError) {
+            console.error('[Token] Failed to refund tokens:', refundError);
+          }
+        }
+        
         if (isPrimary) {
           responses.push({
             character: char.id,

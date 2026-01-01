@@ -7,9 +7,14 @@ class MemoryRelevanceService {
   /**
    * Get memories relevant to current conversation
    */
-  static async getRelevantMemories(memoryService, characterId, userId, currentMessage, context, limit = 8) {
-    // Get all memories
-    const allMemories = await memoryService.getCharacterMemories(characterId, userId, 50);
+  static async getRelevantMemories(memoryService, characterId, userId, currentMessage, context, limit = null) {
+    // Dynamic limit based on conversation importance
+    if (!limit) {
+      limit = context.conversationImportance > 0.7 ? 12 : 8;
+    }
+    
+    // Get memories across all sessions with recency weighting
+    const allMemories = await memoryService.db.getMemoriesAcrossSessions(characterId, userId, 50);
     
     if (!allMemories || allMemories.length === 0) {
       return [];
@@ -28,8 +33,18 @@ class MemoryRelevanceService {
       return scoreB - scoreA;
     });
 
-    // Return top memories
-    return scoredMemories.slice(0, limit);
+    // Get top memories
+    const topMemories = scoredMemories.slice(0, limit);
+    
+    // Consolidate similar memories to avoid redundancy
+    const consolidated = this.consolidateMemories(topMemories);
+    
+    // Update access timestamps for retrieved memories
+    for (const memory of consolidated) {
+      memoryService.db.updateMemoryAccess(memory.id);
+    }
+
+    return consolidated;
   }
 
   /**

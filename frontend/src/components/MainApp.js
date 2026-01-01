@@ -111,7 +111,7 @@ const MainApp = () => {
   // HANDLERS
   // ============================================================================
 
-  const handleStartNewChat = async (scene, characters) => {
+  const handleStartNewChat = async (scene, characters, customTitle = '') => {
     // Set scene and characters
     charactersState.setCurrentScenario(scene.id);
     charactersState.setActiveCharacters(characters);
@@ -121,13 +121,14 @@ const MainApp = () => {
 
     // Create a new session in the backend with the initial message
     try {
+      const defaultTitle = `${scene.name} - ${new Date().toLocaleDateString()}`;
       const response = await apiRequest('/api/chat/sessions/create-with-initial-message', {
         method: 'POST',
         body: JSON.stringify({
           scenario_id: scene.id,
           active_characters: characters.map(c => c.id),
           initial_message: scene.initial_message,
-          title: `${scene.name} - ${new Date().toLocaleDateString()}`
+          title: customTitle.trim() || defaultTitle
         })
       });
 
