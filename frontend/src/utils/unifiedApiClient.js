@@ -8,6 +8,7 @@
 import { isNativePlatform } from './platform';
 import { getMobileDatabaseService } from '../services/MobileDatabaseService';
 import { createApiClient as createWebApiClient } from './apiClient';
+import { supabase } from '../lib/supabase';
 
 class UnifiedApiClient {
   constructor(userId) {
@@ -42,7 +43,9 @@ class UnifiedApiClient {
 
     try {
       // Route based on endpoint
-      if (endpoint.startsWith('/api/characters')) {
+      if (endpoint.startsWith('/api/community')) {
+        return this.handleCommunityRequest(endpoint, options);
+      } else if (endpoint.startsWith('/api/characters')) {
         return this.handleCharactersRequest(endpoint, options);
       } else if (endpoint.startsWith('/api/scenarios')) {
         return this.handleScenariosRequest(endpoint, options);
@@ -62,8 +65,8 @@ class UnifiedApiClient {
           features: {
             chatHistory: true,
             characterMemory: true,
-            offlineMode: true,
-            communityFeatures: false
+            offlineMode: false,
+            communityFeatures: true
           }
         };
       }
@@ -240,6 +243,186 @@ class UnifiedApiClient {
       uses_custom_image: Boolean(char.uses_custom_image),
       is_default: Boolean(char.is_default)
     };
+  }
+
+  /**
+   * Handle community requests using Supabase directly
+   */
+  async handleCommunityRequest(endpoint, options) {
+    const method = options.method || 'GET';
+    console.log('[UnifiedAPI Community]', method, endpoint);
+
+    // Parse endpoint to determine action
+    if (endpoint.startsWith('/api/community/characters')) {
+      // GET /api/community/characters - List community characters
+      if (method === 'GET') {
+        const url = new URL(`https://dummy.com${endpoint}`);
+        const params = url.searchParams;
+        
+        const limit = parseInt(params.get('limit') || '20');
+        const offset = parseInt(params.get('offset') || '0');
+        const sortBy = params.get('sortBy') || 'recent';
+        const search = params.get('search') || '';
+        const tags = params.get('tags') || '';
+
+        let query = supabase
+          .from('community_characters')
+          .select('*', { count: 'exact' });
+
+        // Search filter
+        if (search) {
+          query = query.or(`name.ilike.%${search}%,personality.ilike.%${search}%`);
+        }
+
+        // Tags filter
+        if (tags) {
+          const tagArray = tags.split(',');
+          query = query.contains('tags', tagArray);
+        }
+
+        // Sorting
+        if (sortBy === 'popular') {
+          query = query.order('favorite_count', { ascending: false });
+        } else if (sortBy === 'trending') {
+          query = query.order('view_count', { ascending: false });
+        } else {
+          query = query.order('created_at', { ascending: false });
+        }
+
+        // Pagination
+        query = query.range(offset, offset + limit - 1);
+
+        const { data, error, count } = await query;
+        
+        if (error) throw error;
+
+        return {
+          characters: data || [],
+          hasMore: (offset + limit) < count
+        };
+      }
+
+      // Handle character-specific endpoints
+      const charMatch = endpoint.match(/\/api\/community\/characters\/([^\/]+)\/(.+)/);
+      if (charMatch) {
+        const [, charId, action] = charMatch;
+
+        // POST /api/community/characters/:id/view - Track view
+        if (action === 'view' && method === 'POST') {
+          const { error } = await supabase.rpc('increment_character_views', {
+            character_id: charId
+          });
+          if (error) console.error('Failed to increment views:', error);
+          return { success: true };
+        }
+
+        // POST /api/community/characters/:id/favorite - Toggle favorite
+        if (action === 'favorite' && method === 'POST') {
+          const { error } = await supabase.rpc('increment_character_favorites', {
+            character_id: charId
+          });
+          if (error) throw error;
+          return { success: true };
+        }
+
+        // DELETE /api/community/characters/:id/favorite - Remove favorite
+        if (action === 'favorite' && method === 'DELETE') {
+          const { error } = await supabase.rpc('decrement_character_favorites', {
+            character_id: charId
+          });
+          if (error) throw error;
+          return { success: true };
+        }
+
+        // GET /api/community/characters/:id/comments - Get comments
+        if (action === 'comments' && method === 'GET') {
+          const { data, error } = await supabase
+            .from('character_comments')
+            .select('*')
+            .eq('character_id', charId)
+            .order('created_at', { ascending: false });
+          
+          if (error) throw error;
+          return { comments: data || [] };
+        }
+
+        // POST /api/community/characters/:id/comments - Add comment
+        if (action === 'comments' && method === 'POST') {
+          const body = JSON.parse(options.body);
+          const { data, error } = await supabase
+            .from('character_comments')
+            .insert({
+              character_id: charId,
+              user_id: this.userId,
+              comment: body.comment
+            })
+            .select()
+            .single();
+          
+          if (error) throw error;
+          return { comment: data };
+        }
+      }
+    }
+
+    // Handle scene endpoints
+    if (endpoint.startsWith('/api/community/scenes')) {
+      // GET /api/community/scenes - List community scenes
+      if (method === 'GET') {
+        const url = new URL(`https://dummy.com${endpoint}`);
+        const params = url.searchParams;
+        
+        const limit = parseInt(params.get('limit') || '20');
+        const offset = parseInt(params.get('offset') || '0');
+        const sortBy = params.get('sortBy') || 'recent';
+        const search = params.get('search') || '';
+
+        let query = supabase
+          .from('community_scenes')
+          .select('*', { count: 'exact' });
+
+        // Search filter
+        if (search) {
+          query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+        }
+
+        // Sorting
+        if (sortBy === 'popular') {
+          query = query.order('favorite_count', { ascending: false });
+        } else {
+          query = query.order('created_at', { ascending: false });
+        }
+
+        // Pagination
+        query = query.range(offset, offset + limit - 1);
+
+        const { data, error, count } = await query;
+        
+        if (error) throw error;
+
+        return {
+          scenes: data || [],
+          hasMore: (offset + limit) < count
+        };
+      }
+
+      // Handle scene-specific endpoints
+      const sceneMatch = endpoint.match(/\/api\/community\/scenes\/([^\/]+)\/(.+)/);
+      if (sceneMatch) {
+        const [, sceneId, action] = sceneMatch;
+
+        // POST /api/community/scenes/:id/view - Track view
+        if (action === 'view' && method === 'POST') {
+          const { error } = await supabase.rpc('increment_scene_views', {
+            scene_id: sceneId
+          });
+          if (error) console.error('Failed to increment views:', error);
+          return { success: true };
+        }
+      }
+    }
+
+    throw new Error(`Community endpoint not implemented: ${endpoint}`);
   }
 }
 

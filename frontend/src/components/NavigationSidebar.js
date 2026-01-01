@@ -135,7 +135,7 @@ const NavigationSidebar = ({
       <div className="w-12 bg-slate-900 border-r border-white/10 flex flex-col h-screen items-center py-4">
         <button
           onClick={() => setIsCollapsed(false)}
-          className="p-2 text-gray-400 hover:text-white transition-colors mb-4"
+          className="p-2 text-gray-400 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded-lg mb-4"
           title="Expand sidebar"
         >
           <Menu size={20} />
@@ -167,13 +167,6 @@ const NavigationSidebar = ({
             <h1 className="text-xl font-bold text-white">CHAIT World</h1>
             <p className="text-xs text-gray-400">Local AI Chat</p>
           </div>
-          <button
-            onClick={() => setIsCollapsed(true)}
-            className="p-1 text-gray-400 hover:text-white transition-colors md:hidden"
-            title="Collapse sidebar"
-          >
-            <ChevronLeft size={20} />
-          </button>
         </div>
       </div>
 
@@ -258,7 +251,17 @@ const NavigationSidebar = ({
         )}
 
         {/* Menu Items */}
-        <div className="mt-6 px-2 space-y-1">
+        <div className="px-4 py-2 flex justify-center">
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+            title="Collapse sidebar"
+          >
+            <ChevronLeft size={20} />
+          </button>
+        </div>
+
+        <div className="mt-2 px-2 space-y-1">
           {menuItems.map(item => {
             const Icon = item.icon;
             const isActive = activeView === item.id;

@@ -17,13 +17,10 @@ import {
   MapPin,
   Trash2,
   Lock,
-  Flag,
-  WifiOff
+  Flag
 } from 'lucide-react';
 import CommentsSection from './CommentsSection';
 import ReportModal from './ReportModal';
-import { isOfflineError, getErrorMessage } from '../utils/apiClient';
-import { useCommunityAvailable } from '../hooks/useOfflineStatus';
 
 const CommunityHub = ({
   onImport,
@@ -61,8 +58,6 @@ const CommunityHub = ({
   const [reportingCharacter, setReportingCharacter] = useState(null);
   const [reportingScene, setReportingScene] = useState(null);
   const [reportType, setReportType] = useState('character');
-  const [offlineError, setOfflineError] = useState(null);
-  const communityAvailable = useCommunityAvailable();
   const LIMIT = 20;
 
   // ============================================================================
@@ -84,7 +79,6 @@ const CommunityHub = ({
   const loadCommunityCharacters = async (reset = false) => {
     try {
       setLoading(true);
-      setOfflineError(null);
 
       const params = new URLSearchParams({
         limit: LIMIT,
@@ -111,9 +105,6 @@ const CommunityHub = ({
 
     } catch (error) {
       console.error('Failed to load community characters:', error);
-      if (isOfflineError(error)) {
-        setOfflineError(getErrorMessage(error));
-      }
     } finally {
       setLoading(false);
     }
@@ -122,7 +113,6 @@ const CommunityHub = ({
   const loadCommunityScenes = async (reset = false) => {
     try {
       setLoading(true);
-      setOfflineError(null);
 
       const params = new URLSearchParams({
         limit: LIMIT,
@@ -216,10 +206,7 @@ const CommunityHub = ({
 
     } catch (error) {
       console.error('Failed to import character:', error);
-      const errorMsg = isOfflineError(error) 
-        ? 'Importing requires an internet connection' 
-        : 'Failed to import character. Please try again.';
-      alert(errorMsg);
+      alert('Failed to import character. Please try again.');
     } finally {
       setImporting(null);
     }
@@ -979,21 +966,6 @@ const CommunityHub = ({
   return (
     <div className={containerClass}>
       <div className={innerClass}>
-        {/* Offline Warning Banner */}
-        {offlineError && (
-          <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 px-4 py-3 flex items-center gap-2">
-            <WifiOff size={20} />
-            <span>{offlineError}</span>
-          </div>
-        )}
-        
-        {!communityAvailable && !offlineError && (
-          <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 px-4 py-3 flex items-center gap-2">
-            <WifiOff size={20} />
-            <span>Community features require an internet connection</span>
-          </div>
-        )}
-        
         {/* Header */}
         <div className="border-b border-white/10">
           <div className="flex items-center justify-between p-6">

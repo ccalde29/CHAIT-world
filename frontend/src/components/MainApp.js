@@ -95,12 +95,18 @@ const MainApp = () => {
         console.log('[MainApp] Admin status:', response?.isAdmin);
         setIsAdmin(response?.isAdmin || false);
       } catch (error) {
-        console.error('Failed to load admin status:', error);
-        setIsAdmin(false);
+        console.error('[MainApp] Failed to load admin status:', error);
+        // On native platform, check if user email matches admin email
+        if (user?.email === 'henryrothgates@gmail.com') {
+          console.log('[MainApp] Setting admin based on email match');
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
       }
     };
     loadAdminStatus();
-  }, [user.id, apiRequest]);
+  }, [user.id, user.email, apiRequest]);
 
   // Debug: Log when admin status changes
   useEffect(() => {

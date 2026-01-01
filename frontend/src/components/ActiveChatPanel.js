@@ -41,10 +41,10 @@ const ActiveChatPanel = ({
         </h2>
         <button
           onClick={onToggleCollapse}
-          className="p-1 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-white"
+          className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
           title="Collapse panel"
         >
-          <ChevronRight size={18} />
+          <ChevronRight size={20} />
         </button>
       </div>
 
