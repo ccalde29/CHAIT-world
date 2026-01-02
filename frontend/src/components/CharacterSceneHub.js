@@ -60,10 +60,10 @@ const CharacterSceneHub = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 overflow-x-auto scrollbar-hide">
           <button
             onClick={() => setActiveTab('characters')}
-            className={`pb-3 px-2 border-b-2 transition-colors flex items-center gap-2 ${
+            className={`pb-3 px-2 border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'characters'
                 ? 'border-purple-400 text-purple-400'
                 : 'border-transparent text-gray-400 hover:text-gray-300'
@@ -74,7 +74,7 @@ const CharacterSceneHub = ({
           </button>
           <button
             onClick={() => setActiveTab('scenes')}
-            className={`pb-3 px-2 border-b-2 transition-colors flex items-center gap-2 ${
+            className={`pb-3 px-2 border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'scenes'
                 ? 'border-blue-400 text-blue-400'
                 : 'border-transparent text-gray-400 hover:text-gray-300'
@@ -85,7 +85,7 @@ const CharacterSceneHub = ({
           </button>
           <button
             onClick={() => setActiveTab('credits')}
-            className={`pb-3 px-2 border-b-2 transition-colors flex items-center gap-2 ${
+            className={`pb-3 px-2 border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'credits'
                 ? 'border-green-400 text-green-400'
                 : 'border-transparent text-gray-400 hover:text-gray-300'
@@ -380,6 +380,15 @@ const CharacterSceneHub = ({
         type={publishType}
         name={publishItem?.name}
       />
+      <style jsx>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 };
