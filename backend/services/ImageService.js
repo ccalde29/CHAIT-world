@@ -3,6 +3,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const http = require('http');
 
 class ImageService {
     constructor(supabaseClient) {
@@ -172,6 +174,63 @@ class ImageService {
         } catch (error) {
             console.error('Error uploading image to Supabase:', error);
             return null; // Return null instead of throwing to allow publish to continue
+        }
+    }
+
+    /**
+     * Download an image from a URL and save it locally
+     * Returns the local filename if successful
+     */
+    async downloadImageFromUrl(imageUrl, userId) {
+        try {
+            if (!imageUrl) {
+                return null;
+            }
+
+            // Generate a unique filename
+            const ext = path.extname(new URL(imageUrl).pathname) || '.jpg';
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(7);
+            const filename = `${userId}-${timestamp}-${randomId}${ext}`;
+            
+            // Ensure uploads directory exists
+            const uploadsDir = path.join(__dirname, '../../data/uploads');
+            if (!fs.existsSync(uploadsDir)) {
+                fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+
+            const localPath = path.join(uploadsDir, filename);
+
+            // Download the image
+            return new Promise((resolve, reject) => {
+                const protocol = imageUrl.startsWith('https') ? https : http;
+                
+                protocol.get(imageUrl, (response) => {
+                    if (response.statusCode !== 200) {
+                        reject(new Error(`Failed to download image: ${response.statusCode}`));
+                        return;
+                    }
+
+                    const fileStream = fs.createWriteStream(localPath);
+                    response.pipe(fileStream);
+
+                    fileStream.on('finish', () => {
+                        fileStream.close();
+                        console.log(`✅ Downloaded image from ${imageUrl} to ${filename}`);
+                        resolve(filename);
+                    });
+
+                    fileStream.on('error', (err) => {
+                        fs.unlink(localPath, () => {});
+                        reject(err);
+                    });
+                }).on('error', (err) => {
+                    reject(err);
+                });
+            });
+        } catch (error) {
+            console.error('Error downloading image:', error);
+            return null;
         }
     }
 }

@@ -134,14 +134,6 @@ const NavigationSidebar = ({
     return (
       <div className="w-12 bg-slate-900 border-r border-white/10 flex flex-col h-screen items-center py-4">
         <button
-          onClick={() => setIsCollapsed(false)}
-          className="p-2 text-gray-400 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded-lg mb-4"
-          title="Expand sidebar"
-        >
-          <Menu size={20} />
-        </button>
-        
-        <button
           onClick={onNewChat}
           className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors mb-4"
           title="New Chat"
@@ -154,12 +146,22 @@ const NavigationSidebar = ({
             {sessions.length}
           </div>
         )}
+        
+        <div className="flex-1 flex items-center justify-center">
+          <button
+            onClick={() => setIsCollapsed(false)}
+            className="p-2 text-gray-400 hover:text-white transition-colors bg-white/5 hover:bg-white/10 rounded-lg"
+            title="Expand sidebar"
+          >
+            <Menu size={20} />
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-64 bg-slate-900 border-r border-white/10 flex flex-col h-screen">
+    <div className="w-64 bg-slate-900 border-r border-white/10 flex flex-col h-screen md:relative md:z-auto fixed z-50 left-0 top-0">
       {/* Header */}
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center justify-between">
@@ -251,17 +253,7 @@ const NavigationSidebar = ({
         )}
 
         {/* Menu Items */}
-        <div className="px-4 py-2 flex justify-center">
-          <button
-            onClick={() => setIsCollapsed(true)}
-            className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-            title="Collapse sidebar"
-          >
-            <ChevronLeft size={20} />
-          </button>
-        </div>
-
-        <div className="mt-2 px-2 space-y-1">
+        <div className="mt-6 px-2 space-y-1">
           {menuItems.map(item => {
             const Icon = item.icon;
             const isActive = activeView === item.id;

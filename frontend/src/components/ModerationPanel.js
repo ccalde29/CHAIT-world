@@ -256,9 +256,12 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
       </div>
 
       {/* Tabs */}
-      <div className="bg-gray-800 border-b border-white/10 px-4">
-        <div className="flex gap-2">
-          <button
+      <div className="bg-gray-800 border-b border-white/10 px-4 overflow-x-auto">
+        <style>{`
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
+        <div className="flex gap-2 scrollbar-hide min-w-max">\n          <button
             onClick={() => setActiveTab('pending')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'pending'

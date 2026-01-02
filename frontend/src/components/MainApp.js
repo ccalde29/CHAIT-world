@@ -12,6 +12,7 @@ import { usePersonas } from '../hooks/usePersonas';
 import { useTokens } from '../hooks/useTokens';
 import { createUnifiedApiClient } from '../utils/unifiedApiClient';
 import { isNativePlatform } from '../utils/platform';
+import { Capacitor } from '@capacitor/core';
 
 // Components
 import ChatInterface from './ChatInterface';
@@ -77,6 +78,9 @@ const MainApp = () => {
   // Admin state
   const [isAdmin, setIsAdmin] = useState(false);
   
+  // Sidebar collapse state for mobile
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  
   // Session refresh trigger and callback ref
   const [sessionRefreshTrigger, setSessionRefreshTrigger] = useState(0);
   const loadSessionsRef = useRef(null);
@@ -97,7 +101,7 @@ const MainApp = () => {
       } catch (error) {
         console.error('[MainApp] Failed to load admin status:', error);
         // On native platform, check if user email matches admin email
-        if (user?.email === 'henryrothgates@gmail.com') {
+        if (user?.email === 'ccalde29@gmail.com') {
           console.log('[MainApp] Setting admin based on email match');
           setIsAdmin(true);
         } else {

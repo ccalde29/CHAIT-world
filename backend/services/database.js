@@ -5,6 +5,8 @@
 const { createClient } = require('@supabase/supabase-js');
 const { getInstance: getLocalDb } = require('./LocalDatabaseService');
 const MemoryService = require('./MemoryService');
+const fs = require('fs');
+const path = require('path');
 
 class DatabaseService {
     constructor(options = {}) {
@@ -127,6 +129,22 @@ class DatabaseService {
     }
 
     async deleteCharacter(characterId) {
+        // Get character data before deletion to access image filename
+        const character = this.localDb.getCharacter(characterId);
+        
+        // Delete associated image file if it exists
+        if (character && character.uses_custom_image && character.avatar_image_filename) {
+            const imagePath = path.join(__dirname, '../../data/uploads', character.avatar_image_filename);
+            try {
+                if (fs.existsSync(imagePath)) {
+                    fs.unlinkSync(imagePath);
+                    console.log(`🗑️ Deleted character avatar: ${character.avatar_image_filename}`);
+                }
+            } catch (error) {
+                console.error('Error deleting character avatar:', error);
+            }
+        }
+        
         return this.localDb.deleteCharacter(characterId);
     }
 
@@ -253,6 +271,22 @@ class DatabaseService {
     }
 
     async deleteScenario(userId, scenarioId) {
+        // Get scenario data before deletion to access image filename
+        const scenario = this.localDb.getScenario(scenarioId);
+        
+        // Delete associated image file if it exists
+        if (scenario && scenario.uses_custom_background && scenario.background_image_filename) {
+            const imagePath = path.join(__dirname, '../../data/uploads', scenario.background_image_filename);
+            try {
+                if (fs.existsSync(imagePath)) {
+                    fs.unlinkSync(imagePath);
+                    console.log(`🗑️ Deleted scene background: ${scenario.background_image_filename}`);
+                }
+            } catch (error) {
+                console.error('Error deleting scene background:', error);
+            }
+        }
+        
         return this.localDb.deleteScenario(scenarioId);
     }
 
@@ -332,6 +366,22 @@ class DatabaseService {
                 throw new Error('Character not found');
             }
 
+            // Upload avatar image to Supabase storage if custom image is used
+            let avatarImageUrl = character.avatar_image_url;
+            if (character.uses_custom_image && character.avatar_image_filename) {
+                const ImageService = require('./ImageService');
+                const imageService = new ImageService(this.supabase);
+                const publicUrl = await imageService.uploadLocalImageToSupabase(
+                    character.avatar_image_filename,
+                    'character-avatars',
+                    userId
+                );
+                if (publicUrl) {
+                    avatarImageUrl = publicUrl;
+                    console.log(`✅ Character avatar uploaded to Supabase: ${publicUrl}`);
+                }
+            }
+
             // Get user settings to check auto_approve_characters setting
             const userSettings = await this.getUserSettings(userId);
             const moderationStatus = userSettings?.autoApproveCharacters ? 'approved' : 'pending';
@@ -360,7 +410,7 @@ class DatabaseService {
                 max_tokens: character.max_tokens,
                 context_window: character.context_window,
                 memory_enabled: character.memory_enabled,
-                avatar_image_url: character.avatar_image_url,
+                avatar_image_url: avatarImageUrl,
                 avatar_image_filename: character.avatar_image_filename,
                 uses_custom_image: character.uses_custom_image,
                 is_locked: publishData.isLocked || false,
@@ -433,6 +483,26 @@ class DatabaseService {
 
             if (error) throw error;
 
+            // Download avatar image if it has a custom image
+            let avatarImageFilename = communityChar.avatar_image_filename;
+            let avatarImageUrl = communityChar.avatar_image_url;
+            
+            if (communityChar.uses_custom_image && communityChar.avatar_image_url) {
+                const ImageService = require('./ImageService');
+                const imageService = new ImageService(this.supabase);
+                const downloadedFilename = await imageService.downloadImageFromUrl(
+                    communityChar.avatar_image_url,
+                    userId
+                );
+                
+                if (downloadedFilename) {
+                    avatarImageFilename = downloadedFilename;
+                    // Use local path for imported character
+                    avatarImageUrl = `/uploads/${downloadedFilename}`;
+                    console.log(`✅ Character avatar downloaded: ${downloadedFilename}`);
+                }
+            }
+
             // Import to local SQLite database with defaults for locked/hidden fields
             const characterData = {
                 name: communityChar.name,
@@ -449,8 +519,8 @@ class DatabaseService {
                 max_tokens: communityChar.max_tokens,
                 context_window: communityChar.context_window,
                 memory_enabled: communityChar.memory_enabled,
-                avatar_image_url: communityChar.avatar_image_url,
-                avatar_image_filename: communityChar.avatar_image_filename,
+                avatar_image_url: avatarImageUrl,
+                avatar_image_filename: avatarImageFilename,
                 uses_custom_image: communityChar.uses_custom_image,
                 original_id: communityChar.id // Track where it came from
             };
@@ -502,13 +572,36 @@ class DatabaseService {
 
             if (error) throw error;
 
+            // Download background image if it has a custom background
+            let backgroundImageFilename = communityScene.background_image_filename;
+            let backgroundImageUrl = communityScene.background_image_url;
+            
+            if (communityScene.uses_custom_background && communityScene.background_image_url) {
+                const ImageService = require('./ImageService');
+                const imageService = new ImageService(this.supabase);
+                const downloadedFilename = await imageService.downloadImageFromUrl(
+                    communityScene.background_image_url,
+                    userId
+                );
+                
+                if (downloadedFilename) {
+                    backgroundImageFilename = downloadedFilename;
+                    // Use local path for imported scene
+                    backgroundImageUrl = `/uploads/${downloadedFilename}`;
+                    console.log(`✅ Scene background downloaded: ${downloadedFilename}`);
+                }
+            }
+
             // Import to local SQLite database
             const sceneData = {
                 name: communityScene.title || communityScene.name || 'Imported Scene',
                 description: communityScene.description || 'An imported community scene.',
-                initial_message: communityScene.system_prompt || 'Welcome to this scene!',
-                atmosphere: communityScene.category || 'neutral',
+                initial_message: communityScene.initial_message || 'Welcome to this scene!',
+                atmosphere: communityScene.category || communityScene.atmosphere || 'neutral',
                 tags: communityScene.tags,
+                background_image_url: backgroundImageUrl,
+                background_image_filename: backgroundImageFilename,
+                uses_custom_background: communityScene.uses_custom_background,
                 original_id: communityScene.id // Track where it came from
             };
 

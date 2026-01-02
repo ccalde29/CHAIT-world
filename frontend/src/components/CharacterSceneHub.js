@@ -146,7 +146,8 @@ const CharacterSceneHub = ({
                 <p className="text-xs mt-1">Create your first character!</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="overflow-x-auto pb-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-w-max sm:min-w-0">
               {filteredCharacters.map((character) => (
                 <div
                   key={character.id}
@@ -237,6 +238,7 @@ const CharacterSceneHub = ({
                 </div>
               ))
               }
+                </div>
               </div>
             )}
           </div>
@@ -265,7 +267,8 @@ const CharacterSceneHub = ({
                 <p className="text-xs mt-1">Create your first scene!</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="overflow-x-auto pb-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-w-max sm:min-w-0">
                 {filteredScenes.map((scene) => (
                   <div
                     key={scene.id}
@@ -346,6 +349,7 @@ const CharacterSceneHub = ({
                   </div>
                   </div>
                 ))}
+                </div>
               </div>
             )}
           </div>

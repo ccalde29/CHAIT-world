@@ -157,7 +157,9 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
     const characters = (await Promise.all(characterPromises)).filter(char => char != null); // Filters both null and undefined
     
     if (!characters || characters.length === 0) {
-      return res.status(500).json({ error: 'Failed to load character data' });
+      console.error('[GroupChat] Failed to load characters. Active IDs:', activeCharacters);
+      console.error('[GroupChat] Loaded characters:', characters);
+      return res.status(500).json({ error: 'Failed to load character data. Characters may have been deleted.' });
     }
     
     // ========================================================================
