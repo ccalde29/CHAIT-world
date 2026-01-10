@@ -104,7 +104,6 @@ module.exports = (db) => {
         is_active: true
       });
 
-      console.log(`[TokenModels] Created token model: ${model.name} (${ai_provider}/${model_id}) - ${token_cost || 1} tokens`);
       res.status(201).json({ model, message: 'Token model created successfully' });
 
     } catch (error) {
@@ -175,7 +174,6 @@ module.exports = (db) => {
 
       const model = await supabaseService.updateTokenModel(id, updates);
 
-      console.log(`[TokenModels] Updated token model: ${model.name}`);
       res.json({ model, message: 'Token model updated successfully' });
 
     } catch (error) {
@@ -195,7 +193,7 @@ module.exports = (db) => {
     try {
       const { id } = req.params;
       await supabaseService.deleteTokenModel(id);
-      console.log(`[TokenModels] Deleted token model: ${id}`);
+
       res.json({ success: true, message: 'Token model deleted successfully' });
     } catch (error) {
       if (error.message.includes('not found')) {
@@ -236,8 +234,6 @@ module.exports = (db) => {
         console.error('[TokenModels] Error fetching transactions:', txError);
       }
 
-      console.log(`[TokenModels] Found ${transactions?.length || 0} usage transactions with model_id in last 30 days`);
-      
       // Group by provider and tier
       const analyticsData = {};
 

@@ -43,7 +43,6 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
         setUser(session?.user || null);
         setLoading(false);
         setError(null);
@@ -54,27 +53,19 @@ export const AuthProvider = ({ children }) => {
     let appUrlListener;
     if (Capacitor.isNativePlatform()) {
       appUrlListener = App.addListener('appUrlOpen', async ({ url }) => {
-        console.log('Deep link received:', url);
         
         // Check if this is an auth callback
         if (url.includes('auth/callback')) {
           try {
             // Parse the hash fragment to extract tokens
             const hashFragment = url.split('#')[1];
-            console.log('Hash fragment:', hashFragment);
             
             if (hashFragment) {
               const params = new URLSearchParams(hashFragment);
               const accessToken = params.get('access_token');
               const refreshToken = params.get('refresh_token');
               
-              console.log('Tokens extracted:', { 
-                hasAccessToken: !!accessToken, 
-                hasRefreshToken: !!refreshToken 
-              });
-              
               if (accessToken && refreshToken) {
-                console.log('Setting session from tokens...');
                 const { data, error } = await supabase.auth.setSession({
                   access_token: accessToken,
                   refresh_token: refreshToken
@@ -84,7 +75,6 @@ export const AuthProvider = ({ children }) => {
                   console.error('Error setting session:', error);
                   setError(error.message);
                 } else {
-                  console.log('Session set successfully:', data.user?.email);
                   setUser(data.user);
                 }
               } else {

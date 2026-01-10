@@ -476,17 +476,7 @@ class SupabaseAdminTokenService {
      * Log a token transaction
      */
     async logTransaction(userId, amount, type, reference, balanceAfter, modelId = null, apiCost = null, providerCostPer500 = null) {
-        console.log(`[SupabaseAdminTokenService] Logging transaction:`, {
-            userId,
-            amount,
-            type,
-            reference,
-            balanceAfter,
-            modelId,
-            apiCost,
-            providerCostPer500
-        });
-        
+
         const { data, error } = await this.supabase
             .from('token_transactions')
             .insert({
@@ -506,8 +496,7 @@ class SupabaseAdminTokenService {
             console.error('[SupabaseAdminTokenService] Error logging transaction:', error);
             throw error;
         }
-        
-        console.log(`[SupabaseAdminTokenService] Transaction logged successfully:`, data.id);
+
         return data;
     }
 

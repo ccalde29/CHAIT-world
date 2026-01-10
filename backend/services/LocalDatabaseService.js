@@ -49,7 +49,6 @@ class LocalDatabaseService {
             this.initializeSchema();
             
             this.isInitialized = true;
-            console.log(`Local SQLite database initialized at: ${this.dbPath}`);
         } catch (error) {
             console.error('Failed to initialize local database:', error);
             throw error;
@@ -67,7 +66,6 @@ class LocalDatabaseService {
             ).get();
 
             if (versionCheck) {
-                console.log('Database schema already exists');
                 // Run migrations for existing databases
                 this.runMigrations();
                 return;
@@ -79,8 +77,6 @@ class LocalDatabaseService {
             
             // Execute schema (split by semicolon and execute each statement)
             this.db.exec(schema);
-            
-            console.log('Database schema initialized successfully');
         } catch (error) {
             console.error('Failed to initialize schema:', error);
             throw error;
@@ -98,32 +94,26 @@ class LocalDatabaseService {
 
             // Add missing columns if they don't exist
             if (!columnNames.includes('group_dynamics_mode')) {
-                console.log('Adding group_dynamics_mode column to user_settings_local');
                 this.db.exec("ALTER TABLE user_settings_local ADD COLUMN group_dynamics_mode TEXT DEFAULT 'natural'");
             }
 
             if (!columnNames.includes('message_delay')) {
-                console.log('Adding message_delay column to user_settings_local');
                 this.db.exec("ALTER TABLE user_settings_local ADD COLUMN message_delay INTEGER DEFAULT 1200");
             }
 
             if (!columnNames.includes('admin_system_prompt')) {
-                console.log('Adding admin_system_prompt column to user_settings_local');
                 this.db.exec("ALTER TABLE user_settings_local ADD COLUMN admin_system_prompt TEXT");
             }
 
             if (!columnNames.includes('is_admin')) {
-                console.log('Adding is_admin column to user_settings_local');
                 this.db.exec("ALTER TABLE user_settings_local ADD COLUMN is_admin INTEGER DEFAULT 0");
             }
 
             if (!columnNames.includes('auto_approve_characters')) {
-                console.log('Adding auto_approve_characters column to user_settings_local');
                 this.db.exec("ALTER TABLE user_settings_local ADD COLUMN auto_approve_characters INTEGER DEFAULT 0");
             }
 
             if (!columnNames.includes('use_ai_memory_extraction')) {
-                console.log('Adding use_ai_memory_extraction column to user_settings_local');
                 this.db.exec("ALTER TABLE user_settings_local ADD COLUMN use_ai_memory_extraction INTEGER DEFAULT 0");
             }
 
@@ -132,7 +122,6 @@ class LocalDatabaseService {
             const memColumnNames = memTableInfo.map(col => col.name);
 
             if (!memColumnNames.includes('target_type')) {
-                console.log('Adding target_type and target_entity to character_memories');
                 this.db.exec(`
                     ALTER TABLE character_memories ADD COLUMN target_type TEXT DEFAULT 'user' CHECK(target_type IN ('user', 'character', 'general'));
                 `);
@@ -156,7 +145,6 @@ class LocalDatabaseService {
             const tableNames = tables.map(t => t.name);
 
             if (!tableNames.includes('character_learning')) {
-                console.log('Creating character_learning table');
                 this.db.exec(`
                     CREATE TABLE character_learning (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,7 +164,6 @@ class LocalDatabaseService {
             }
 
             if (!tableNames.includes('character_topic_engagement')) {
-                console.log('Creating character_topic_engagement table');
                 this.db.exec(`
                     CREATE TABLE character_topic_engagement (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,7 +183,6 @@ class LocalDatabaseService {
             }
 
             if (!tableNames.includes('user_tokens')) {
-                console.log('Creating user_tokens table');
                 this.db.exec(`
                     CREATE TABLE user_tokens (
                         user_id TEXT PRIMARY KEY,
@@ -213,7 +199,6 @@ class LocalDatabaseService {
             }
 
             if (!tableNames.includes('token_transactions')) {
-                console.log('Creating token_transactions table');
                 this.db.exec(`
                     CREATE TABLE token_transactions (
                         id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
@@ -232,7 +217,6 @@ class LocalDatabaseService {
             }
 
             if (!tableNames.includes('token_models')) {
-                console.log('Creating token_models table');
                 this.db.exec(`
                     CREATE TABLE token_models (
                         id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
@@ -255,8 +239,6 @@ class LocalDatabaseService {
                     CREATE INDEX idx_token_models_cost ON token_models(token_cost);
                 `);
             }
-
-            console.log('Database migrations completed');
         } catch (error) {
             console.error('Failed to run migrations:', error);
             // Don't throw - allow app to continue

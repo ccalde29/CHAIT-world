@@ -27,7 +27,6 @@ import CharacterMemoryViewer from './CharacterMemoryViewer';
 import NavigationSidebar from './NavigationSidebar';
 import CommunityHub from './CommunityHub';
 import ModerationPanel from './ModerationPanel';
-import OfflineIndicator from './OfflineIndicator';
 import LoginRequiredModal from './LoginRequiredModal';
 
 const MainApp = () => {
@@ -95,14 +94,11 @@ const MainApp = () => {
     const loadAdminStatus = async () => {
       try {
         const response = await apiRequest('/api/user/settings');
-        console.log('[MainApp] User settings loaded:', response);
-        console.log('[MainApp] Admin status:', response?.isAdmin);
         setIsAdmin(response?.isAdmin || false);
       } catch (error) {
         console.error('[MainApp] Failed to load admin status:', error);
         // On native platform, check if user email matches admin email
         if (user?.email === 'ccalde29@gmail.com') {
-          console.log('[MainApp] Setting admin based on email match');
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
@@ -111,11 +107,6 @@ const MainApp = () => {
     };
     loadAdminStatus();
   }, [user.id, user.email, apiRequest]);
-
-  // Debug: Log when admin status changes
-  useEffect(() => {
-    console.log('[MainApp] isAdmin state changed to:', isAdmin);
-  }, [isAdmin]);
 
   // ============================================================================
   // HANDLERS
@@ -177,7 +168,6 @@ const MainApp = () => {
       }
     );
     // Refresh token balance after sending message
-    console.log('[MainApp] Refreshing token balance after message sent');
     await tokens.refreshBalance();
   };
 
@@ -357,9 +347,6 @@ const MainApp = () => {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
-      {/* Offline Status Indicator */}
-      <OfflineIndicator />
-      
       {/* Left Sidebar - Navigation & Chat History */}
       <NavigationSidebar
         apiRequest={apiRequest}

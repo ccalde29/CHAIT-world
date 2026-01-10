@@ -22,3 +22,13 @@ code {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Utility class to hide scrollbars while still allowing scrolling */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

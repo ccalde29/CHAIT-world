@@ -274,8 +274,7 @@ module.exports = (db) => {
                 temperature: tokenModel.temperature,
                 max_tokens: tokenModel.max_tokens
               };
-              
-              console.log(`[Narrator Token] Using token model: ${tokenModel.display_name} (${tokenModel.ai_provider}/${tokenModel.model_id}) - Cost: ${modelCost} tokens`);
+
             }
 
             let narratorPrompt = `You are the narrator for this scene: ${scene.name}
@@ -320,7 +319,7 @@ Keep responses brief (1-2 sentences). Focus on what's happening in the scene, no
                 estimatedApiCost, // api_cost_usd
                 tokenModel.provider_cost_per_500_tokens // provider_cost_per_500_tokens
               );
-              console.log(`[Narrator Token] Deducted ${modelCost} tokens. New balance: ${result.new_balance}`);
+
             }
 
             res.json({ triggered: true, response, scene: scene.name });

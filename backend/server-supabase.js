@@ -64,11 +64,6 @@ app.use('/uploads', express.static(path.join(__dirname, '../data/uploads')));
 // Apply general rate limiting to all API routes
 app.use('/api', generalLimiter);
 
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  next();
-});
-
 const requireAuth = (req, res, next) => {
   const userId = req.headers['user-id'];
   if (!userId) {
@@ -190,21 +185,7 @@ app.use('*', (req, res) => {
 // ============================================================================
 
 app.listen(PORT, () => {
-  console.log(`
-🚀 CHAIT World Server Started
-📡 Port: ${PORT}
-🌍 Environment: ${process.env.NODE_ENV || 'development'}
-🗄️  Database: Supabase
-🔐 Auth: Google OAuth
-✨ Features:
-   ✓ Character-to-Character Interactions
-   ✓ Memory & Learning System
-   ✓ Chat History & Sessions
-   ✓ Custom Characters & Scenes
-   ✓ Community Hub
-   ✓ Image Uploads
-   ✓ Modular Architecture
-  `);
+
 });
 
 module.exports = app;

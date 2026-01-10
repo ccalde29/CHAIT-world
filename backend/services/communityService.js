@@ -393,7 +393,7 @@ class CommunityService {
         );
         if (publicUrl) {
           avatarImageUrl = publicUrl;
-          console.log(`✅ Character avatar uploaded to Supabase: ${publicUrl}`);
+
         }
       }
 
@@ -435,7 +435,6 @@ class CommunityService {
         throw error;
       }
 
-      console.log(`Character published to community: ${data.id} (status: ${moderationStatus})`);
       return {
         ...data,
         requiresModeration: moderationStatus === 'pending'
@@ -619,8 +618,6 @@ class CommunityService {
         throw error;
       }
 
-      console.log(`Community scenes fetched: ${data?.length || 0} scenes, total: ${count}`);
-
       return {
         scenes: data || [],
         total: count || 0,
@@ -670,7 +667,7 @@ class CommunityService {
         );
         if (publicUrl) {
           backgroundImageUrl = publicUrl;
-          console.log(`✅ Scene background uploaded to Supabase: ${publicUrl}`);
+
         }
       }
 
@@ -701,7 +698,6 @@ class CommunityService {
         throw error;
       }
 
-      console.log('Scene published to community:', data.id);
       return data;
     } catch (error) {
       console.error('Error publishing scene:', error);

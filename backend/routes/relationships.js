@@ -17,16 +17,12 @@ router.get('/:characterId/relationships', async (req, res) => {
     const { characterId } = req.params;
     const { target_type } = req.query; // Optional filter: 'character' or 'user'
 
-    console.log(`[Relationships GET] CharacterId: ${characterId}, UserId: ${userId}, TargetType: ${target_type}`);
-
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Get relationships from local database
     let relationships = await db.getRelationshipsForCharacter(characterId, userId, target_type);
-
-    console.log(`[Relationships GET] Found ${relationships?.length || 0} relationships`);
 
     // Enrich relationships with target details
     const characterRelationships = relationships.filter(r => r.target_type === 'character');
@@ -67,7 +63,7 @@ router.get('/:characterId/relationships', async (req, res) => {
               uses_custom_image: targetPersona.uses_custom_image,
               avatar_image_url: targetPersona.avatar_image_url
             };
-            console.log('[Relationships GET] Enriched relationship with persona:', rel);
+
           } else {
             console.warn('[Relationships GET] No persona found for target_id:', rel.target_id);
           }
@@ -155,8 +151,6 @@ router.post('/:characterId/relationships', async (req, res) => {
       custom_context: custom_context || null
     });
 
-    console.log(`[Relationships] Created relationship: ${sourceChar.name} → ${targetName} (${relationship_type})`);
-
     // If this is a character-to-character relationship, create the reverse relationship
     if (targetType === 'character') {
       await db.createOrUpdateRelationship(targetId, userId, {
@@ -169,7 +163,6 @@ router.post('/:characterId/relationships', async (req, res) => {
         custom_context: custom_context || null
       });
 
-      console.log(`[Relationships] Created reverse relationship: ${targetName} → ${sourceChar.name} (${relationship_type})`);
     }
 
     res.json({
@@ -204,12 +197,10 @@ router.delete('/:characterId/relationships/:targetId', async (req, res) => {
     // Delete relationship from local database
     await db.deleteRelationship(characterId, userId, targetId);
 
-    console.log(`[Relationships] Deleted relationship: ${characterId} → ${targetId}`);
-
     // If this was a character-to-character relationship, also delete the reverse
     if (relationshipToDelete && relationshipToDelete.target_type === 'character') {
       await db.deleteRelationship(targetId, userId, characterId);
-      console.log(`[Relationships] Deleted reverse relationship: ${targetId} → ${characterId}`);
+
     }
 
     res.json({ success: true, message: 'Relationship deleted successfully' });

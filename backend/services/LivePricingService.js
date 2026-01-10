@@ -22,7 +22,7 @@ class LivePricingService {
             // Check cache first
             const cached = await this.getCachedPricing(provider, modelId);
             if (cached && this.isCacheFresh(cached.last_updated)) {
-                console.log(`[Pricing] Using cached price for ${provider}/${modelId}: $${cached.cost_per_500_tokens}`);
+
                 return cached.cost_per_500_tokens;
             }
 
@@ -31,8 +31,7 @@ class LivePricingService {
             
             // Update cache
             await this.updateCache(provider, modelId, cost);
-            
-            console.log(`[Pricing] Fetched fresh price for ${provider}/${modelId}: $${cost}`);
+
             return cost;
 
         } catch (error) {
@@ -41,7 +40,7 @@ class LivePricingService {
             // Fallback to cached value even if stale
             const cached = await this.getCachedPricing(provider, modelId);
             if (cached) {
-                console.log(`[Pricing] Using stale cache as fallback`);
+
                 return cached.cost_per_500_tokens;
             }
             
@@ -210,8 +209,7 @@ class LivePricingService {
      * Force refresh all cached pricing
      */
     async refreshAllPricing(adminApiKeys) {
-        console.log('[Pricing] Force refreshing all pricing...');
-        
+
         const SupabaseAdminTokenService = require('./SupabaseAdminTokenService');
         const models = await SupabaseAdminTokenService.getTokenModels(true);
 

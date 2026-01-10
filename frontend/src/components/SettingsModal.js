@@ -422,7 +422,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         body: JSON.stringify(keysToSave)
       });
       
-      console.log('[Settings] Admin API keys saved');
     } catch (error) {
       console.error('Failed to save admin keys:', error);
       throw error;

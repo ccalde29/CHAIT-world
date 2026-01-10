@@ -154,8 +154,6 @@ router.post('/:personaId/activate', async (req, res) => {
       );
     }
 
-    console.log(`[Personas] User ${userId} activated persona ${personaId}: ${persona.name}`);
-
     res.json({
       success: true,
       persona,
@@ -271,8 +269,6 @@ router.post('/', async (req, res) => {
       persona.interests = JSON.parse(persona.interests);
     }
 
-    console.log(`[Personas] Created new persona ${persona.id}: ${persona.name}`);
-
     res.json({ persona });
 
   } catch (error) {
@@ -364,8 +360,6 @@ router.put('/:personaId', async (req, res) => {
       persona.interests = JSON.parse(persona.interests);
     }
 
-    console.log(`[Personas] Updated persona ${personaId}: ${persona.name}`);
-
     res.json({ persona });
 
   } catch (error) {
@@ -424,8 +418,6 @@ router.delete('/:personaId', async (req, res) => {
         );
       }
     }
-
-    console.log(`[Personas] Deleted persona ${personaId}`);
 
     res.json({ success: true, message: 'Persona deleted successfully' });
 
@@ -508,7 +500,6 @@ ${persona.personality}`;
     };
 
     // Generate response using AIProviderService
-    console.log(`[Personas] Generating auto-response for persona ${persona.name} (${persona.ai_provider}/${persona.ai_model})`);
 
     // Check if this is a token model and resolve it
     let modelCost = null;
@@ -562,8 +553,7 @@ ${persona.personality}`;
         temperature: tokenModel.temperature,
         max_tokens: tokenModel.max_tokens
       };
-      
-      console.log(`[Token] Using token model: ${tokenModel.display_name} (${tokenModel.ai_provider}/${tokenModel.model_id}) - Cost: ${modelCost} tokens`);
+
     }
 
     // Prepare settings object with both ollama and lmstudio configurations
@@ -600,10 +590,8 @@ ${persona.personality}`;
         estimatedApiCost, // api_cost_usd
         tokenModel.provider_cost_per_500_tokens // provider_cost_per_500_tokens
       );
-      console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${result.new_balance}`);
-    }
 
-    console.log(`[Personas] Generated response for persona ${persona.name}: ${response.substring(0, 50)}...`);
+    }
 
     res.json({
       success: true,

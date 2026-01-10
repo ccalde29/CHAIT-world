@@ -23,9 +23,7 @@ class AIProviderService {
   static async generateResponse(character, messages, apiKeys = {}, ollamaSettings = {}, options = {}) {
     const provider = character.ai_provider || 'openai';
     const model = character.ai_model || 'gpt-3.5-turbo';
-    
-    console.log(`[AI Service] Generating response for ${character.name} using ${provider}/${model}`);
-    
+
     try {
       // Route to appropriate provider
       switch (provider.toLowerCase()) {
@@ -62,8 +60,7 @@ class AIProviderService {
       
       // Try fallback if configured
       if (character.fallback_provider && character.fallback_model) {
-        console.log(`[AI Service] Attempting fallback: ${character.fallback_provider}/${character.fallback_model}`);
-        
+
         const fallbackChar = {
           ...character,
           ai_provider: character.fallback_provider,

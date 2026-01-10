@@ -34,10 +34,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   // Fetch moderation queue
   const fetchQueue = async () => {
     try {
-      console.log('[ModerationPanel] Fetching queue...');
       const response = await apiRequest('/api/moderation/queue');
-      console.log('[ModerationPanel] Queue response:', response);
-      console.log('[ModerationPanel] Queue items:', response.queue);
       setQueue(response.queue || []);
     } catch (error) {
       console.error('Failed to fetch moderation queue:', error);
@@ -68,12 +65,9 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   const fetchPricing = async () => {
     setLoadingPricing(true);
     try {
-      console.log('[ModerationPanel] Fetching pricing recommendations...');
       const response = await apiRequest('/api/pricing/recommendations');
-      console.log('[ModerationPanel] Received response:', response);
       setRecommendations(response.recommendations || {});
       setPricing(response.tierPricing || {});
-      console.log('[ModerationPanel] Set recommendations:', Object.keys(response.recommendations || {}).length, 'providers');
     } catch (error) {
       console.error('Failed to fetch pricing:', error);
     } finally {
@@ -257,10 +251,6 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
 
       {/* Tabs */}
       <div className="bg-gray-800 border-b border-white/10 px-4 overflow-x-auto">
-        <style>{`
-          .scrollbar-hide::-webkit-scrollbar { display: none; }
-          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        `}</style>
         <div className="flex gap-2 scrollbar-hide min-w-max">          <button
             onClick={() => setActiveTab('pending')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${

@@ -62,7 +62,6 @@ module.exports = (db) => {
                 });
             }
 
-            console.log('✅ Created chat session with initial message:', session.id);
             res.status(201).json({
                 sessionId: session.id,
                 message: 'Chat session created successfully'

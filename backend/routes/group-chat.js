@@ -111,8 +111,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    console.log(`[Group Chat v2.0] Processing for ${activeCharacters.length} characters`);
-
     // ========================================================================
     // STEP 0: CREATE OR USE EXISTING SESSION
     // ========================================================================
@@ -136,9 +134,7 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       });
 
       activeSessionId = newSession.id;
-      console.log(`[Session] Created new session: ${activeSessionId}`);
     } else {
-      console.log(`[Session] Using existing session: ${activeSessionId}`);
     }
 
     // Save user message to database
@@ -146,8 +142,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       type: 'user',
       content: userMessage
     });
-
-    console.log(`[Session] Saved user message to session ${activeSessionId}`);
 
     // ========================================================================
     // STEP 1: LOAD CHARACTER DATA
@@ -217,8 +211,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       conversationHistory,
       conversationTracker
     );
-
-    console.log(`[Planning] ${responsePlan.responders.length} character(s) will respond`);
 
     // Limit to max 3 responding characters to prevent conversation breakdown
     const respondingCharacters = responsePlan.responders.slice(0, 3);
@@ -379,8 +371,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         const dynamicTemp = ProviderAdapter.calculateDynamicTemperature(char, charContext);
         const tokenBudget = ProviderAdapter.calculateResponseBudget(char, charContext);
 
-        console.log(`[Response] ${char.name} - Temp: ${dynamicTemp.toFixed(2)}, Tokens: ${tokenBudget}`);
-
         // Check if this is a token model and resolve it
         let resolvedChar = { ...char, temperature: dynamicTemp, max_tokens: tokenBudget };
         let modelCost = null;
@@ -429,10 +419,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
             temperature: tokenModel.temperature,
             max_tokens: tokenModel.max_tokens
           };
-          
-          console.log(`[Token] Using token model: ${tokenModel.display_name}`);
-          console.log(`[Token] Provider: ${tokenModel.ai_provider}, Model: ${tokenModel.model_id}`);
-          console.log(`[Token] Cost: ${modelCost} tokens, using admin keys`);
         }
 
         const rawResponse = await AIProviderService.generateResponse(
@@ -456,7 +442,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
             estimatedApiCost, // api_cost_usd
             tokenModel.provider_cost_per_500_tokens // provider_cost_per_500_tokens
           );
-          console.log(`[Token] Deducted ${modelCost} tokens. New balance: ${result.new_balance}`);
         }
 
         // Normalize response
@@ -511,7 +496,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
               userId,
               apiKeys
             );
-            console.log(`[Memory] AI extracted ${newMemories.length} memories for ${char.name}`);
           } else {
             newMemories = memoryService.analyzeConversationForMemories(
               userMessage,
@@ -555,10 +539,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
             for (const mem of charToCharMemories) {
               await memoryService.addCharacterMemory(char.id, userId, mem);
             }
-            
-            if (charToCharMemories.length > 0) {
-              console.log(`[Memory] ${char.name} stored ${charToCharMemories.length} memories about other characters`);
-            }
           }
         } catch (memErr) {
           console.error(`[Memory] Error for ${char.name}:`, memErr);
@@ -589,15 +569,9 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
               emotionalAssociation
             );
           }
-          
-          if (topicKeywords.length > 0) {
-            console.log(`[Topics] Updated ${topicKeywords.length} topics for ${char.name}: ${topicKeywords.join(', ')}`);
-          }
         } catch (learnErr) {
           console.error(`[Learning] Error for ${char.name}:`, learnErr);
         }
-
-        console.log(`[Response] ${char.name}: "${response.substring(0, 80)}..."`);
 
       } catch (error) {
         console.error(`[Response] Error for ${char.name}:`, error);
@@ -605,7 +579,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         // If tokens were deducted and request failed, refund and log
         if (useServerKeys && modelCost > 0) {
           try {
-            console.log(`[Token] Request failed, refunding ${modelCost} tokens...`);
             await supabaseTokenService.refundTokens(
               userId, 
               modelCost, 
@@ -619,7 +592,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
               error.message || 'Unknown error',
               modelCost
             );
-            console.log(`[Token] Refunded ${modelCost} tokens and logged failed transaction`);
           } catch (refundError) {
             console.error('[Token] Failed to refund tokens:', refundError);
           }
@@ -644,9 +616,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
     // Validate group coherence
     const isCoherent = ResponsePlanner.validateGroupCoherence(responses);
-    if (!isCoherent) {
-      console.log('[Coherence] Warning: Potential contradictions detected in responses');
-    }
 
     // Store session metadata for continuity
     const conversationSummary = conversationTracker.getSummary();
@@ -655,8 +624,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       key_topics: conversationSummary.active_topics,
       message_count: conversationHistory.length + responses.length
     });
-
-    console.log(`[Group Chat v3.0] Generated ${responses.length} responses`);
 
     res.json({
       sessionId: activeSessionId,

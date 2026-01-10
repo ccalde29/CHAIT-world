@@ -142,10 +142,6 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
   const aggregatedUsage = aggregateTransactions();
   const otherTransactions = getNonUsageTransactions();
 
-  console.log('[UserCreditsPanel] Total transactions:', transactions.length);
-  console.log('[UserCreditsPanel] Aggregated usage:', aggregatedUsage.length, aggregatedUsage);
-  console.log('[UserCreditsPanel] Other transactions:', otherTransactions.length);
-
   return (
     <div className="p-6 space-y-6" style={{ height: '100%', overflowY: 'auto' }}>
       {/* Balance Overview */}

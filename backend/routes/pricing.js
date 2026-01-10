@@ -86,7 +86,6 @@ router.get('/', requireAdmin, async (req, res) => {
             return a.input - b.input;
           });
 
-        console.log(`[Pricing] Fetched ${pricing.openrouter.length} OpenRouter models`);
       } else {
         console.error('[Pricing] OpenRouter API returned status:', response.status);
         pricing.openrouter = [];
@@ -179,8 +178,7 @@ router.get('/recommendations', requireAdmin, async (req, res) => {
             per: '1M',
             context: m.context_length
           }));
-        
-        console.log(`[Pricing] Fetched ${openrouterModels.length} chat-capable OpenRouter models`);
+
       }
     } catch (error) {
       console.error('[Pricing] Failed to fetch OpenRouter models, using static list:', error.message);
@@ -197,10 +195,8 @@ router.get('/recommendations', requireAdmin, async (req, res) => {
     
     // Calculate recommendations for each provider
     const recommendations = {};
-    
-    console.log('[Pricing] Processing recommendations for', Object.keys(providerPricing).length, 'providers');
-    console.log('[Pricing] Found', tokenModels.length, 'token models');
-    
+
+
     for (const [provider, models] of Object.entries(providerPricing)) {
       recommendations[provider] = await Promise.all(
         models.map(async (model) => {
@@ -311,8 +307,6 @@ router.get('/refresh', requireAdmin, async (req, res) => {
         context: m.context_length,
         tier: parseFloat(m.pricing.prompt) === 0 ? 'free' : 'paid'
       }));
-
-    console.log(`[Pricing] Refreshed ${models.length} OpenRouter models`);
 
     res.json({
       success: true,

@@ -50,7 +50,7 @@ async function requireAdmin(req, res, next) {
     }
 
     // User is admin, proceed to next middleware
-    console.log(`[AdminAuth] Admin access granted to user: ${userId}`);
+
     next();
 
   } catch (error) {

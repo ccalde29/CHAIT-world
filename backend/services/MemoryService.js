@@ -28,8 +28,6 @@ class MemoryService {
      */
     async addCharacterMemory(characterId, userId, memoryData) {
         try {
-            console.log('Adding memory for character:', characterId);
-            
             // Map 'fact' to 'semantic' for database constraint
             let memoryType = memoryData.type || 'semantic';
             if (memoryType === 'fact') {
@@ -45,7 +43,6 @@ class MemoryService {
                 content: memoryData.content,
                 importance_score: memoryData.importance_score || 0.5
             });
-            console.log('Memory added successfully');
             return memory;
         } catch (error) {
             console.error('Database error adding character memory:', error);
@@ -105,7 +102,6 @@ class MemoryService {
      */
     async updateCharacterRelationship(characterId, userId, relationshipData) {
         try {
-            console.log('Updating relationship for character:', characterId);
             const relationship = await this.db.createOrUpdateRelationship(characterId, userId, {
                 target_type: 'user',
                 target_id: userId,
@@ -115,7 +111,6 @@ class MemoryService {
                 emotional_bond: relationshipData.emotional_bond ?? 0.0
             });
             
-            console.log('Relationship updated successfully', relationship);
             return relationship;
         } catch (error) {
             console.error('Database error updating character relationship:', error);
@@ -190,8 +185,6 @@ class MemoryService {
      */
     async buildCharacterContext(characterId, userId, sessionId = null, otherCharacters = []) {
         try {
-            console.log('Building context for character:', characterId);
-
             const [memories, relationship] = await Promise.all([
                 this.getCharacterMemories(characterId, userId, 5),
                 this.getCharacterRelationship(characterId, userId)
@@ -230,7 +223,6 @@ class MemoryService {
                 otherCharacterMessages: recentCharacterMessages
             };
 
-            console.log('Context built successfully');
             return context;
 
         } catch (error) {
@@ -260,8 +252,6 @@ class MemoryService {
     analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId) {
         const memories = [];
         const userText = userMessage.toLowerCase();
-
-        console.log('Analyzing conversation for memories...');
 
         // Enhanced pattern matching
         const patterns = [
@@ -299,8 +289,6 @@ class MemoryService {
                     importance_score: importance,
                     target_entity: userId
                 });
-
-                console.log('Found memory:', memoryContent);
             }
         });
 
@@ -320,10 +308,8 @@ class MemoryService {
             memories.forEach(memory => {
                 memory.importance_score = Math.min(1.0, memory.importance_score + 0.1);
             });
-            console.log('Boosted memory importance (character showed understanding)');
         }
 
-        console.log(`Total memories found: ${memories.length}`);
         return memories;
     }
 
@@ -384,13 +370,11 @@ Return ONLY the JSON array, nothing else.`;
                     {}
                 );
             } catch (error) {
-                console.log('[Memory] AI provider failed for memory extraction, using regex fallback:', error.message);
                 return this.analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId);
             }
             
             const jsonMatch = responseText.match(/\[[\s\S]*\]/);
             if (!jsonMatch) {
-                console.log('[Memory] AI did not return valid JSON, using regex fallback');
                 return this.analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId);
             }
             
@@ -418,8 +402,6 @@ Return ONLY the JSON array, nothing else.`;
         let trustChange = 0.0;
 
         const userText = userMessage.toLowerCase();
-
-        console.log('Calculating relationship update...');
 
         // Positive interactions (2-3x stronger)
         if (userText.match(/(?:thank you|thanks|appreciate|love|like|great|wonderful|amazing)/)) {
@@ -455,8 +437,6 @@ Return ONLY the JSON array, nothing else.`;
         const newEmotionalBond = Math.max(-1, Math.min(1, currentRelationship.emotional_bond + emotionalChange));
 
         const relationshipType = this.determineRelationshipType(newEmotionalBond, newFamiliarity);
-
-        console.log(`Relationship updated: ${relationshipType} (trust: ${newTrust.toFixed(2)}, familiarity: ${newFamiliarity.toFixed(2)})`);
 
         return {
             relationship_type: relationshipType,

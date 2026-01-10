@@ -358,7 +358,6 @@ const CharacterEditorV15 = ({
 
       if (response.ok) {
         const data = await response.json();
-        console.log('[CharacterEditor] Loaded relationships:', data.relationships);
         setCharacterRelationships(data.relationships || []);
       }
     } catch (error) {
@@ -429,7 +428,6 @@ const CharacterEditorV15 = ({
   // Load relationships when editing an existing character
   useEffect(() => {
     if (character?.id) {
-      console.log('[CharacterEditor] Loading relationships for character:', character.id);
       loadCharacterRelationships();
       loadAvailableCharactersForRelationships();
     }
@@ -735,9 +733,6 @@ const CharacterEditorV15 = ({
                 <p className="text-xs text-gray-400 mb-3">
                   Define how this character knows other characters in your world. This helps create more natural conversations.
                 </p>
-
-                {/* Debug info */}
-                {console.log('[CharacterEditor] Relationships state:', characterRelationships)}
 
                 {/* Existing Relationships */}
                 {characterRelationships.length > 0 ? (

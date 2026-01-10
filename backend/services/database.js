@@ -25,7 +25,6 @@ class DatabaseService {
                 // Load Supabase admin/token service only if env vars are set
                 this.supabaseService = require('./SupabaseAdminTokenService');
                 
-                console.log('[Database] Supabase initialized for community features');
             } catch (error) {
                 console.error('[Database] Failed to initialize Supabase:', error);
                 this.supabaseAvailable = false;
@@ -39,7 +38,6 @@ class DatabaseService {
         try {
             this.localDb = getLocalDb(options.localDbPath);
             this.localDb.initialize();
-            console.log('[Database] SQLite initialized for local data');
         } catch (error) {
             console.error('[Database] Failed to initialize SQLite:', error);
             throw error;
@@ -138,7 +136,6 @@ class DatabaseService {
             try {
                 if (fs.existsSync(imagePath)) {
                     fs.unlinkSync(imagePath);
-                    console.log(`🗑️ Deleted character avatar: ${character.avatar_image_filename}`);
                 }
             } catch (error) {
                 console.error('Error deleting character avatar:', error);
@@ -280,7 +277,6 @@ class DatabaseService {
             try {
                 if (fs.existsSync(imagePath)) {
                     fs.unlinkSync(imagePath);
-                    console.log(`🗑️ Deleted scene background: ${scenario.background_image_filename}`);
                 }
             } catch (error) {
                 console.error('Error deleting scene background:', error);
@@ -378,19 +374,12 @@ class DatabaseService {
                 );
                 if (publicUrl) {
                     avatarImageUrl = publicUrl;
-                    console.log(`✅ Character avatar uploaded to Supabase: ${publicUrl}`);
                 }
             }
 
             // Get user settings to check auto_approve_characters setting
             const userSettings = await this.getUserSettings(userId);
             const moderationStatus = userSettings?.autoApproveCharacters ? 'approved' : 'pending';
-
-            console.log('[PublishCharacter] User settings:', { 
-                userId, 
-                autoApproveCharacters: userSettings?.autoApproveCharacters,
-                moderationStatus 
-            });
 
             // Prepare community character data
             const communityData = {
@@ -440,7 +429,6 @@ class DatabaseService {
                 result = data;
             } else {
                 // Create new
-                console.log('[PublishCharacter] Creating new community character with moderation_status:', moderationStatus);
                 const { data, error } = await this.supabase
                     .from('community_characters')
                     .insert(communityData)
@@ -448,7 +436,6 @@ class DatabaseService {
                     .single();
                 
                 if (error) throw error;
-                console.log('[PublishCharacter] Successfully created:', { id: data.id, name: data.name, status: data.moderation_status });
                 result = data;
             }
 
@@ -499,7 +486,6 @@ class DatabaseService {
                     avatarImageFilename = downloadedFilename;
                     // Use local path for imported character
                     avatarImageUrl = `/uploads/${downloadedFilename}`;
-                    console.log(`✅ Character avatar downloaded: ${downloadedFilename}`);
                 }
             }
 
@@ -588,7 +574,6 @@ class DatabaseService {
                     backgroundImageFilename = downloadedFilename;
                     // Use local path for imported scene
                     backgroundImageUrl = `/uploads/${downloadedFilename}`;
-                    console.log(`✅ Scene background downloaded: ${downloadedFilename}`);
                 }
             }
 

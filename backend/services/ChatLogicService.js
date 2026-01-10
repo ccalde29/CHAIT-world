@@ -256,7 +256,6 @@ You can reference, respond to, or build upon what these other characters said.`;
      */
     async processConversationMemories(characterId, userId, userMessage, characterResponse, characterContext, sessionId) {
         try {
-            console.log(`>� Processing memories for character ${characterId}...`);
 
             // Analyze conversation for new memories
             const newMemories = this.db.analyzeConversationForMemories(
@@ -279,8 +278,6 @@ You can reference, respond to, or build upon what these other characters said.`;
             );
 
             await this.db.updateCharacterRelationship(characterId, userId, relationshipUpdate);
-
-            console.log(` Processed ${newMemories.length} memories for ${characterId}`);
 
         } catch (error) {
             console.error('Error processing conversation memories:', error);

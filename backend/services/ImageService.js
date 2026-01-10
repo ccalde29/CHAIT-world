@@ -169,7 +169,6 @@ class ImageService {
                 .from(bucketName)
                 .getPublicUrl(storagePath);
 
-            console.log(`✅ Uploaded ${localFilename} to ${bucketName}: ${publicUrlData.publicUrl}`);
             return publicUrlData.publicUrl;
         } catch (error) {
             console.error('Error uploading image to Supabase:', error);
@@ -216,7 +215,7 @@ class ImageService {
 
                     fileStream.on('finish', () => {
                         fileStream.close();
-                        console.log(`✅ Downloaded image from ${imageUrl} to ${filename}`);
+
                         resolve(filename);
                     });
 

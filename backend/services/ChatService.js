@@ -11,7 +11,6 @@ class ChatService {
      */
     async createChatSession(userId, sessionData) {
         try {
-            console.log('📝 Creating chat session for user:', userId);
 
             const { data, error } = await this.supabase
             .from('chat_sessions')
@@ -31,7 +30,6 @@ class ChatService {
                 throw error;
             }
 
-            console.log('✅ Chat session created:', data.id);
             return data;
 
         } catch (error) {
@@ -45,7 +43,6 @@ class ChatService {
      */
     async saveChatMessage(sessionId, messageData) {
         try {
-            console.log('💬 Saving message to session:', sessionId);
 
             const { data, error } = await this.supabase
             .from('messages')
@@ -80,7 +77,6 @@ class ChatService {
               })
               .eq('id', sessionId);
 
-            console.log('✅ Message saved successfully');
             return data;
 
         } catch (error) {

@@ -39,18 +39,11 @@ function getSupabase() {
  */
 router.get('/queue', requireAdmin, async (req, res) => {
   try {
-    console.log('[Moderation] Fetching moderation queue...');
     const { data: queue, error } = await getSupabase()
       .from('community_characters')
       .select('*')
       .in('moderation_status', ['pending', 'rejected'])
       .order('published_at', { ascending: false });
-
-    console.log('[Moderation] Queue query result:', { 
-      count: queue?.length || 0, 
-      error: error ? error.message : null,
-      items: queue?.map(q => ({ id: q.id, name: q.name, status: q.moderation_status })) || []
-    });
 
     if (error) {
       console.error('[Moderation] Error fetching queue:', error);
@@ -107,7 +100,7 @@ router.get('/stats', requireAdmin, async (req, res) => {
         .eq('status', 'pending');
       unresolvedReports = count || 0;
     } catch (error) {
-      console.log('[Moderation] Error fetching community reports count:', error);
+      // Error fetching community reports count
     }
 
     // Total community characters
@@ -296,7 +289,6 @@ router.post('/reports/:reportId/resolve', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to update report' });
     }
 
-    console.log(`[Moderation] Report ${reportId} (${report.report_type}) resolved with action: ${action}`);
     res.json({
       message: 'Report resolved successfully',
       report: updatedReport,
@@ -343,7 +335,6 @@ router.post('/approve/:characterId', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Community character not found' });
     }
 
-    console.log(`[Moderation] Community character ${characterId} approved by admin ${userId}`);
     res.json({
       message: 'Character approved successfully',
       character
@@ -384,13 +375,6 @@ router.post('/reject/:characterId', requireAdmin, async (req, res) => {
 
     if (!character) {
       return res.status(404).json({ error: 'Community character not found' });
-    }
-
-    // Log the rejection reason if provided
-    if (reason) {
-      console.log(`[Moderation] Community character ${characterId} rejected by admin ${userId}. Reason: ${reason}`);
-    } else {
-      console.log(`[Moderation] Community character ${characterId} rejected by admin ${userId}`);
     }
 
     res.json({
@@ -435,7 +419,6 @@ router.post('/bulk-approve', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to bulk approve characters' });
     }
 
-    console.log(`[Moderation] ${characters.length} community characters bulk approved by admin ${userId}`);
     res.json({
       message: `${characters.length} characters approved successfully`,
       count: characters.length
