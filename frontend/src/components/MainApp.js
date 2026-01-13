@@ -10,9 +10,7 @@ import { useCharacters } from '../hooks/useCharacters';
 import { useSettings } from '../hooks/useSettings';
 import { usePersonas } from '../hooks/usePersonas';
 import { useTokens } from '../hooks/useTokens';
-import { createUnifiedApiClient } from '../utils/unifiedApiClient';
-import { isNativePlatform } from '../utils/platform';
-import { Capacitor } from '@capacitor/core';
+import { createApiClient } from '../utils/apiClient';
 
 // Components
 import ChatInterface from './ChatInterface';
@@ -36,7 +34,7 @@ const MainApp = () => {
   // API CLIENT
   // ============================================================================
 
-  const apiRequest = useMemo(() => createUnifiedApiClient(user.id), [user.id]);
+  const apiRequest = useMemo(() => createApiClient(user.id), [user.id]);
 
   // ============================================================================
   // CUSTOM HOOKS

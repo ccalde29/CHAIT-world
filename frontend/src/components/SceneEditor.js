@@ -274,7 +274,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <MapPin className="text-purple-400" size={24} />
+            <MapPin className="text-orange-400" size={24} />
             <h2 className="text-xl font-bold text-white">
               Manage Scenes & Locations
             </h2>
@@ -301,7 +301,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                     resetForm();
                     setShowCreateForm(true);
                   }}
-                  className="flex items-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors"
+                  className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <Plus size={16} />
                   Create Scene
@@ -326,7 +326,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                         <div className="absolute inset-0 bg-black/40"></div>
                       </div>
                     ) : (
-                      <div className="h-24 bg-gradient-to-r from-purple-500/20 to-blue-500/20"></div>
+                      <div className="h-24 bg-orange-500/10"></div>
                     )}
             
                     {/* Scene Content */}
@@ -348,8 +348,8 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                               onClick={() => scene.is_public ? onUnpublish(scene.id) : onPublish(scene.id)}
                               className={`p-1 transition-colors ${
                                 scene.is_public
-                                  ? 'text-green-400 hover:text-green-300'
-                                  : 'text-gray-400 hover:text-green-400'
+                                  ? 'text-orange-400 hover:text-orange-300'
+                                  : 'text-gray-400 hover:text-orange-400'
                               }`}
                               title={scene.is_public ? 'Unpublish from community' : 'Publish to community'}
                             >
@@ -369,7 +369,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                                 onDelete(scene.id);
                               }
                             }}
-                            className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                            className="p-1 text-gray-400 hover:text-orange-400 transition-colors"
                             title="Delete scene"
                           >
                             <Trash2 size={14} />
@@ -381,12 +381,12 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                         <span className="font-medium">Initial Message:</span> {scene.initial_message}
                       </div>
                       {scene.atmosphere && (
-                        <div className="text-xs text-purple-300 mt-1">
+                        <div className="text-xs text-orange-300 mt-1">
                           <span className="font-medium">Atmosphere:</span> {scene.atmosphere}
                         </div>
                       )}
                       {scene.uses_custom_background && (
-                        <div className="text-xs text-blue-300 mt-1">
+                        <div className="text-xs text-orange-300 mt-1">
                           <span className="font-medium">📸 Custom Background</span>
                         </div>
                       )}
@@ -417,14 +417,14 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
 
               {/* Error Message */}
               {error && (
-                <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4">
-                  <p className="text-red-400 text-sm">{error}</p>
+                <div className="bg-orange-600/10 border border-red-500/50 rounded-lg p-4">
+                  <p className="text-orange-400 text-sm">{error}</p>
                 </div>
               )}
 
               {/* Scene Preview with Background */}
               <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
-                <h4 className="text-sm font-medium text-purple-300 mb-2 p-4 pb-0">Preview</h4>
+                <h4 className="text-sm font-medium text-orange-300 mb-2 p-4 pb-0">Preview</h4>
         
                 {/* Background Preview */}
                 {formData.background_image_url && formData.uses_custom_background ? (
@@ -472,11 +472,11 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                   placeholder="Enter scene name"
                   maxLength={50}
                   className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
-                    getFieldError('name') ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                    getFieldError('name') ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
                   }`}
                 />
                 {getFieldError('name') && (
-                  <p className="text-red-400 text-xs mt-1">{getFieldError('name')}</p>
+                  <p className="text-orange-400 text-xs mt-1">{getFieldError('name')}</p>
                 )}
                 <p className="text-xs text-gray-500 mt-1">{formData.name.length}/50 characters</p>
               </div>
@@ -493,11 +493,11 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                   placeholder="Brief description of the location"
                   maxLength={200}
                   className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
-                    getFieldError('description') ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                    getFieldError('description') ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
                   }`}
                 />
                 {getFieldError('description') && (
-                  <p className="text-red-400 text-xs mt-1">{getFieldError('description')}</p>
+                  <p className="text-orange-400 text-xs mt-1">{getFieldError('description')}</p>
                 )}
                 <p className="text-xs text-gray-500 mt-1">{formData.description.length}/200 characters</p>
               </div>
@@ -555,11 +555,11 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                   rows={4}
                   maxLength={500}
                   className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none resize-none ${
-                    getFieldError('initial_message') ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                    getFieldError('initial_message') ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
                   }`}
                 />
                 {getFieldError('initial_message') && (
-                  <p className="text-red-400 text-xs mt-1">{getFieldError('initial_message')}</p>
+                  <p className="text-orange-400 text-xs mt-1">{getFieldError('initial_message')}</p>
                 )}
                 <p className="text-xs text-gray-500 mt-1">{formData.initial_message.length}/500 characters</p>
               </div>
@@ -576,11 +576,11 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                   placeholder="e.g., relaxed and friendly, energetic and social, intimate and cozy"
                   maxLength={100}
                   className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
-                    getFieldError('atmosphere') ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                    getFieldError('atmosphere') ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
                   }`}
                 />
                 {getFieldError('atmosphere') && (
-                  <p className="text-red-400 text-xs mt-1">{getFieldError('atmosphere')}</p>
+                  <p className="text-orange-400 text-xs mt-1">{getFieldError('atmosphere')}</p>
                 )}
                 <p className="text-xs text-gray-500 mt-1">{formData.atmosphere.length}/100 characters</p>
               </div>
@@ -598,7 +598,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                       onChange={(e) => handleInputChange('narrator_enabled', e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
                   </label>
                 </div>
                 <p className="text-xs text-gray-400 mb-4">
@@ -615,7 +615,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                       <select
                         value={formData.narrator_trigger_mode}
                         onChange={(e) => handleInputChange('narrator_trigger_mode', e.target.value)}
-                        className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-purple-400"
+                        className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-orange-400"
                         style={{ colorScheme: 'dark' }}
                       >
                         <option value="manual">Manual (on request only)</option>
@@ -654,7 +654,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                       <select
                         value={formData.narrator_ai_provider}
                         onChange={(e) => handleInputChange('narrator_ai_provider', e.target.value)}
-                        className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-purple-400"
+                        className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-orange-400"
                         style={{ colorScheme: 'dark' }}
                       >
                         <option value="openai">OpenAI</option>
@@ -676,7 +676,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                         value={formData.narrator_ai_model}
                         onChange={(e) => handleInputChange('narrator_ai_model', e.target.value)}
                         disabled={loadingNarratorModels}
-                        className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-purple-400 disabled:opacity-50"
+                        className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-orange-400 disabled:opacity-50"
                         style={{ colorScheme: 'dark' }}
                       >
                         {loadingNarratorModels ? (
@@ -743,7 +743,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                         placeholder="e.g., poetic and descriptive, matter-of-fact, dramatic and cinematic"
                         rows={2}
                         maxLength={200}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 resize-none"
+                        className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 resize-none"
                       />
                       <p className="text-xs text-gray-500 mt-1">{formData.narrator_personality.length}/200 characters</p>
                     </div>
@@ -766,7 +766,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all"
+                  className="px-6 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all"
                 >
                   {saving ? 'Saving...' : editingScene ? 'Update Scene' : 'Create Scene'}
                 </button>

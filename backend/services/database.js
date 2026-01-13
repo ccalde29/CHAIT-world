@@ -343,8 +343,7 @@ class DatabaseService {
     async publishCharacter(userId, characterId, publishData) {
         if (!this.isCommunityAvailable()) {
             const error = new Error('Community features require internet connection');
-            error.code = 'OFFLINE';
-            error.offline = true;
+            error.code = 'COMMUNITY_UNAVAILABLE';
             throw error;
         }
 
@@ -455,8 +454,7 @@ class DatabaseService {
     async importCharacterFromCommunity(userId, communityCharacterId) {
         if (!this.isCommunityAvailable()) {
             const error = new Error('Community features require internet connection');
-            error.code = 'OFFLINE';
-            error.offline = true;
+            error.code = 'COMMUNITY_UNAVAILABLE';
             throw error;
         }
 
@@ -543,8 +541,7 @@ class DatabaseService {
     async importSceneFromCommunity(userId, communitySceneId) {
         if (!this.isCommunityAvailable()) {
             const error = new Error('Community features require internet connection');
-            error.code = 'OFFLINE';
-            error.offline = true;
+            error.code = 'COMMUNITY_UNAVAILABLE';
             throw error;
         }
 

@@ -109,11 +109,11 @@ const TokenAnalyticsDashboard = ({ apiRequest }) => {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-        <p className="text-red-400">Error: {error}</p>
+      <div className="p-4 bg-orange-600/10 border border-orange-500/20 rounded-lg">
+        <p className="text-orange-400">Error: {error}</p>
         <button
           onClick={loadAnalytics}
-          className="mt-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors"
+          className="mt-2 px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded transition-colors"
         >
           Retry
         </button>
@@ -135,7 +135,7 @@ const TokenAnalyticsDashboard = ({ apiRequest }) => {
           <button
             onClick={handleRefreshPricing}
             disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded transition-colors disabled:opacity-50"
           >
             <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
             Refresh Pricing
@@ -184,7 +184,7 @@ const TokenAnalyticsDashboard = ({ apiRequest }) => {
 
                   return (
                     <div key={tier} className="space-y-2">
-                      <h5 className="text-md font-semibold text-purple-400">
+                      <h5 className="text-md font-semibold text-orange-400">
                         {tier}x Credit Tier ({tierModels.length} models)
                       </h5>
 
@@ -226,7 +226,7 @@ const TokenAnalyticsDashboard = ({ apiRequest }) => {
 
                               <div className="flex justify-between">
                                 <span className="text-gray-400">Credits Collected</span>
-                                <span className="text-blue-400 font-medium">
+                                <span className="text-orange-400 font-medium">
                                   {formatNumber(model.total_credits_collected)}
                                 </span>
                               </div>
@@ -243,12 +243,12 @@ const TokenAnalyticsDashboard = ({ apiRequest }) => {
                                   {model.is_profitable ? (
                                     <TrendingUp size={12} className="text-green-400" />
                                   ) : (
-                                    <TrendingDown size={12} className="text-red-400" />
+                                    <TrendingDown size={12} className="text-orange-400" />
                                   )}
                                   Net Profit
                                 </span>
                                 <span className={`font-bold ${
-                                  model.is_profitable ? 'text-green-400' : 'text-red-400'
+                                  model.is_profitable ? 'text-green-400' : 'text-orange-400'
                                 }`}>
                                   {formatCurrency(model.net_profit_usd)}
                                 </span>

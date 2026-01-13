@@ -5,8 +5,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
 
 const AuthContext = createContext();
 
@@ -49,54 +47,8 @@ export const AuthProvider = ({ children }) => {
       }
     );
 
-    // Handle deep links for OAuth callback on mobile
-    let appUrlListener;
-    if (Capacitor.isNativePlatform()) {
-      appUrlListener = App.addListener('appUrlOpen', async ({ url }) => {
-        
-        // Check if this is an auth callback
-        if (url.includes('auth/callback')) {
-          try {
-            // Parse the hash fragment to extract tokens
-            const hashFragment = url.split('#')[1];
-            
-            if (hashFragment) {
-              const params = new URLSearchParams(hashFragment);
-              const accessToken = params.get('access_token');
-              const refreshToken = params.get('refresh_token');
-              
-              if (accessToken && refreshToken) {
-                const { data, error } = await supabase.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken
-                });
-                
-                if (error) {
-                  console.error('Error setting session:', error);
-                  setError(error.message);
-                } else {
-                  setUser(data.user);
-                }
-              } else {
-                console.error('Missing tokens in URL');
-              }
-            } else {
-              console.error('No hash fragment in URL');
-            }
-          } catch (err) {
-            console.error('Error processing auth callback:', err);
-            console.error('Error details:', err.message, err.stack);
-            setError(err.message);
-          }
-        }
-      });
-    }
-
     return () => {
       subscription.unsubscribe();
-      if (appUrlListener) {
-        appUrlListener.remove();
-      }
     };
   }, []);
 
@@ -105,16 +57,10 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       
-      // Detect platform and set appropriate redirect URL
-      const isNative = Capacitor.isNativePlatform();
-      const redirectTo = isNative 
-        ? 'chaitworld://auth/callback'
-        : window.location.origin;
-      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo
+          redirectTo: window.location.origin
         }
       });
       if (error) throw error;

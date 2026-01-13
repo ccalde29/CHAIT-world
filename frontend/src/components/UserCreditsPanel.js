@@ -72,10 +72,10 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
   const getTypeIcon = (type) => {
     switch (type) {
       case 'weekly_grant': return <Gift size={16} className="text-green-400" />;
-      case 'purchase': return <ShoppingCart size={16} className="text-blue-400" />;
+      case 'purchase': return <ShoppingCart size={16} className="text-orange-400" />;
       case 'usage': return <Coins size={16} className="text-orange-400" />;
       case 'token_usage': return <Coins size={16} className="text-orange-400" />;
-      case 'refund': return <RefreshCw size={16} className="text-purple-400" />;
+      case 'refund': return <RefreshCw size={16} className="text-orange-400" />;
       default: return <Coins size={16} className="text-gray-400" />;
     }
   };
@@ -145,7 +145,7 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
   return (
     <div className="p-6 space-y-6" style={{ height: '100%', overflowY: 'auto' }}>
       {/* Balance Overview */}
-      <div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded-lg p-6">
+      <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="text-gray-400 text-sm mb-1">Current Balance</p>
@@ -156,7 +156,7 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
               <span className="text-xl text-gray-400">credits</span>
             </div>
           </div>
-          <Coins className="text-purple-400" size={48} />
+          <Coins className="text-orange-400" size={48} />
         </div>
 
         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
@@ -184,7 +184,7 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
       {/* Purchase Credits */}
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <ShoppingCart className="text-blue-400" size={20} />
+          <ShoppingCart className="text-orange-400" size={20} />
           <h3 className="text-lg font-semibold text-white">Purchase Credits</h3>
         </div>
         
@@ -200,7 +200,7 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
             >
               {option.popular && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-500 text-white text-xs px-3 py-1 rounded-full font-medium">
+                  <span className="bg-orange-600 text-white text-xs px-3 py-1 rounded-full font-medium">
                     Most Popular
                   </span>
                 </div>
@@ -215,7 +215,7 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
 
               <div className="text-center mb-4">
                 <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-2xl font-bold text-blue-400">${option.price}</span>
+                  <span className="text-2xl font-bold text-orange-400">${option.price}</span>
                   <span className="text-gray-500 text-sm">USD</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
@@ -228,7 +228,7 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
                 disabled={purchasing !== null}
                 className={`w-full py-2 rounded-lg font-medium transition-colors ${
                   option.popular
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    ? 'bg-orange-600 hover:bg-orange-700 text-white'
                     : 'bg-gray-700 hover:bg-gray-600 text-white'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
@@ -238,8 +238,8 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
           ))}
         </div>
 
-        <div className="mt-4 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-          <p className="text-sm text-blue-400">
+        <div className="mt-4 bg-orange-600/10 border border-blue-500/20 rounded-lg p-3">
+          <p className="text-sm text-orange-400">
             💡 <strong>Tip:</strong> Credits never expire! Use them anytime to chat with premium token models.
           </p>
         </div>
@@ -288,7 +288,7 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
                           <Coins className="text-orange-400" size={16} />
                           <span className="text-sm font-medium text-white">{agg.model}</span>
                         </div>
-                        <span className="text-red-400 font-medium">{agg.amount} credits</span>
+                        <span className="text-orange-400 font-medium">{agg.amount} credits</span>
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-500">{agg.date}</span>
@@ -329,7 +329,7 @@ const UserCreditsPanel = ({ user, apiRequest }) => {
                             {formatDate(tx.created_at)}
                           </td>
                           <td className={`py-3 px-4 text-right font-medium ${
-                            tx.amount >= 0 ? 'text-green-400' : 'text-red-400'
+                            tx.amount >= 0 ? 'text-green-400' : 'text-orange-400'
                           }`}>
                             {tx.amount >= 0 ? '+' : ''}{tx.amount}
                           </td>

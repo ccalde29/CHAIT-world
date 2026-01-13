@@ -36,8 +36,8 @@ const LoginRequiredModal = ({ isOpen, onClose, feature = 'Community' }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-purple-600/20 flex items-center justify-center">
-              <Lock className="text-purple-400" size={20} />
+            <div className="w-10 h-10 rounded-full bg-orange-700/20 flex items-center justify-center">
+              <Lock className="text-orange-400" size={20} />
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Sign In Required</h2>
@@ -55,9 +55,9 @@ const LoginRequiredModal = ({ isOpen, onClose, feature = 'Community' }) => {
         {/* Content */}
         <div className="p-6 space-y-6">
           {/* Feature Info */}
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+          <div className="bg-orange-600/10 border border-blue-500/20 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Globe className="text-blue-400 mt-0.5" size={20} />
+              <Globe className="text-orange-400 mt-0.5" size={20} />
               <div>
                 <h3 className="text-white font-medium mb-1">Community Features</h3>
                 <p className="text-sm text-gray-400">

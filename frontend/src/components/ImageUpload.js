@@ -169,7 +169,7 @@ const ImageUpload = ({
               name={`${type}-image-mode`}
               checked={!useCustomImage}
               onChange={handleSwitchToEmoji}
-              className="text-purple-500 focus:ring-purple-500"
+              className="text-orange-500 focus:ring-purple-500"
             />
             <span className="text-sm text-gray-300">
               {type === 'scene' ? 'No Background' : 'Use Emoji'}
@@ -182,7 +182,7 @@ const ImageUpload = ({
               name={`${type}-image-mode`}
               checked={useCustomImage}
               onChange={handleSwitchToCustomImage}
-              className="text-purple-500 focus:ring-purple-500"
+              className="text-orange-500 focus:ring-purple-500"
             />
             <span className="text-sm text-gray-300">Custom Image</span>
           </label>
@@ -206,7 +206,7 @@ const ImageUpload = ({
                 <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                   <button
                     onClick={handleRemoveImage}
-                    className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                    className="p-2 bg-orange-600 hover:bg-orange-700 text-white rounded-full transition-colors"
                     title="Remove image"
                   >
                     <Trash2 size={16} />
@@ -218,7 +218,7 @@ const ImageUpload = ({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="mt-2 text-sm text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                className="mt-2 text-sm text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50"
               >
                 Replace Image
               </button>
@@ -227,13 +227,13 @@ const ImageUpload = ({
             /* Upload Area */
             <div
               onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed border-white/20 rounded-lg p-6 text-center cursor-pointer hover:border-purple-400 hover:bg-white/5 transition-colors ${
+              className={`border-2 border-dashed border-white/20 rounded-lg p-6 text-center cursor-pointer hover:border-orange-400 hover:bg-white/5 transition-colors ${
                 aspectRatio === 'wide' ? 'aspect-video max-w-md' : 'aspect-square w-32'
               }`}
             >
               {uploading ? (
                 <div className="flex flex-col items-center justify-center h-full">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mb-2"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-400 mb-2"></div>
                   <p className="text-sm text-gray-400">Uploading...</p>
                 </div>
               ) : (
@@ -259,7 +259,7 @@ const ImageUpload = ({
 
       {/* Error Display */}
       {error && (
-        <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded p-2">
+        <div className="text-orange-400 text-xs bg-orange-600/10 border border-orange-500/20 rounded p-2">
           {error}
         </div>
       )}

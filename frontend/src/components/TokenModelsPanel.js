@@ -172,19 +172,21 @@ const TokenModelsPanel = ({ apiRequest }) => {
   };
 
   const handleDelete = async (model) => {
-    if (!window.confirm(`Are you sure you want to delete "${model.display_name}"?`)) {
+    if (!window.confirm(`Are you sure you want to delete "${model.display_name}"?\n\nNote: Existing transactions using this model will have their model reference removed.`)) {
       return;
     }
 
     try {
-      await apiRequest(`/api/token-models/${model.id}`, {
+      const response = await apiRequest(`/api/token-models/${model.id}`, {
         method: 'DELETE'
       });
+      
       await fetchModels();
       alert(`Successfully deleted "${model.display_name}"`);
     } catch (error) {
       console.error('[TokenModels] Error deleting model:', error);
-      alert(error.message || 'Failed to delete token model. Make sure you have admin permissions.');
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to delete token model';
+      alert(`Error: ${errorMsg}\n\nMake sure you have admin permissions.`);
     }
   };
 
@@ -223,11 +225,11 @@ const TokenModelsPanel = ({ apiRequest }) => {
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 placeholder="e.g., creative-storyteller"
                 className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
-                  validationErrors.name ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                  validationErrors.name ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
                 }`}
               />
               {validationErrors.name && (
-                <p className="text-red-400 text-xs mt-1">{validationErrors.name}</p>
+                <p className="text-orange-400 text-xs mt-1">{validationErrors.name}</p>
               )}
               <p className="text-xs text-gray-500 mt-1">Unique identifier (lowercase, hyphens only)</p>
             </div>
@@ -243,11 +245,11 @@ const TokenModelsPanel = ({ apiRequest }) => {
                 onChange={(e) => handleInputChange('display_name', e.target.value)}
                 placeholder="e.g., Creative Storyteller"
                 className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
-                  validationErrors.display_name ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                  validationErrors.display_name ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
                 }`}
               />
               {validationErrors.display_name && (
-                <p className="text-red-400 text-xs mt-1">{validationErrors.display_name}</p>
+                <p className="text-orange-400 text-xs mt-1">{validationErrors.display_name}</p>
               )}
             </div>
 
@@ -261,7 +263,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Brief description of this model preset..."
                 rows={2}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 resize-none"
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 resize-none"
               />
             </div>
 
@@ -277,7 +279,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
                   handleInputChange('model_id', ''); // Reset model when provider changes
                 }}
                 className={`w-full bg-white/5 border rounded-lg p-3 text-white focus:outline-none ${
-                  validationErrors.ai_provider ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                  validationErrors.ai_provider ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
                 }`}
               >
                 <option value="openai">OpenAI</option>
@@ -286,7 +288,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
                 <option value="openrouter">OpenRouter</option>
               </select>
               {validationErrors.ai_provider && (
-                <p className="text-red-400 text-xs mt-1">{validationErrors.ai_provider}</p>
+                <p className="text-orange-400 text-xs mt-1">{validationErrors.ai_provider}</p>
               )}
             </div>
 
@@ -300,7 +302,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
                 onChange={(e) => handleInputChange('model_id', e.target.value)}
                 disabled={loadingProviderModels}
                 className={`w-full bg-white/5 border rounded-lg p-3 text-white focus:outline-none ${
-                  validationErrors.model_id ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                  validationErrors.model_id ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
                 } disabled:opacity-50`}
               >
                 <option value="">
@@ -313,7 +315,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
                 ))}
               </select>
               {validationErrors.model_id && (
-                <p className="text-red-400 text-xs mt-1">{validationErrors.model_id}</p>
+                <p className="text-orange-400 text-xs mt-1">{validationErrors.model_id}</p>
               )}
             </div>
 
@@ -329,11 +331,11 @@ const TokenModelsPanel = ({ apiRequest }) => {
                 min="1"
                 placeholder="10"
                 className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
-                  validationErrors.token_cost ? 'border-red-400' : 'border-white/10 focus:border-purple-400'
+                  validationErrors.token_cost ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
                 }`}
               />
               {validationErrors.token_cost && (
-                <p className="text-red-400 text-xs mt-1">{validationErrors.token_cost}</p>
+                <p className="text-orange-400 text-xs mt-1">{validationErrors.token_cost}</p>
               )}
               <p className="text-xs text-gray-500 mt-1">How many tokens users pay per message</p>
             </div>
@@ -348,7 +350,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
                 onChange={(e) => handleInputChange('custom_system_prompt', e.target.value)}
                 placeholder="This prompt will be prepended to all character prompts using this model..."
                 rows={6}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 resize-none"
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 resize-none"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Use this to modify the model's behavior globally
@@ -402,7 +404,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all"
+                className="px-6 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all"
               >
                 {saving ? 'Saving...' : editing ? 'Update Model' : 'Create Model'}
               </button>
@@ -424,7 +426,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
         </div>
         <button
           onClick={handleNew}
-          className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-lg transition-all flex items-center gap-2"
+          className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-all flex items-center gap-2"
         >
           <Plus size={18} />
           New Model
@@ -437,7 +439,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
         </div>
       ) : models.length === 0 ? (
         <div className="text-center py-12 bg-gray-800 border border-white/10 rounded-lg">
-          <Sparkles className="mx-auto mb-4 text-purple-400" size={48} />
+          <Sparkles className="mx-auto mb-4 text-orange-400" size={48} />
           <p className="text-gray-400">No token models yet</p>
           <p className="text-sm text-gray-500 mt-2">Create your first token model preset</p>
         </div>
@@ -446,7 +448,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
           {models.map(model => (
             <div
               key={model.id}
-              className="bg-gray-800 border border-white/10 rounded-lg p-4 hover:border-purple-400/50 transition-colors"
+              className="bg-gray-800 border border-white/10 rounded-lg p-4 hover:border-orange-400/50 transition-colors"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
@@ -482,7 +484,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
               {model.tags && model.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
                   {model.tags.map((tag, idx) => (
-                    <span key={idx} className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded">
+                    <span key={idx} className="px-2 py-0.5 bg-orange-600/20 text-orange-300 text-xs rounded">
                       {tag}
                     </span>
                   ))}
@@ -499,7 +501,7 @@ const TokenModelsPanel = ({ apiRequest }) => {
                 </button>
                 <button
                   onClick={() => handleDelete(model)}
-                  className="flex-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors text-sm flex items-center justify-center gap-2"
+                  className="flex-1 px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded transition-colors text-sm flex items-center justify-center gap-2"
                 >
                   <Trash2 size={14} />
                   Delete

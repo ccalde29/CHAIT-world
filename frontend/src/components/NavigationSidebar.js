@@ -135,14 +135,14 @@ const NavigationSidebar = ({
       <div className="w-12 bg-slate-900 border-r border-white/10 flex flex-col h-screen items-center py-4">
         <button
           onClick={onNewChat}
-          className="p-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors mb-4"
+          className="p-2 bg-orange-700 hover:bg-orange-800 text-white rounded-lg transition-colors mb-4"
           title="New Chat"
         >
           <Plus size={20} />
         </button>
         
         {sessions.length > 0 && (
-          <div className="mt-2 bg-red-500/20 text-red-300 text-xs px-2 py-1 rounded-full">
+          <div className="mt-2 bg-orange-600/20 text-orange-300 text-xs px-2 py-1 rounded-full">
             {sessions.length}
           </div>
         )}
@@ -176,7 +176,7 @@ const NavigationSidebar = ({
       <div className="p-4">
         <button
           onClick={onNewChat}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-700 hover:bg-orange-800 text-white rounded-lg transition-colors font-medium"
         >
           <Plus size={20} />
           New Chat
@@ -215,7 +215,7 @@ const NavigationSidebar = ({
                     key={session.id}
                     className={`group relative flex items-center px-3 py-2 rounded-lg transition-colors ${
                       currentSessionId === session.id
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-orange-700 text-white'
                         : 'text-gray-300 hover:bg-white/5'
                     }`}
                   >
@@ -240,10 +240,10 @@ const NavigationSidebar = ({
                           await onDeleteSession(session.id);
                         }
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-opacity"
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-orange-600/20 rounded transition-opacity"
                       title="Delete chat"
                     >
-                      <Trash2 size={14} className="text-red-400" />
+                      <Trash2 size={14} className="text-orange-400" />
                     </button>
                   </div>
                 ))}
@@ -264,7 +264,7 @@ const NavigationSidebar = ({
                 onClick={() => handleMenuClick(item)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-colors ${
                   isActive
-                    ? 'bg-purple-600 text-white'
+                    ? 'bg-orange-700 text-white'
                     : 'text-gray-300 hover:bg-white/5'
                 }`}
               >
@@ -294,7 +294,7 @@ const NavigationSidebar = ({
           )}
           
           <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-orange-700 flex items-center justify-center">
               <User size={18} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">

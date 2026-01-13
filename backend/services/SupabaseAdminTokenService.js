@@ -296,14 +296,42 @@ class SupabaseAdminTokenService {
 
     /**
      * Delete token model
+     * Also handles cleanup of related transactions
      */
     async deleteTokenModel(modelId) {
+        // First, check if any transactions reference this model
+        const { data: transactions, error: checkError } = await this.supabase
+            .from('token_transactions')
+            .select('id')
+            .eq('model_id', modelId)
+            .limit(1);
+
+        if (checkError) {
+            throw new Error(`Failed to check model usage: ${checkError.message}`);
+        }
+
+        // If transactions exist, set their model_id to null instead of blocking deletion
+        if (transactions && transactions.length > 0) {
+            const { error: updateError } = await this.supabase
+                .from('token_transactions')
+                .update({ model_id: null })
+                .eq('model_id', modelId);
+
+            if (updateError) {
+                throw new Error(`Failed to update transactions: ${updateError.message}`);
+            }
+        }
+
+        // Now delete the token model
         const { data, error } = await this.supabase
             .from('token_models')
             .delete()
             .eq('id', modelId);
 
-        if (error) throw error;
+        if (error) {
+            throw new Error(`Failed to delete model: ${error.message}`);
+        }
+        
         return data;
     }
 

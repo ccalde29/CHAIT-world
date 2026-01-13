@@ -10,7 +10,6 @@ const path = require('path');
 const DatabaseService = require('./services/database');
 const CommunityService = require('./services/communityService');
 const { generalLimiter } = require('./middleware/rateLimiter');
-const { requireOnline, offlineCapable, handleDatabaseError } = require('./middleware/offlineMode');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -111,26 +110,25 @@ app.use('/api/community', (req, res, next) => {
   }
   return requireAuth(req, res, next); // Auth required for mutations
 });
-app.use('/api/community', requireOnline, communityRoutes);
+app.use('/api/community', communityRoutes);
 
 // Other routes - mark offline-capable routes
 app.use('/api/characters', requireAuth, communityRoutes); // For publish/unpublish (needs online)
 app.use('/api/user', requireAuth, userRoutes);
-app.use('/api/scenarios', requireAuth, offlineCapable, scenarioRoutes); // Offline-capable
-app.use('/api/character', requireAuth, offlineCapable, memoryRoutes); // Offline-capable
-app.use('/api/learning', requireAuth, offlineCapable, characterLearningRoutes); // Offline-capable
-app.use('/api/character-comments', requireAuth, characterCommentRoutes); // Needs online
-app.use('/api/scene-comments', requireAuth, sceneCommentRoutes); // Needs online
-app.use('/api/personas', requireAuth, offlineCapable, personasRoutes); // Offline-capable
-app.use('/api/characters', requireAuth, offlineCapable, relationshipsRoutes); // Offline-capable
-app.use('/api/moderation', requireAuth, moderationRoutes); // Admin-only, needs online
-app.use('/api/token-models', requireAuth, offlineCapable, tokenModelsRoutes); // Offline-capable (renamed from custom-models)
-app.use('/api/custom-models', requireAuth, offlineCapable, tokenModelsRoutes); // Backward compatibility alias
-app.use('/api/pricing', requireAuth, pricingRoutes); // Needs online
-app.use('/api/tokens', requireAuth, offlineCapable, tokenRoutes); // Offline-capable
-app.use('/api/admin-keys', requireAuth, offlineCapable, require('./routes/admin-keys')(db)); // Admin API keys management
-// Image routes
-app.use('/api/images', requireAuth, offlineCapable, imageRoutes); // Offline-capable
+app.use('/api/scenarios', requireAuth, scenarioRoutes);
+app.use('/api/character', requireAuth, memoryRoutes);
+app.use('/api/learning', requireAuth, characterLearningRoutes);
+app.use('/api/character-comments', requireAuth, characterCommentRoutes);
+app.use('/api/scene-comments', requireAuth, sceneCommentRoutes);
+app.use('/api/personas', requireAuth, personasRoutes);
+app.use('/api/characters', requireAuth, relationshipsRoutes);
+app.use('/api/moderation', requireAuth, moderationRoutes);
+app.use('/api/token-models', requireAuth, tokenModelsRoutes);
+app.use('/api/custom-models', requireAuth, tokenModelsRoutes); // Backward compatibility alias
+app.use('/api/pricing', requireAuth, pricingRoutes);
+app.use('/api/tokens', requireAuth, tokenRoutes);
+app.use('/api/admin-keys', requireAuth, require('./routes/admin-keys')(db));
+app.use('/api/images', requireAuth, imageRoutes);
 
 // ============================================================================
 // HEALTH & UTILITY ROUTES
@@ -146,13 +144,11 @@ app.get('/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     mode: 'local',
     database: 'SQLite (local) + Supabase (community)',
-    offline: !communityAvailable,
     features: {
       chatHistory: true,
       characterMemory: true,
       characterInteractions: true,
       modularArchitecture: true,
-      offlineMode: true,
       communityFeatures: communityAvailable
     }
   });
@@ -161,9 +157,6 @@ app.get('/health', (req, res) => {
 // ============================================================================
 // ERROR HANDLING
 // ============================================================================
-
-// Database error handler (must be before generic error handler)
-app.use(handleDatabaseError);
 
 app.use((error, req, res, next) => {
   console.error('Unhandled error:', error);

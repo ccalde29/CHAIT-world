@@ -496,7 +496,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
             <span className={`text-xs px-2 py-1 rounded ${
               status.success 
                 ? 'text-green-400 bg-green-400/20' 
-                : 'text-red-400 bg-red-400/20'
+                : 'text-orange-400 bg-red-400/20'
             }`}>
               {status.success ? '✓ Valid' : '✗ Invalid'}
             </span>
@@ -537,7 +537,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         </div>
         
         {status && !status.success && (
-          <p className="text-xs text-red-400 mt-1">{status.message}</p>
+          <p className="text-xs text-orange-400 mt-1">{status.message}</p>
         )}
       </div>
     );
@@ -560,7 +560,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-gray-900 z-10">
           <div className="flex items-center gap-3">
-            <Settings className="text-red-500" size={24} />
+            <Settings className="text-orange-500" size={24} />
             <h2 className="text-xl font-bold text-white">Settings</h2>
           </div>
           <button
@@ -580,7 +580,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         )}
         
         {error && (
-          <div className="mx-6 mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-400">
+          <div className="mx-6 mt-4 p-3 bg-orange-600/20 border border-red-500/30 rounded-lg flex items-center gap-2 text-orange-400">
             <AlertCircle size={16} />
             <span className="text-sm">{error}</span>
           </div>
@@ -592,7 +592,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
           {/* Group Chat Settings - Moved to top */}
           <div>
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Zap size={18} className="text-red-500" />
+              <Zap size={18} className="text-orange-500" />
               Group Chat Settings
             </h3>
             
@@ -680,7 +680,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
           {/* AI Provider Keys Section */}
           <div className="pt-6 border-t border-white/10">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Key size={18} className="text-red-500" />
+              <Key size={18} className="text-orange-500" />
               AI Provider API Keys
             </h3>
             
@@ -704,7 +704,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                     <span className={`text-xs px-2 py-1 rounded ${
                       keyStatus.ollama.success
                         ? 'text-green-400 bg-green-400/20'
-                        : 'text-red-400 bg-red-400/20'
+                        : 'text-orange-400 bg-red-400/20'
                     }`}>
                       {keyStatus.ollama.success ? '✓ Connected' : '✗ Offline'}
                     </span>
@@ -753,7 +753,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                 </div>
 
                 <p className="text-xs text-gray-500 mt-2">
-                  Run models locally with Ollama. <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer" className="text-red-400 hover:underline">Learn more</a>
+                  Run models locally with Ollama. <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">Learn more</a>
                 </p>
               </div>
 
@@ -767,7 +767,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                     <span className={`text-xs px-2 py-1 rounded ${
                       keyStatus.lmstudio.success
                         ? 'text-green-400 bg-green-400/20'
-                        : 'text-red-400 bg-red-400/20'
+                        : 'text-orange-400 bg-red-400/20'
                     }`}>
                       {keyStatus.lmstudio.success ? '✓ Connected' : '✗ Offline'}
                     </span>
@@ -816,7 +816,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                 </div>
 
                 <p className="text-xs text-gray-500 mt-2">
-                  Run models locally with LM Studio. Change to network IP if accessing from another device. <a href="https://lmstudio.ai" target="_blank" rel="noopener noreferrer" className="text-red-400 hover:underline">Learn more</a>
+                  Run models locally with LM Studio. Change to network IP if accessing from another device. <a href="https://lmstudio.ai" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">Learn more</a>
                 </p>
               </div>
             </div>
@@ -826,14 +826,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
           {settings.isAdmin && (
             <div className="pt-6 border-t border-white/10">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Shield size={18} className="text-purple-500" />
+                <Shield size={18} className="text-orange-500" />
                 Admin Settings
               </h3>
 
               <div className="space-y-6">
                 {/* Admin API Keys Section */}
-                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
-                  <h4 className="text-md font-semibold text-purple-400 mb-2 flex items-center gap-2">
+                <div className="bg-orange-600/10 border border-orange-500/30 rounded-lg p-4">
+                  <h4 className="text-md font-semibold text-orange-400 mb-2 flex items-center gap-2">
                     <Key size={16} />
                     Admin API Keys for Token Models
                   </h4>
@@ -859,7 +859,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                           value={formData.adminOpenaiKey}
                           onChange={(e) => handleInputChange('adminOpenaiKey', e.target.value)}
                           placeholder="sk-proj-..."
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
                         />
                         <button
                           onClick={() => toggleShowKey('adminOpenai')}
@@ -870,14 +870,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                         <button
                           onClick={() => testAdminKey('openai')}
                           disabled={testingKey === 'admin-openai'}
-                          className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
+                          className="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
                         >
                           {testingKey === 'admin-openai' ? <Loader size={16} className="animate-spin" /> : 'Test'}
                         </button>
                       </div>
                       {keyStatus['admin-openai'] && (
                         <div className={`flex items-center gap-2 mt-1 text-xs ${
-                          keyStatus['admin-openai'].success ? 'text-green-400' : 'text-red-400'
+                          keyStatus['admin-openai'].success ? 'text-green-400' : 'text-orange-400'
                         }`}>
                           {keyStatus['admin-openai'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
                           {keyStatus['admin-openai'].success ? 'Valid' : keyStatus['admin-openai'].error}
@@ -902,7 +902,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                           value={formData.adminAnthropicKey}
                           onChange={(e) => handleInputChange('adminAnthropicKey', e.target.value)}
                           placeholder="sk-ant-..."
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
                         />
                         <button
                           onClick={() => toggleShowKey('adminAnthropic')}
@@ -913,14 +913,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                         <button
                           onClick={() => testAdminKey('anthropic')}
                           disabled={testingKey === 'admin-anthropic'}
-                          className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
+                          className="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
                         >
                           {testingKey === 'admin-anthropic' ? <Loader size={16} className="animate-spin" /> : 'Test'}
                         </button>
                       </div>
                       {keyStatus['admin-anthropic'] && (
                         <div className={`flex items-center gap-2 mt-1 text-xs ${
-                          keyStatus['admin-anthropic'].success ? 'text-green-400' : 'text-red-400'
+                          keyStatus['admin-anthropic'].success ? 'text-green-400' : 'text-orange-400'
                         }`}>
                           {keyStatus['admin-anthropic'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
                           {keyStatus['admin-anthropic'].success ? 'Valid' : keyStatus['admin-anthropic'].error}
@@ -945,7 +945,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                           value={formData.adminGoogleKey}
                           onChange={(e) => handleInputChange('adminGoogleKey', e.target.value)}
                           placeholder="AIza..."
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
                         />
                         <button
                           onClick={() => toggleShowKey('adminGoogle')}
@@ -956,14 +956,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                         <button
                           onClick={() => testAdminKey('google')}
                           disabled={testingKey === 'admin-google'}
-                          className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
+                          className="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
                         >
                           {testingKey === 'admin-google' ? <Loader size={16} className="animate-spin" /> : 'Test'}
                         </button>
                       </div>
                       {keyStatus['admin-google'] && (
                         <div className={`flex items-center gap-2 mt-1 text-xs ${
-                          keyStatus['admin-google'].success ? 'text-green-400' : 'text-red-400'
+                          keyStatus['admin-google'].success ? 'text-green-400' : 'text-orange-400'
                         }`}>
                           {keyStatus['admin-google'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
                           {keyStatus['admin-google'].success ? 'Valid' : keyStatus['admin-google'].error}
@@ -988,7 +988,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                           value={formData.adminOpenrouterKey}
                           onChange={(e) => handleInputChange('adminOpenrouterKey', e.target.value)}
                           placeholder="sk-or-..."
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
                         />
                         <button
                           onClick={() => toggleShowKey('adminOpenrouter')}
@@ -999,14 +999,14 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                         <button
                           onClick={() => testAdminKey('openrouter')}
                           disabled={testingKey === 'admin-openrouter'}
-                          className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
+                          className="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
                         >
                           {testingKey === 'admin-openrouter' ? <Loader size={16} className="animate-spin" /> : 'Test'}
                         </button>
                       </div>
                       {keyStatus['admin-openrouter'] && (
                         <div className={`flex items-center gap-2 mt-1 text-xs ${
-                          keyStatus['admin-openrouter'].success ? 'text-green-400' : 'text-red-400'
+                          keyStatus['admin-openrouter'].success ? 'text-green-400' : 'text-orange-400'
                         }`}>
                           {keyStatus['admin-openrouter'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
                           {keyStatus['admin-openrouter'].success ? 'Valid' : keyStatus['admin-openrouter'].error}
@@ -1080,7 +1080,7 @@ CORE RULES:
                     onChange={(e) => handleInputChange('adminSystemPrompt', e.target.value)}
                     placeholder="When saved, this overrides the global prompt for your chats only..."
                     rows={4}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-400 resize-none"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 resize-none"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     This prompt will replace the global prompt above for your chats only (not system-wide)
@@ -1091,8 +1091,8 @@ CORE RULES:
           )}
 
           {/* Info Box */}
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-            <h4 className="text-sm font-semibold text-blue-400 mb-2">💡 Tips</h4>
+          <div className="p-4 bg-orange-600/10 border border-blue-500/20 rounded-lg">
+            <h4 className="text-sm font-semibold text-orange-400 mb-2">💡 Tips</h4>
             <ul className="text-xs text-gray-400 space-y-1">
               <li>• You only need keys for providers you want to use</li>
               <li>• OpenRouter gives you access to 100+ models with one key</li>
@@ -1114,7 +1114,7 @@ CORE RULES:
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving ? (
               <>

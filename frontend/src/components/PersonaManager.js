@@ -18,7 +18,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
     interests: [],
     communication_style: '',
     avatar: '👤',
-    color: 'from-blue-500 to-indigo-500',
+    color: 'bg-orange-600',
     avatar_image_url: null,
     avatar_image_filename: null,
     uses_custom_image: false,
@@ -50,16 +50,16 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
   }, [apiRequest]);
 
   const colorOptions = [
-    { name: 'Blue Indigo', value: 'from-blue-500 to-indigo-500' },
-    { name: 'Purple Pink', value: 'from-purple-500 to-pink-500' },
-    { name: 'Green Teal', value: 'from-green-500 to-teal-500' },
-    { name: 'Orange Red', value: 'from-orange-500 to-red-500' },
-    { name: 'Yellow Amber', value: 'from-yellow-500 to-amber-500' },
-    { name: 'Cyan Blue', value: 'from-cyan-500 to-blue-500' },
-    { name: 'Rose Pink', value: 'from-rose-500 to-pink-500' },
-    { name: 'Emerald Green', value: 'from-emerald-500 to-green-500' },
-    { name: 'Violet Purple', value: 'from-violet-500 to-purple-500' },
-    { name: 'Gray Slate', value: 'from-gray-500 to-slate-500' }
+    { name: 'Orange Light', value: 'bg-orange-500' },
+    { name: 'Orange', value: 'bg-orange-600' },
+    { name: 'Orange Dark', value: 'bg-orange-700' },
+    { name: 'Gray Light', value: 'bg-gray-600' },
+    { name: 'Gray', value: 'bg-gray-700' },
+    { name: 'Gray Dark', value: 'bg-gray-800' },
+    { name: 'Black Orange', value: 'bg-orange-900' },
+    { name: 'Warm Gray', value: 'bg-gray-500' },
+    { name: 'Deep Orange', value: 'bg-orange-800' },
+    { name: 'Stone', value: 'bg-gray-700' }
   ];
 
   const emojiOptions = [
@@ -82,7 +82,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
       interests: [],
       communication_style: '',
       avatar: '👤',
-      color: 'from-blue-500 to-indigo-500',
+      color: 'bg-orange-600',
       avatar_image_url: null,
       avatar_image_filename: null,
       uses_custom_image: false,
@@ -103,7 +103,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
       interests: persona.interests || [],
       communication_style: persona.communication_style || '',
       avatar: persona.avatar || '👤',
-      color: persona.color || 'from-blue-500 to-indigo-500',
+      color: persona.color || 'bg-orange-600',
       avatar_image_url: persona.avatar_image_url || null,
       avatar_image_filename: persona.avatar_image_filename || null,
       uses_custom_image: persona.uses_custom_image || false,
@@ -276,7 +276,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/10">
             <div className="flex items-center gap-3">
-              <User className="text-blue-400" size={24} />
+              <User className="text-orange-400" size={24} />
               <h2 className="text-xl font-bold text-white">Your Personas</h2>
             </div>
             <button
@@ -290,8 +290,8 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {/* Info Box */}
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-blue-300 mb-2">💡 What are Personas?</h4>
+            <div className="bg-orange-600/10 border border-blue-500/20 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-orange-300 mb-2">💡 What are Personas?</h4>
               <p className="text-xs text-blue-200">
                 Personas represent different versions of yourself. Switch between them to interact with characters from different perspectives or moods.
               </p>
@@ -301,7 +301,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
             <div className="flex justify-center">
               <button
                 onClick={handleNew}
-                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-4 py-2.5 rounded-lg transition-all font-medium text-sm"
+                className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-lg transition-all font-medium text-sm"
               >
                 <Plus size={16} />
                 Create New Persona
@@ -320,20 +320,20 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                   <div
                     key={persona.id}
                     className={`relative bg-white/5 border rounded-lg overflow-hidden hover:bg-white/10 transition-all group ${
-                      activePersona?.id === persona.id ? 'border-blue-400 hover:border-blue-400/30' : 'border-white/10 hover:border-blue-400/30'
+                      activePersona?.id === persona.id ? 'border-orange-400 hover:border-orange-400/30' : 'border-white/10 hover:border-orange-400/30'
                     }`}
                   >
                     {/* Delete button positioned inside the card (top-right) */}
                     <button
                       onClick={() => handleDelete(persona)}
-                      className="absolute right-2 top-2 z-10 flex items-center gap-1 text-xs text-red-400 hover:text-red-300 p-1.5 hover:bg-black/50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                      className="absolute right-2 top-2 z-10 flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 p-1.5 hover:bg-black/50 rounded transition-colors opacity-0 group-hover:opacity-100"
                       aria-label={`Delete ${persona.name}`}
                     >
                       <Trash2 size={14} />
                     </button>
 
                     {/* Persona Avatar Header */}
-                    <div className="relative h-32 flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800">
+                    <div className="relative h-16 flex items-center justify-center bg-gray-900">
                       {persona.uses_custom_image && persona.avatar_image_url ? (
                         <img
                           src={persona.avatar_image_url}
@@ -342,9 +342,9 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                         />
                       ) : (
                         <div
-                          className={`w-16 h-16 rounded-full bg-gradient-to-br ${
-                            persona.color || 'from-blue-500 to-indigo-500'
-                          } flex items-center justify-center text-3xl`}
+                          className={`w-8 h-8 rounded-full ${
+                            persona.color || 'bg-orange-600'
+                          } flex items-center justify-center text-xl`}
                         >
                           <span>{persona.avatar || '👤'}</span>
                         </div>
@@ -352,47 +352,47 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                     </div>
 
                     {/* Info */}
-                    <div className="p-3">
-                      <div className="flex items-center justify-center gap-2 mb-1">
-                        <p className="font-bold text-white text-center">{persona.name}</p>
+                    <div className="p-2">
+                      <div className="flex items-center justify-center gap-1.5 mb-0.5">
+                        <p className="font-bold text-white text-center text-sm">{persona.name}</p>
                         {activePersona?.id === persona.id && (
-                          <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          <span className="text-[10px] bg-orange-600/20 text-orange-300 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                             Active
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 line-clamp-2 text-center mb-3">
-                        {persona.personality?.substring(0, 80)}...
+                      <p className="text-[10px] text-gray-400 line-clamp-2 text-center mb-1.5">
+                        {persona.personality?.substring(0, 60)}...
                       </p>
                       {persona.interests && persona.interests.length > 0 && (
-                        <div className="flex flex-wrap gap-1 justify-center mb-3">
+                        <div className="flex flex-wrap gap-0.5 justify-center mb-1.5">
                           {persona.interests.slice(0, 3).map((interest, idx) => (
-                            <span key={idx} className="text-xs bg-white/10 text-gray-300 px-2 py-0.5 rounded">
+                            <span key={idx} className="text-[10px] bg-white/10 text-gray-300 px-1.5 py-0.5 rounded">
                               {interest}
                             </span>
                           ))}
                           {persona.interests.length > 3 && (
-                            <span className="text-xs text-gray-400">+{persona.interests.length - 3}</span>
+                            <span className="text-[10px] text-gray-400">+{persona.interests.length - 3}</span>
                           )}
                         </div>
                       )}
 
                       {/* Action Buttons */}
-                      <div className="flex items-center justify-center gap-1 flex-wrap">
+                      <div className="flex items-center justify-center gap-0.5 flex-wrap">
                         {activePersona?.id !== persona.id && (
                           <button
                             onClick={() => handleActivate(persona)}
-                            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
+                            className="flex items-center gap-0.5 text-[10px] text-orange-400 hover:text-orange-300 px-1.5 py-0.5 hover:bg-white/5 rounded transition-colors"
                           >
-                            <User size={12} />
+                            <User size={10} />
                             Activate
                           </button>
                         )}
                         <button
                           onClick={() => handleEdit(persona)}
-                          className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 px-2 py-1 hover:bg-white/5 rounded transition-colors"
+                          className="flex items-center gap-0.5 text-[10px] text-orange-400 hover:text-orange-300 px-1.5 py-0.5 hover:bg-white/5 rounded transition-colors"
                         >
-                          <Edit2 size={12} />
+                          <Edit2 size={10} />
                           Edit
                         </button>
                       </div>
@@ -422,7 +422,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <User className="text-blue-400" size={24} />
+            <User className="text-orange-400" size={24} />
             <h2 className="text-xl font-bold text-white">
               {editingPersona ? 'Edit Persona' : 'Create New Persona'}
             </h2>
@@ -452,11 +452,11 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
               placeholder="How would you like to be addressed?"
               maxLength={50}
               className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
-                validationErrors.name ? 'border-red-400' : 'border-white/10 focus:border-blue-400'
+                validationErrors.name ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
               }`}
             />
             {validationErrors.name && (
-              <p className="text-red-400 text-xs mt-1">{validationErrors.name}</p>
+              <p className="text-orange-400 text-xs mt-1">{validationErrors.name}</p>
             )}
           </div>
 
@@ -530,7 +530,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                 <button
                   key={index}
                   onClick={() => handleInputChange('color', option.value)}
-                  className={`h-12 rounded-lg bg-gradient-to-r ${option.value} border-2 transition-all ${
+                  className={`h-12 rounded-lg ${option.value} border-2 transition-all ${
                     formData.color === option.value ? 'border-white' : 'border-transparent hover:border-white/50'
                   }`}
                   title={option.name}
@@ -554,11 +554,11 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
               rows={6}
               maxLength={500}
               className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none resize-none ${
-                validationErrors.personality ? 'border-red-400' : 'border-white/10 focus:border-blue-400'
+                validationErrors.personality ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
               }`}
             />
             {validationErrors.personality && (
-              <p className="text-red-400 text-xs mt-1">{validationErrors.personality}</p>
+              <p className="text-orange-400 text-xs mt-1">{validationErrors.personality}</p>
             )}
           </div>
 
@@ -573,12 +573,12 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                 {formData.interests.map((interest, index) => (
                   <span
                     key={index}
-                    className="flex items-center gap-1 bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-sm"
+                    className="flex items-center gap-1 bg-orange-600/20 text-orange-300 px-2 py-1 rounded-full text-sm"
                   >
                     {interest}
                     <button
                       onClick={() => removeInterest(interest)}
-                      className="text-blue-300 hover:text-white"
+                      className="text-orange-300 hover:text-white"
                     >
                       <X size={12} />
                     </button>
@@ -594,11 +594,11 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                 onChange={(e) => setCurrentInterest(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && addInterest()}
                 placeholder="Add an interest..."
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400"
               />
               <button
                 onClick={addInterest}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
               >
                 Add
               </button>
@@ -613,7 +613,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                     onClick={() => addCommonInterest(interest)}
                     className={`text-xs px-2 py-1 rounded transition-colors ${
                       formData.interests.includes(interest)
-                        ? 'bg-blue-500/30 text-blue-300 cursor-default'
+                        ? 'bg-orange-600/30 text-orange-300 cursor-default'
                         : 'bg-white/10 text-gray-300 hover:bg-white/20'
                     }`}
                     disabled={formData.interests.includes(interest)}
@@ -637,7 +637,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
               onChange={(e) => handleInputChange('communication_style', e.target.value)}
               placeholder="e.g., casual and friendly, formal and direct..."
               maxLength={100}
-              className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400"
+              className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400"
             />
             <p className="text-xs text-gray-500 mt-1">{formData.communication_style.length}/100</p>
           </div>
@@ -661,7 +661,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                 <select
                   value={formData.ai_provider}
                   onChange={(e) => handleInputChange('ai_provider', e.target.value)}
-                  className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-blue-400"
+                  className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-orange-400"
                   style={{ colorScheme: 'dark' }}
                 >
                   <option value="openai">OpenAI</option>
@@ -683,7 +683,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                   value={formData.ai_model}
                   onChange={(e) => handleInputChange('ai_model', e.target.value)}
                   disabled={loadingModels}
-                  className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-blue-400 disabled:opacity-50"
+                  className="w-full bg-gray-800 border border-white/10 rounded-lg p-2 text-white focus:outline-none focus:border-orange-400 disabled:opacity-50"
                   style={{ colorScheme: 'dark' }}
                 >
                   {loadingModels ? (
@@ -753,7 +753,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all"
+            className="px-6 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all"
           >
             {saving ? 'Saving...' : editingPersona ? 'Update Persona' : 'Create Persona'}
           </button>

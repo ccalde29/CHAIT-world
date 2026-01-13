@@ -4,13 +4,6 @@
   "description": "Frontend for AI Group Chat application",
   "private": true,
   "dependencies": {
-    "@capacitor-community/sqlite": "^7.0.2",
-    "@capacitor/app": "^8.0.0",
-    "@capacitor/cli": "^8.0.0",
-    "@capacitor/core": "^8.0.0",
-    "@capacitor/filesystem": "^8.0.0",
-    "@capacitor/ios": "^8.0.0",
-    "@capacitor/preferences": "^8.0.0",
     "@supabase/supabase-js": "^2.57.4",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",

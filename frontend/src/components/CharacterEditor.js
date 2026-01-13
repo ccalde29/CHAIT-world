@@ -476,13 +476,13 @@ const CharacterEditorV15 = ({
       anthropic: {
         name: 'Anthropic',
         icon: '🧠',
-        color: 'text-purple-400',
+        color: 'text-orange-400',
         description: 'Claude models - thoughtful and nuanced'
       },
       openrouter: {
         name: 'OpenRouter',
         icon: '🌐',
-        color: 'text-blue-400',
+        color: 'text-orange-400',
         description: 'Access to 100+ models'
       },
       google: {
@@ -521,7 +521,7 @@ const CharacterEditorV15 = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-gray-900 z-10">
           <div className="flex items-center gap-3">
-            <User className="text-red-500" size={24} />
+            <User className="text-orange-500" size={24} />
             <h2 className="text-xl font-bold text-white">
               {character ? 'Edit Character' : 'Create Character'}
             </h2>
@@ -536,7 +536,7 @@ const CharacterEditorV15 = ({
         
         {/* Error Message - Only show if there's an error and no models loaded */}
         {error && availableModels.length === 0 && (
-          <div className="mx-6 mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-400">
+          <div className="mx-6 mt-4 p-3 bg-orange-600/20 border border-red-500/30 rounded-lg flex items-center gap-2 text-orange-400">
             <AlertCircle size={16} />
             <span className="text-sm">{error}</span>
           </div>
@@ -548,7 +548,7 @@ const CharacterEditorV15 = ({
           {/* Basic Info */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Sparkles size={18} className="text-red-500" />
+              <Sparkles size={18} className="text-orange-500" />
               Basic Information
             </h3>
             
@@ -557,7 +557,7 @@ const CharacterEditorV15 = ({
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Character Name *
                 <span className={`ml-2 text-xs ${
-                  formData.name.length > 50 ? 'text-red-400' : 'text-gray-500'
+                  formData.name.length > 50 ? 'text-orange-400' : 'text-gray-500'
                 }`}>
                   ({formData.name.length} / 50 characters)
                 </span>
@@ -635,7 +635,7 @@ const CharacterEditorV15 = ({
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Appearance
                 <span className={`ml-2 text-xs ${
-                  formData.appearance.length > 1000 ? 'text-red-400' : 'text-gray-500'
+                  formData.appearance.length > 1000 ? 'text-orange-400' : 'text-gray-500'
                 }`}>
                   ({formData.appearance.length} / 1000 characters)
                 </span>
@@ -658,7 +658,7 @@ const CharacterEditorV15 = ({
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Personality & Background *
                 <span className={`ml-2 text-xs ${
-                  formData.personality.length > 500 ? 'text-red-400' : 'text-gray-500'
+                  formData.personality.length > 500 ? 'text-orange-400' : 'text-gray-500'
                 }`}>
                   ({formData.personality.length} / 500 characters)
                 </span>
@@ -707,7 +707,7 @@ const CharacterEditorV15 = ({
                   {formData.tags.map(tag => (
                     <span
                       key={tag}
-                      className="px-3 py-1 bg-red-500/20 text-red-300 rounded-full text-xs flex items-center gap-2"
+                      className="px-3 py-1 bg-orange-600/20 text-orange-300 rounded-full text-xs flex items-center gap-2"
                     >
                       {tag}
                       <button
@@ -748,7 +748,7 @@ const CharacterEditorV15 = ({
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex items-start gap-3 flex-1">
-                              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${target.color} flex items-center justify-center flex-shrink-0`}>
+                              <div className={`w-10 h-10 rounded-full ${target.color} flex items-center justify-center flex-shrink-0`}>
                                 {target.uses_custom_image && target.avatar_image_url ? (
                                   <img
                                     src={target.avatar_image_url}
@@ -762,11 +762,11 @@ const CharacterEditorV15 = ({
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <p className="text-sm font-medium text-white">{target.name}</p>
-                                  <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">
+                                  <span className="text-xs bg-orange-600/20 text-orange-300 px-2 py-0.5 rounded-full">
                                     {rel.relationship_type}
                                   </span>
                                   {rel.target_persona && (
-                                    <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
+                                    <span className="text-xs bg-orange-600/20 text-orange-300 px-2 py-0.5 rounded-full">
                                       User Persona
                                     </span>
                                   )}
@@ -785,7 +785,7 @@ const CharacterEditorV15 = ({
                                   </div>
                                   <div>
                                     <span className="text-gray-500">Bond:</span>
-                                    <span className={`ml-1 ${rel.emotional_bond > 0 ? 'text-green-400' : rel.emotional_bond < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                                    <span className={`ml-1 ${rel.emotional_bond > 0 ? 'text-green-400' : rel.emotional_bond < 0 ? 'text-orange-400' : 'text-gray-400'}`}>
                                       {rel.emotional_bond > 0 ? '+' : ''}{Math.round(rel.emotional_bond * 100)}%
                                     </span>
                                   </div>
@@ -795,7 +795,7 @@ const CharacterEditorV15 = ({
                             <button
                               type="button"
                               onClick={() => handleDeleteRelationship(rel.target_id)}
-                              className="text-red-400 hover:text-red-300 p-1"
+                              className="text-orange-400 hover:text-orange-300 p-1"
                               title="Remove Relationship"
                             >
                               <X size={16} />
@@ -843,7 +843,7 @@ const CharacterEditorV15 = ({
           {/* AI Model Selection */}
           <div className="pt-6 border-t border-white/10 space-y-4">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Brain size={18} className="text-red-500" />
+              <Brain size={18} className="text-orange-500" />
               AI Model Configuration
             </h3>
 
@@ -867,7 +867,7 @@ const CharacterEditorV15 = ({
                   }}
                   className={`p-3 rounded-lg border transition-all ${
                     ['openai', 'anthropic', 'openrouter', 'google'].includes(formData.ai_provider)
-                      ? 'bg-purple-500/20 border-purple-500 text-white'
+                      ? 'bg-orange-600/20 border-purple-500 text-white'
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
                 >
@@ -919,7 +919,7 @@ const CharacterEditorV15 = ({
                   <select
                     value={formData.ai_provider}
                     onChange={(e) => handleProviderChange(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-purple-400"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-orange-400"
                   >
                     <option value="openai" className="bg-gray-800">🤖 OpenAI - GPT Models</option>
                     <option value="anthropic" className="bg-gray-800">🧠 Anthropic - Claude Models</option>
@@ -1025,7 +1025,7 @@ const CharacterEditorV15 = ({
           {/* Advanced Settings */}
           <div className="pt-6 border-t border-white/10 space-y-4">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Sliders size={18} className="text-red-500" />
+              <Sliders size={18} className="text-orange-500" />
               Advanced Settings
             </h3>
 
@@ -1086,7 +1086,7 @@ const CharacterEditorV15 = ({
                   type="button"
                   onClick={() => handleInputChange('memory_enabled', !formData.memory_enabled)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    formData.memory_enabled ? 'bg-red-500' : 'bg-gray-600'
+                    formData.memory_enabled ? 'bg-orange-600' : 'bg-gray-600'
                   }`}
                 >
                   <span
@@ -1120,7 +1120,7 @@ const CharacterEditorV15 = ({
           <button
             onClick={handleSave}
             disabled={saving || loadingModels || !formData.ai_model}
-            className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Save size={16} />
             {saving ? 'Saving...' : character ? 'Update Character' : 'Create Character'}
@@ -1288,7 +1288,7 @@ const AddRelationshipForm = ({ availableCharacters, onAdd, onCancel }) => {
         <button
           type="button"
           onClick={handleSubmit}
-          className="flex-1 px-3 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white text-sm transition-colors"
+          className="flex-1 px-3 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg text-white text-sm transition-colors"
         >
           Add Relationship
         </button>

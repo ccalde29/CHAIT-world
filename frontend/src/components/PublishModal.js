@@ -86,7 +86,7 @@ const PublishModal = ({
         <div className="p-6 space-y-4">
           {/* Error Message */}
           {error && (
-            <div className="bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg flex items-center gap-2">
+            <div className="bg-orange-600/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg flex items-center gap-2">
               {isOfflineError({ message: error }) ? (
                 <WifiOff size={20} />
               ) : (
@@ -96,8 +96,8 @@ const PublishModal = ({
             </div>
           )}
           
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-            <p className="text-sm text-blue-300">
+          <div className="bg-orange-600/10 border border-blue-500/20 rounded-lg p-4">
+            <p className="text-sm text-orange-300">
               Your {type} will be visible to everyone in the Community Hub. Others can import and use it.
             </p>
           </div>
@@ -166,7 +166,7 @@ const PublishModal = ({
           <button
             onClick={handlePublish}
             disabled={publishing}
-            className="px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 text-white rounded-lg transition-all font-medium"
+            className="px-6 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-lg transition-all font-medium"
           >
             {publishing ? 'Publishing...' : 'Publish to Community'}
           </button>

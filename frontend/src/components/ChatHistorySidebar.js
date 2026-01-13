@@ -218,7 +218,7 @@ const ChatHistorySidebar = ({
           
           <button
             onClick={handleNewChat}
-            className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors mb-4"
+            className="p-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors mb-4"
             title="Clear chat"
           >
             <X size={20} />
@@ -229,7 +229,7 @@ const ChatHistorySidebar = ({
           </div>
           
           {chatSessions.length > 0 && (
-            <div className="mt-4 bg-red-500/20 text-red-300 text-xs px-2 py-1 rounded-full">
+            <div className="mt-4 bg-orange-600/20 text-orange-300 text-xs px-2 py-1 rounded-full">
               {chatSessions.length}
             </div>
           )}
@@ -243,10 +243,10 @@ const ChatHistorySidebar = ({
           <div className="p-4 border-b border-white/10">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <MessageCircle className="text-red-400" size={20} />
+                <MessageCircle className="text-orange-400" size={20} />
                 <h2 className="text-lg font-semibold text-white">Chat History</h2>
                 {chatSessions.length > 0 && (
-                  <span className="bg-red-500/20 text-red-300 text-xs px-2 py-0.5 rounded-full">
+                  <span className="bg-orange-600/20 text-orange-300 text-xs px-2 py-0.5 rounded-full">
                     {chatSessions.length}
                   </span>
                 )}
@@ -255,7 +255,7 @@ const ChatHistorySidebar = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleNewChat}
-                  className="flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg transition-colors text-sm"
+                  className="flex items-center gap-1 bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-lg transition-colors text-sm"
                   title="Clear chat"
                 >
                   <X size={16} />
@@ -292,7 +292,7 @@ const ChatHistorySidebar = ({
                     key={session.id}
                     className={`group relative rounded-lg border transition-all ${
                       session.id === currentSessionId
-                        ? 'bg-red-500/20 border-red-400/30'
+                        ? 'bg-orange-600/20 border-orange-400/30'
                         : 'bg-white/5 border-white/10 hover:bg-white/10'
                     } ${
                       deletingSessionId === session.id ? 'opacity-50 pointer-events-none' : 'cursor-pointer'
@@ -352,7 +352,7 @@ const ChatHistorySidebar = ({
                               </button>
                               <button
                                 onClick={(e) => deleteSession(session.id, e)}
-                                className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                                className="p-1 text-gray-400 hover:text-orange-400 transition-colors"
                                 title="Delete chat"
                                 disabled={deletingSessionId === session.id}
                               >

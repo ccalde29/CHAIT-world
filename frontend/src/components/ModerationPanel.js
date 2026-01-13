@@ -241,7 +241,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
       {/* Header */}
       <div className="bg-gray-800 border-b border-white/10 p-4">
         <div className="flex items-center gap-3">
-          <Shield className="text-purple-400" size={24} />
+          <Shield className="text-orange-400" size={24} />
           <div>
             <h2 className="text-xl font-bold text-white">Admin Panel</h2>
             <p className="text-sm text-gray-400">Review and moderate community content</p>
@@ -255,7 +255,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('pending')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'pending'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -266,7 +266,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('reports')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'reports'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -277,7 +277,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('stats')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'stats'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -288,7 +288,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('token-models')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'token-models'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -299,7 +299,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('user-tokens')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'user-tokens'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -310,7 +310,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('pricing')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'pricing'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -321,7 +321,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('analytics')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'analytics'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -332,7 +332,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('failed-transactions')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'failed-transactions'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -371,12 +371,12 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
                               item.moderation_status === 'pending'
                                 ? 'bg-yellow-500/20 text-yellow-400'
-                                : 'bg-red-500/20 text-red-400'
+                                : 'bg-orange-600/20 text-orange-400'
                             }`}>
                               {item.moderation_status}
                             </span>
                             {item.report_count > 0 && (
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400 flex items-center gap-1">
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-orange-600/20 text-orange-400 flex items-center gap-1">
                                 <AlertTriangle size={12} />
                                 {item.report_count} report{item.report_count > 1 ? 's' : ''}
                               </span>
@@ -402,7 +402,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                           <button
                             onClick={() => handleReject(item.id)}
                             disabled={processing === item.id}
-                            className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+                            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
                             title="Reject"
                           >
                             <XCircle size={18} />
@@ -439,13 +439,13 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-orange-600/20 text-orange-400">
                                 {itemType}
                               </span>
                               <h3 className="text-lg font-bold text-white">
                                 {itemName}
                               </h3>
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-orange-600/20 text-orange-400">
                                 {report.reason}
                               </span>
                             </div>
@@ -471,7 +471,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                             <button
                               onClick={() => handleResolveReport(report.id, 'unpublish')}
                               disabled={processing === report.id}
-                              className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
                               title={isCharacter ? "Unpublish character" : "Delete scene"}
                             >
                               {isCharacter ? 'Unpublish' : 'Delete'}
@@ -510,7 +510,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
 
                     <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
                       <div className="flex items-center gap-3 mb-2">
-                        <XCircle className="text-red-400" size={24} />
+                        <XCircle className="text-orange-400" size={24} />
                         <h3 className="text-sm font-medium text-gray-400">Rejected</h3>
                       </div>
                       <p className="text-3xl font-bold text-white">{stats.rejected || 0}</p>
@@ -532,7 +532,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
                       <div className="flex items-center gap-3 mb-2">
-                        <Eye className="text-blue-400" size={24} />
+                        <Eye className="text-orange-400" size={24} />
                         <h3 className="text-sm font-medium text-gray-400">Total Characters</h3>
                       </div>
                       <p className="text-3xl font-bold text-white">{stats.totalCharacters || 0}</p>
@@ -540,7 +540,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
 
                     <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
                       <div className="flex items-center gap-3 mb-2">
-                        <Eye className="text-purple-400" size={24} />
+                        <Eye className="text-orange-400" size={24} />
                         <h3 className="text-sm font-medium text-gray-400">Total Scenes</h3>
                       </div>
                       <p className="text-3xl font-bold text-white">{stats.totalScenes || 0}</p>
@@ -626,7 +626,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                   </div>
                 ) : userBalances.length === 0 ? (
                   <div className="text-center py-12 bg-gray-800 border border-white/10 rounded-lg">
-                    <Coins className="mx-auto mb-4 text-purple-400" size={48} />
+                    <Coins className="mx-auto mb-4 text-orange-400" size={48} />
                     <p className="text-gray-400">No users with token balances yet</p>
                   </div>
                 ) : (
@@ -651,7 +651,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                               </td>
                               <td className="text-right py-3 px-4">
                                 <span className={`font-semibold ${
-                                  user.balance < 50 ? 'text-red-400' : 
+                                  user.balance < 50 ? 'text-orange-400' : 
                                   user.balance < 200 ? 'text-amber-400' : 
                                   'text-green-400'
                                 }`}>
@@ -689,7 +689,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                                         handleTokenOperation('deduct', user.user_id, amount, reason);
                                       }
                                     }}
-                                    className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-sm transition-colors"
+                                    className="px-3 py-1 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded text-sm transition-colors"
                                   >
                                     Deduct
                                   </button>
@@ -700,7 +700,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                                         handleTokenOperation('set', user.user_id, balance, '');
                                       }
                                     }}
-                                    className="px-3 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded text-sm transition-colors"
+                                    className="px-3 py-1 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded text-sm transition-colors"
                                   >
                                     Set
                                   </button>
@@ -734,7 +734,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                     </div>
                     <button
                       onClick={fetchPricing}
-                      className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded transition-colors text-sm"
+                      className="px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded transition-colors text-sm"
                     >
                       Refresh
                     </button>

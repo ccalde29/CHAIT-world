@@ -192,15 +192,24 @@ module.exports = (db) => {
   router.delete('/:id', requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({ error: 'Model ID is required' });
+      }
+
       await supabaseService.deleteTokenModel(id);
 
       res.json({ success: true, message: 'Token model deleted successfully' });
     } catch (error) {
+      console.error('[TokenModels] Delete error:', error);
+      
       if (error.message.includes('not found')) {
         return res.status(404).json({ error: 'Token model not found' });
       }
-      console.error('[TokenModels] Error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      
+      // Provide more detailed error message
+      const errorMessage = error.message || 'Failed to delete token model';
+      res.status(500).json({ error: errorMessage });
     }
   });
 

@@ -40,7 +40,7 @@ const ChatInterface = ({
             if (message.type === 'system') {
               return (
                 <div key={message.id} className="flex justify-center my-6">
-                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg px-6 py-4 max-w-2xl">
+                  <div className="bg-orange-600/10 border border-orange-500/30 rounded-lg px-6 py-4 max-w-2xl">
                     <p className="text-gray-300 text-center italic">{message.content}</p>
                   </div>
                 </div>
@@ -93,7 +93,7 @@ const ChatInterface = ({
               ? messagePersona?.name || 'You'
               : character?.name || 'Character';
             const colorClass = isUser
-              ? messagePersona?.color || 'from-blue-500 to-indigo-500'
+              ? messagePersona?.color || 'bg-orange-600'
               : character?.color || 'from-gray-500 to-slate-500';
 
             // Check for custom images
@@ -106,7 +106,7 @@ const ChatInterface = ({
                 className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
               >
                 {/* Avatar */}
-                <div className={`flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br ${colorClass} flex items-center justify-center text-white text-xl`}>
+                <div className={`flex-shrink-0 w-10 h-10 rounded-full ${colorClass} flex items-center justify-center text-white text-xl`}>
                   {(hasUserImage || hasCharacterImage) ? (
                     <img
                       src={hasUserImage ? messagePersona.avatar_image_url : character.avatar_image_url}
@@ -136,7 +136,7 @@ const ChatInterface = ({
                       <textarea
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-400"
+                        className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
                         rows={3}
                         autoFocus
                       />
@@ -169,7 +169,7 @@ const ChatInterface = ({
                       <div
                         className={`rounded-2xl px-4 py-2 ${
                           isUser
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-orange-700 text-white'
                             : 'bg-white/5 text-gray-100'
                         }`}
                       >
@@ -200,8 +200,8 @@ const ChatInterface = ({
 
       {/* Error Display */}
       {error && (
-        <div className="px-6 py-3 bg-red-500/10 border-t border-red-500/20">
-          <div className="flex items-center gap-2 text-red-400">
+        <div className="px-6 py-3 bg-orange-600/10 border-t border-orange-500/20">
+          <div className="flex items-center gap-2 text-orange-400">
             <AlertCircle size={16} />
             <span className="text-sm">{error}</span>
           </div>
@@ -224,7 +224,7 @@ const ChatInterface = ({
             <button
               onClick={onGeneratePersonaResponse}
               disabled={isGenerating || generatingPersonaResponse || !userPersona?.persona?.ai_model}
-              className="px-4 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               title={
                 !userPersona?.persona?.ai_model
                   ? "Configure AI model in Persona Manager to enable auto-responses"
@@ -238,7 +238,7 @@ const ChatInterface = ({
           <button
             onClick={onSendMessage}
             disabled={isGenerating || !userInput.trim()}
-            className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Send size={18} />
             {isGenerating ? 'Sending...' : 'Send'}

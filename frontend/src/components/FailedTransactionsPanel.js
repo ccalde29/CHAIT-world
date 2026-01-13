@@ -64,7 +64,7 @@ const FailedTransactionsPanel = ({ apiRequest }) => {
         </div>
         <button
           onClick={loadTransactions}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 rounded transition-colors"
         >
           <RefreshCw size={16} />
           Refresh
@@ -97,7 +97,7 @@ const FailedTransactionsPanel = ({ apiRequest }) => {
           onClick={() => setFilter('all')}
           className={`px-4 py-2 rounded-lg text-sm transition-colors ${
             filter === 'all'
-              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+              ? 'bg-orange-600/20 text-orange-400 border border-blue-500/30'
               : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
           }`}
         >
@@ -112,7 +112,7 @@ const FailedTransactionsPanel = ({ apiRequest }) => {
         </div>
       ) : error ? (
         <div className="flex items-center justify-center py-12">
-          <div className="text-red-400">Error: {error}</div>
+          <div className="text-orange-400">Error: {error}</div>
         </div>
       ) : transactions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12">
@@ -169,7 +169,7 @@ const FailedTransactionsPanel = ({ apiRequest }) => {
                     </div>
                     <div className="col-span-2">
                       <p className="text-gray-400 text-xs mb-1">Error</p>
-                      <p className="text-red-400 text-xs bg-red-500/10 p-2 rounded font-mono">
+                      <p className="text-orange-400 text-xs bg-orange-600/10 p-2 rounded font-mono">
                         {transaction.error_message}
                       </p>
                     </div>
