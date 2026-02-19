@@ -4,9 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { Users, MapPin, Coins, Plus, Edit, Trash2, Eye, Search, X, Upload, LayoutGrid } from 'lucide-react';
+import { Users, MapPin, Plus, Edit, Trash2, Eye, Search, X, Upload, LayoutGrid } from 'lucide-react';
 import PublishModal from './PublishModal';
-import UserCreditsPanel from './UserCreditsPanel';
 
 const CharacterSceneHub = ({
   characters,
@@ -24,7 +23,7 @@ const CharacterSceneHub = ({
   apiRequest,
   fullScreen = false
 }) => {
-  const [activeTab, setActiveTab] = useState('characters'); // 'characters', 'scenes', or 'credits'
+  const [activeTab, setActiveTab] = useState('characters'); // 'characters' or 'scenes'
   const [searchQuery, setSearchQuery] = useState('');
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [publishItem, setPublishItem] = useState(null);
@@ -83,22 +82,10 @@ const CharacterSceneHub = ({
             <MapPin size={16} />
             Scenes
           </button>
-          <button
-            onClick={() => setActiveTab('credits')}
-            className={`pb-3 px-2 border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'credits'
-                ? 'border-green-400 text-green-400'
-                : 'border-transparent text-gray-400 hover:text-gray-300'
-            }`}
-          >
-            <Coins size={16} />
-            Credits
-          </button>
         </div>
       </div>
 
       {/* Search */}
-      {activeTab !== 'credits' && (
       <div className="p-4 border-b border-white/10">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -119,7 +106,6 @@ const CharacterSceneHub = ({
           )}
         </div>
       </div>
-      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 240px)' }}>
@@ -355,9 +341,6 @@ const CharacterSceneHub = ({
           </div>
         )}
 
-        {activeTab === 'credits' && (
-          <UserCreditsPanel user={user} apiRequest={apiRequest} />
-        )}
       </div>
       </div>
 

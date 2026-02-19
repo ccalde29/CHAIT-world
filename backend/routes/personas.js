@@ -5,7 +5,6 @@
 const express = require('express');
 const router = express.Router();
 const AIProviderService = require('../services/AIProviderService');
-const supabaseTokenService = require('../services/SupabaseAdminTokenService');
 
 module.exports = (db) => {
 
@@ -501,61 +500,6 @@ ${persona.personality}`;
 
     // Generate response using AIProviderService
 
-    // Check if this is a token model and resolve it
-    let modelCost = null;
-    let useServerKeys = false;
-    let adminApiKeys = {};
-    let tokenModel = null; // Declare tokenModel in outer scope for analytics
-    
-    if (persona.ai_provider === 'token') {
-      // Resolve token model from Supabase
-      const allTokenModels = await supabaseTokenService.getTokenModels(true);
-      tokenModel = allTokenModels.find(m => m.id === persona.ai_model || m.name === persona.ai_model);
-      
-      if (!tokenModel) {
-        return res.status(404).json({ error: `Token model not found: ${persona.ai_model}` });
-      }
-      
-      modelCost = tokenModel.token_cost;
-      useServerKeys = true;
-      
-      // Get admin API keys from Supabase
-      const adminKeys = await supabaseTokenService.getAdminApiKeys(userId);
-      
-      adminApiKeys = {
-        openai: adminKeys.openai_key,
-        anthropic: adminKeys.anthropic_key,
-        google: adminKeys.google_key,
-        openrouter: adminKeys.openrouter_key
-      };
-      
-      // Verify admin has the required key
-      if (!adminApiKeys[tokenModel.ai_provider]) {
-        return res.status(400).json({ 
-          error: `Admin API key not configured for ${tokenModel.ai_provider}. Please add it in Admin Settings.`
-        });
-      }
-      
-      // Check balance before generating
-      const userBalance = await supabaseTokenService.getUserTokens(userId);
-      if (userBalance.balance < modelCost) {
-        return res.status(402).json({ 
-          error: `Insufficient tokens. Need ${modelCost} tokens, you have ${userBalance.balance}. Please refill or choose a cheaper model.`,
-          requiredTokens: modelCost
-        });
-      }
-      
-      // Update persona with actual provider and model
-      personaAsCharacter = {
-        ...personaAsCharacter,
-        ai_provider: tokenModel.ai_provider,
-        ai_model: tokenModel.model_id,
-        temperature: tokenModel.temperature,
-        max_tokens: tokenModel.max_tokens
-      };
-
-    }
-
     // Prepare settings object with both ollama and lmstudio configurations
     const localProviderSettings = {
       ...settings?.ollamaSettings,
@@ -572,26 +516,9 @@ ${persona.personality}`;
         { role: 'system', content: personaPrompt },
         ...messages.slice(-10) // Last 10 messages for context
       ],
-      useServerKeys ? adminApiKeys : (settings?.apiKeys || {}),
-      localProviderSettings,
-      { useServerKeys: false }
+      settings?.apiKeys || {},
+      localProviderSettings
     );
-
-    // Deduct tokens if it was a token model
-    if (useServerKeys && modelCost > 0) {
-      // Calculate estimated API cost
-      const estimatedApiCost = (modelCost / 500) * (tokenModel.provider_cost_per_500_tokens || 0);
-      
-      const result = await supabaseTokenService.deductTokens(
-        userId,
-        modelCost,
-        `Persona ${persona.name}`,
-        tokenModel.id, // model_id for analytics
-        estimatedApiCost, // api_cost_usd
-        tokenModel.provider_cost_per_500_tokens // provider_cost_per_500_tokens
-      );
-
-    }
 
     res.json({
       success: true,

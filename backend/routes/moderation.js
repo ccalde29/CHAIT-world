@@ -113,10 +113,8 @@ router.get('/stats', requireAdmin, async (req, res) => {
       .from('community_scenes')
       .select('*', { count: 'exact', head: true });
 
-    // Total users (with settings)
-    const { count: totalUsers } = await getSupabase()
-      .from('user_settings')
-      .select('*', { count: 'exact', head: true });
+    // Total users — user_settings is SQLite-only, count not available from Supabase
+    const totalUsers = 0;
 
     // Get top characters by imports
     const { data: topCharacters } = await getSupabase()

@@ -368,38 +368,40 @@ CREATE TABLE IF NOT EXISTS user_settings_local (
 CREATE INDEX idx_settings_user ON user_settings_local(user_id);
 
 -- =============================================================================
--- CHARACTER COMMENTS TABLE (LOCAL) - Comments on local characters (not community)
+-- CHARACTER NOTES TABLE (LOCAL) - Private notes/ratings on local characters
+-- Distinct from community character_comments in Supabase
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS character_comments (
+CREATE TABLE IF NOT EXISTS character_notes (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     character_id TEXT NOT NULL,
     user_id TEXT,
-    content TEXT NOT NULL,
+    note TEXT NOT NULL,
     rating INTEGER CHECK(rating >= 1 AND rating <= 5),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_character_comments_character ON character_comments(character_id);
-CREATE INDEX idx_character_comments_user ON character_comments(user_id);
+CREATE INDEX idx_character_notes_character ON character_notes(character_id);
+CREATE INDEX idx_character_notes_user ON character_notes(user_id);
 
 -- =============================================================================
--- SCENE COMMENTS TABLE (LOCAL) - Comments on local scenarios
+-- SCENE NOTES TABLE (LOCAL) - Private notes/ratings on local scenarios
+-- Distinct from community scene_comments in Supabase
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS scene_comments (
+CREATE TABLE IF NOT EXISTS scene_notes (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     scenario_id TEXT NOT NULL,
     user_id TEXT,
-    content TEXT NOT NULL,
+    note TEXT NOT NULL,
     rating INTEGER CHECK(rating >= 1 AND rating <= 5),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (scenario_id) REFERENCES scenarios(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_scene_comments_scenario ON scene_comments(scenario_id);
-CREATE INDEX idx_scene_comments_user ON scene_comments(user_id);
+CREATE INDEX idx_scene_notes_scenario ON scene_notes(scenario_id);
+CREATE INDEX idx_scene_notes_user ON scene_notes(user_id);
 
 -- =============================================================================
 -- TRIGGERS FOR UPDATED_AT COLUMNS
@@ -459,16 +461,16 @@ BEGIN
     UPDATE user_settings_local SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
-CREATE TRIGGER update_character_comments_timestamp 
-AFTER UPDATE ON character_comments 
+CREATE TRIGGER update_character_notes_timestamp 
+AFTER UPDATE ON character_notes 
 BEGIN
-    UPDATE character_comments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    UPDATE character_notes SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
-CREATE TRIGGER update_scene_comments_timestamp 
-AFTER UPDATE ON scene_comments 
+CREATE TRIGGER update_scene_notes_timestamp 
+AFTER UPDATE ON scene_notes 
 BEGIN
-    UPDATE scene_comments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    UPDATE scene_notes SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
 -- =============================================================================

@@ -9,7 +9,6 @@ import { useChat } from '../hooks/useChat';
 import { useCharacters } from '../hooks/useCharacters';
 import { useSettings } from '../hooks/useSettings';
 import { usePersonas } from '../hooks/usePersonas';
-import { useTokens } from '../hooks/useTokens';
 import { createApiClient } from '../utils/apiClient';
 
 // Components
@@ -44,7 +43,6 @@ const MainApp = () => {
   const charactersState = useCharacters(apiRequest);
   const settings = useSettings(apiRequest);
   const personasState = usePersonas(apiRequest);
-  const tokens = useTokens(apiRequest);
 
   // ============================================================================
   // UI STATE
@@ -165,8 +163,6 @@ const MainApp = () => {
         }
       }
     );
-    // Refresh token balance after sending message
-    await tokens.refreshBalance();
   };
 
   const handlePersonaSwitch = async (personaId) => {
@@ -351,8 +347,6 @@ const MainApp = () => {
         currentSessionId={chat.currentSessionId}
         refreshTrigger={sessionRefreshTrigger}
         onSessionsLoad={(loadFn) => { loadSessionsRef.current = loadFn; }}
-        tokenBalance={tokens.balance}
-        tokensLoading={tokens.loading}
         onSessionSelect={async (session) => {
           try {
             // First, restore the active characters from the session
@@ -431,8 +425,7 @@ const MainApp = () => {
                   setSessionRefreshTrigger(prev => prev + 1);
                 }
               );
-              // Refresh token balance after editing message
-              tokens.refreshBalance();
+
             }}
             onStartEdit={chat.setEditingMessageId}
             onCancelEdit={() => chat.setEditingMessageId(null)}
@@ -563,6 +556,7 @@ const MainApp = () => {
               onSave={settings.saveUserSettings}
               onClose={() => setActiveView('chat')}
               fullScreen={true}
+              apiRequest={apiRequest}
             />
           </div>
         )}

@@ -182,63 +182,49 @@ class LocalDatabaseService {
                 `);
             }
 
-            if (!tableNames.includes('user_tokens')) {
-                this.db.exec(`
-                    CREATE TABLE user_tokens (
-                        user_id TEXT PRIMARY KEY,
-                        balance INTEGER DEFAULT 100,
-                        lifetime_earned INTEGER DEFAULT 100,
-                        lifetime_purchased INTEGER DEFAULT 0,
-                        last_weekly_refill DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    );
-                    CREATE INDEX idx_user_tokens_balance ON user_tokens(balance);
-                    CREATE INDEX idx_user_tokens_refill ON user_tokens(last_weekly_refill);
-                `);
+            // user_tokens and token_transactions removed — token system deprecated
+
+            // Add granular model parameter columns to characters table
+            const charTableInfo = this.db.prepare("PRAGMA table_info(characters)").all();
+            const charColumnNames = charTableInfo.map(col => col.name);
+
+            if (!charColumnNames.includes('top_p')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN top_p REAL DEFAULT NULL");
+            }
+            if (!charColumnNames.includes('frequency_penalty')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN frequency_penalty REAL DEFAULT NULL");
+            }
+            if (!charColumnNames.includes('presence_penalty')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN presence_penalty REAL DEFAULT NULL");
+            }
+            if (!charColumnNames.includes('repetition_penalty')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN repetition_penalty REAL DEFAULT NULL");
+            }
+            if (!charColumnNames.includes('stop_sequences')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN stop_sequences TEXT DEFAULT NULL");
             }
 
-            if (!tableNames.includes('token_transactions')) {
-                this.db.exec(`
-                    CREATE TABLE token_transactions (
-                        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-                        user_id TEXT NOT NULL,
-                        amount INTEGER NOT NULL,
-                        type TEXT NOT NULL CHECK(type IN ('weekly_refill', 'purchase', 'admin_grant', 'admin_deduct', 'usage')),
-                        reference TEXT,
-                        balance_after INTEGER NOT NULL,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES user_tokens(user_id) ON DELETE CASCADE
-                    );
-                    CREATE INDEX idx_token_transactions_user ON token_transactions(user_id);
-                    CREATE INDEX idx_token_transactions_type ON token_transactions(type);
-                    CREATE INDEX idx_token_transactions_created ON token_transactions(created_at);
-                `);
+            // Add granular model parameter columns to custom_models table
+            const customModelTableInfo = this.db.prepare("PRAGMA table_info(custom_models)").all();
+            const customModelColumnNames = customModelTableInfo.map(col => col.name);
+
+            if (!customModelColumnNames.includes('top_p')) {
+                this.db.exec("ALTER TABLE custom_models ADD COLUMN top_p REAL DEFAULT NULL");
+            }
+            if (!customModelColumnNames.includes('frequency_penalty')) {
+                this.db.exec("ALTER TABLE custom_models ADD COLUMN frequency_penalty REAL DEFAULT NULL");
+            }
+            if (!customModelColumnNames.includes('presence_penalty')) {
+                this.db.exec("ALTER TABLE custom_models ADD COLUMN presence_penalty REAL DEFAULT NULL");
+            }
+            if (!customModelColumnNames.includes('repetition_penalty')) {
+                this.db.exec("ALTER TABLE custom_models ADD COLUMN repetition_penalty REAL DEFAULT NULL");
+            }
+            if (!customModelColumnNames.includes('stop_sequences')) {
+                this.db.exec("ALTER TABLE custom_models ADD COLUMN stop_sequences TEXT DEFAULT NULL");
             }
 
-            if (!tableNames.includes('token_models')) {
-                this.db.exec(`
-                    CREATE TABLE token_models (
-                        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-                        name TEXT NOT NULL UNIQUE,
-                        display_name TEXT NOT NULL,
-                        description TEXT,
-                        ai_provider TEXT NOT NULL CHECK(ai_provider IN ('openai', 'anthropic', 'google', 'openrouter')),
-                        model_id TEXT NOT NULL,
-                        token_cost INTEGER NOT NULL DEFAULT 1 CHECK(token_cost >= 0),
-                        custom_system_prompt TEXT,
-                        temperature REAL DEFAULT 0.7 CHECK(temperature >= 0 AND temperature <= 2.0),
-                        max_tokens INTEGER DEFAULT 150 CHECK(max_tokens >= 50 AND max_tokens <= 1000),
-                        tags TEXT,
-                        is_active INTEGER DEFAULT 1,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    );
-                    CREATE INDEX idx_token_models_active ON token_models(is_active);
-                    CREATE INDEX idx_token_models_provider ON token_models(ai_provider);
-                    CREATE INDEX idx_token_models_cost ON token_models(token_cost);
-                `);
-            }
+            // token_models removed — model presets now live in custom_models (SQLite)
         } catch (error) {
             console.error('Failed to run migrations:', error);
             // Don't throw - allow app to continue
@@ -326,9 +312,11 @@ class LocalDatabaseService {
                 tags, temperature, max_tokens, context_window, memory_enabled,
                 ai_provider, ai_model, fallback_provider, fallback_model,
                 voice_traits, speech_patterns, avatar_image_url, avatar_image_filename,
-                uses_custom_image, is_default, original_id
+                uses_custom_image, is_default, original_id,
+                top_p, frequency_penalty, presence_penalty, repetition_penalty, stop_sequences
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?
             )
         `);
 
@@ -360,7 +348,12 @@ class LocalDatabaseService {
             characterData.avatar_image_filename || null,
             characterData.uses_custom_image ? 1 : 0,
             characterData.is_default ? 1 : 0,
-            characterData.original_id || null
+            characterData.original_id || null,
+            characterData.top_p ?? null,
+            characterData.frequency_penalty ?? null,
+            characterData.presence_penalty ?? null,
+            characterData.repetition_penalty ?? null,
+            characterData.stop_sequences ? JSON.stringify(characterData.stop_sequences) : null
         );
 
         // Get the created character
@@ -395,7 +388,8 @@ class LocalDatabaseService {
             'tags', 'temperature', 'max_tokens', 'context_window', 'memory_enabled',
             'ai_provider', 'ai_model', 'fallback_provider', 'fallback_model',
             'voice_traits', 'speech_patterns', 'avatar_image_url', 'avatar_image_filename',
-            'uses_custom_image'
+            'uses_custom_image',
+            'top_p', 'frequency_penalty', 'presence_penalty', 'repetition_penalty', 'stop_sequences'
         ];
 
         const setClauses = [];
@@ -404,14 +398,16 @@ class LocalDatabaseService {
         for (const [key, value] of Object.entries(updates)) {
             if (allowedFields.includes(key)) {
                 setClauses.push(`${key} = ?`);
-                
+
                 // Handle JSON fields
                 if (['chat_examples', 'relationships', 'tags', 'voice_traits', 'speech_patterns'].includes(key)) {
                     values.push(JSON.stringify(value));
+                } else if (key === 'stop_sequences') {
+                    values.push(value ? JSON.stringify(value) : null);
                 } else if (['memory_enabled', 'uses_custom_image'].includes(key)) {
                     values.push(value ? 1 : 0);
                 } else {
-                    values.push(value);
+                    values.push(value ?? null);
                 }
             }
         }
@@ -438,6 +434,95 @@ class LocalDatabaseService {
         return stmt.run(characterId);
     }
 
+    // ============================================================================
+    // CUSTOM MODEL PRESETS (local SQLite)
+    // ============================================================================
+
+    getCustomModels(userId) {
+        this.ensureInitialized();
+        // Return global presets (user_id IS NULL) AND user-specific presets
+        const rows = this.all(
+            `SELECT * FROM custom_models WHERE (user_id IS NULL OR user_id = ?) AND is_active = 1 ORDER BY created_at DESC`,
+            [userId]
+        );
+        return rows.map(r => this.parseCustomModelJson(r));
+    }
+
+    getCustomModel(id) {
+        this.ensureInitialized();
+        const row = this.get('SELECT * FROM custom_models WHERE id = ?', [id]);
+        return row ? this.parseCustomModelJson(row) : null;
+    }
+
+    createCustomModel(userId, data) {
+        this.ensureInitialized();
+        const stmt = this.db.prepare(`
+            INSERT INTO custom_models (
+                user_id, name, display_name, description, provider, model_id,
+                custom_system_prompt, temperature, max_tokens,
+                top_p, frequency_penalty, presence_penalty, repetition_penalty, stop_sequences,
+                tags, is_active
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        `);
+        const result = stmt.run(
+            userId,
+            data.name,
+            data.display_name || data.name,
+            data.description || null,
+            data.provider,
+            data.model_id,
+            data.custom_system_prompt || null,
+            data.temperature ?? 0.8,
+            data.max_tokens || 150,
+            data.top_p ?? null,
+            data.frequency_penalty ?? null,
+            data.presence_penalty ?? null,
+            data.repetition_penalty ?? null,
+            data.stop_sequences ? JSON.stringify(data.stop_sequences) : null,
+            JSON.stringify(data.tags || [])
+        );
+        return this.getCustomModel(this.db.prepare('SELECT last_insert_rowid() as id').get()['last_insert_rowid()']);
+    }
+
+    updateCustomModel(id, updates) {
+        this.ensureInitialized();
+        const allowed = [
+            'name', 'display_name', 'description', 'provider', 'model_id',
+            'custom_system_prompt', 'temperature', 'max_tokens',
+            'top_p', 'frequency_penalty', 'presence_penalty', 'repetition_penalty',
+            'stop_sequences', 'tags', 'is_active'
+        ];
+        const setClauses = [];
+        const values = [];
+        for (const [key, value] of Object.entries(updates)) {
+            if (allowed.includes(key)) {
+                setClauses.push(`${key} = ?`);
+                if (key === 'stop_sequences') values.push(value ? JSON.stringify(value) : null);
+                else if (key === 'tags') values.push(JSON.stringify(value || []));
+                else values.push(value ?? null);
+            }
+        }
+        if (setClauses.length === 0) return this.getCustomModel(id);
+        values.push(id);
+        this.db.prepare(`UPDATE custom_models SET ${setClauses.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(values);
+        return this.getCustomModel(id);
+    }
+
+    deleteCustomModel(id) {
+        this.ensureInitialized();
+        return this.db.prepare('DELETE FROM custom_models WHERE id = ?').run(id);
+    }
+
+    parseCustomModelJson(row) {
+        if (!row) return null;
+        return {
+            ...row,
+            tags: this.safeJsonParse(row.tags, []),
+            stop_sequences: this.safeJsonParse(row.stop_sequences, null),
+            is_active: Boolean(row.is_active)
+        };
+    }
+
     /**
      * Parse JSON fields in character object
      */
@@ -451,6 +536,7 @@ class LocalDatabaseService {
             tags: this.safeJsonParse(character.tags, []),
             voice_traits: this.safeJsonParse(character.voice_traits, {}),
             speech_patterns: this.safeJsonParse(character.speech_patterns, {}),
+            stop_sequences: this.safeJsonParse(character.stop_sequences, null),
             memory_enabled: Boolean(character.memory_enabled),
             uses_custom_image: Boolean(character.uses_custom_image),
             is_default: Boolean(character.is_default),

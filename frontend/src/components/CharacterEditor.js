@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Save, User, MessageCircle, Sparkles, Sliders,
-  Brain, Zap, Tag, Globe, RefreshCw, AlertCircle, Users, Heart
+  Brain, Zap, Tag, Globe, RefreshCw, AlertCircle, Users, Heart, ChevronDown, ChevronUp
 } from 'lucide-react';
 import ImageUpload from './ImageUpload';
 
@@ -37,6 +37,11 @@ const CharacterEditorV15 = ({
     max_tokens: 150,
     context_window: 8000,
     memory_enabled: true,
+    top_p: null,
+    frequency_penalty: null,
+    presence_penalty: null,
+    repetition_penalty: null,
+    stop_sequences: null,
     chat_examples: [],
     relationships: [],
 
@@ -56,6 +61,7 @@ const CharacterEditorV15 = ({
   const [loadingModels, setLoadingModels] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [showAdvancedParams, setShowAdvancedParams] = useState(false);
 
   // Relationships state
   const [availableCharacters, setAvailableCharacters] = useState([]);
@@ -83,6 +89,11 @@ const CharacterEditorV15 = ({
         max_tokens: character.max_tokens || 150,
         context_window: character.context_window || 8000,
         memory_enabled: character.memory_enabled !== false,
+        top_p: character.top_p ?? null,
+        frequency_penalty: character.frequency_penalty ?? null,
+        presence_penalty: character.presence_penalty ?? null,
+        repetition_penalty: character.repetition_penalty ?? null,
+        stop_sequences: character.stop_sequences ?? null,
         chat_examples: character.chat_examples || [],
         relationships: character.relationships || [],
         avatar_image_url: character.avatar_image_url || null,
@@ -1104,6 +1115,175 @@ const CharacterEditorV15 = ({
                   {formData.memory_enabled ? 'Memory Active - Character will remember your conversations' : 'Memory Disabled - Each chat starts fresh'}
                 </span>
               </p>
+            </div>
+
+            {/* Advanced Model Parameters — collapsible */}
+            <div className="pt-4 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedParams(v => !v)}
+                className="flex items-center justify-between w-full text-sm font-medium text-gray-300 hover:text-white transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Sliders size={15} className="text-orange-400" />
+                  Advanced Model Parameters
+                  <span className="text-xs text-gray-500 font-normal">(optional overrides)</span>
+                </span>
+                {showAdvancedParams ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {showAdvancedParams && (
+                <div className="mt-4 space-y-5">
+                  <p className="text-xs text-gray-500">
+                    Leave a field blank to use the provider's default. Changes here override global defaults for this character only.
+                  </p>
+
+                  {/* Top P */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Top P{formData.top_p != null ? `: ${formData.top_p.toFixed(2)}` : ' — provider default'}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Nucleus sampling. Limits token selection to the top probability mass. Lower = more focused. Supported by all providers.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0.0"
+                        max="1.0"
+                        step="0.05"
+                        value={formData.top_p ?? 1.0}
+                        onChange={(e) => handleInputChange('top_p', parseFloat(e.target.value))}
+                        className="flex-1 accent-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('top_p', null)}
+                        className="text-xs text-gray-500 hover:text-orange-400 transition-colors whitespace-nowrap"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-1">
+                      <span>Narrow (0.0)</span><span>Full (1.0)</span>
+                    </div>
+                  </div>
+
+                  {/* Frequency Penalty */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Frequency Penalty{formData.frequency_penalty != null ? `: ${formData.frequency_penalty.toFixed(2)}` : ' — provider default'}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Reduces repetition of tokens proportional to how often they've appeared. Supported by OpenAI, OpenRouter, LM Studio.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="-2.0"
+                        max="2.0"
+                        step="0.05"
+                        value={formData.frequency_penalty ?? 0}
+                        onChange={(e) => handleInputChange('frequency_penalty', parseFloat(e.target.value))}
+                        className="flex-1 accent-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('frequency_penalty', null)}
+                        className="text-xs text-gray-500 hover:text-orange-400 transition-colors whitespace-nowrap"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-1">
+                      <span>More repetition (-2)</span><span>Less repetition (+2)</span>
+                    </div>
+                  </div>
+
+                  {/* Presence Penalty */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Presence Penalty{formData.presence_penalty != null ? `: ${formData.presence_penalty.toFixed(2)}` : ' — provider default'}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Encourages the model to introduce new topics by penalising tokens that have appeared at all. Supported by OpenAI, OpenRouter, LM Studio.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="-2.0"
+                        max="2.0"
+                        step="0.05"
+                        value={formData.presence_penalty ?? 0}
+                        onChange={(e) => handleInputChange('presence_penalty', parseFloat(e.target.value))}
+                        className="flex-1 accent-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('presence_penalty', null)}
+                        className="text-xs text-gray-500 hover:text-orange-400 transition-colors whitespace-nowrap"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-1">
+                      <span>Stay on topic (-2)</span><span>Explore more (+2)</span>
+                    </div>
+                  </div>
+
+                  {/* Repetition Penalty */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Repetition Penalty{formData.repetition_penalty != null ? `: ${formData.repetition_penalty.toFixed(2)}` : ' — provider default'}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Penalises recently used tokens. Values {'>'} 1 reduce repetition. Supported by Ollama and OpenRouter.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="2.0"
+                        step="0.05"
+                        value={formData.repetition_penalty ?? 1.0}
+                        onChange={(e) => handleInputChange('repetition_penalty', parseFloat(e.target.value))}
+                        className="flex-1 accent-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('repetition_penalty', null)}
+                        className="text-xs text-gray-500 hover:text-orange-400 transition-colors whitespace-nowrap"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-1">
+                      <span>Allow repeats (0.5)</span><span>Strongly avoid (2.0)</span>
+                    </div>
+                  </div>
+
+                  {/* Stop Sequences */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Stop Sequences
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Comma-separated strings that will stop generation when encountered. Supported by all providers.
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="e.g.  [END], ###, User:"
+                      value={Array.isArray(formData.stop_sequences) ? formData.stop_sequences.join(', ') : (formData.stop_sequences || '')}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const parsed = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : null;
+                        handleInputChange('stop_sequences', parsed?.length ? parsed : null);
+                      }}
+                      className="w-full bg-gray-700 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

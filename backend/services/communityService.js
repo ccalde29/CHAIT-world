@@ -420,7 +420,12 @@ class CommunityService {
         uses_custom_image: character.uses_custom_image,
         is_locked: isLocked,
         hidden_fields: hiddenFields,
-        moderation_status: moderationStatus
+        moderation_status: moderationStatus,
+        top_p: character.top_p ?? null,
+        frequency_penalty: character.frequency_penalty ?? null,
+        presence_penalty: character.presence_penalty ?? null,
+        repetition_penalty: character.repetition_penalty ?? null,
+        stop_sequences: character.stop_sequences ?? null
       };
 
       // Insert into community_characters table
@@ -779,10 +784,90 @@ class CommunityService {
         })
         .eq('id', communitySceneId);
 
+      // Track the import
+      try {
+        await this.supabase
+          .from('scene_imports')
+          .insert({
+            original_scene_id: communityScene.original_scenario_id,
+            imported_scene_id: newScene.id,
+            imported_by_user_id: userId
+          });
+      } catch (importTrackError) {
+        console.warn('Could not track scene import:', importTrackError.message);
+      }
+
       return newScene;
     } catch (error) {
       console.error('Error importing scene:', error);
       throw error;
+    }
+  }
+
+  // ============================================================================
+  // SCENE FAVORITES
+  // ============================================================================
+
+  async addToSceneFavorites(userId, sceneId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('scene_favorites')
+        .insert({ user_id: userId, scene_id: sceneId })
+        .select()
+        .single();
+      if (error && error.code !== '23505') throw error; // ignore duplicate
+      return data;
+    } catch (error) {
+      console.error('Error adding scene to favorites:', error);
+      return null;
+    }
+  }
+
+  async removeFromSceneFavorites(userId, sceneId) {
+    try {
+      const { error } = await this.supabase
+        .from('scene_favorites')
+        .delete()
+        .eq('user_id', userId)
+        .eq('scene_id', sceneId);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error removing scene from favorites:', error);
+      return true;
+    }
+  }
+
+  async getUserSceneFavorites(userId, limit = 50) {
+    try {
+      if (!userId || userId === 'undefined' || userId === 'anonymous') return [];
+      const { data, error } = await this.supabase
+        .from('scene_favorites')
+        .select('scene_id, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error getting user scene favorites:', error);
+      return [];
+    }
+  }
+
+  async isSceneFavorited(userId, sceneId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('scene_favorites')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('scene_id', sceneId)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return !!data;
+    } catch (error) {
+      console.error('Error checking scene favorite status:', error);
+      return false;
     }
   }
 

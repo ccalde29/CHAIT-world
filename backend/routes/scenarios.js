@@ -3,7 +3,6 @@
 
 const express = require('express');
 const router = express.Router();
-const supabaseTokenService = require('../services/SupabaseAdminTokenService');
 
 module.exports = (db) => {
     
@@ -39,7 +38,7 @@ module.exports = (db) => {
 
             // Validate narrator settings if enabled
             if (narrator_enabled) {
-                const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom', 'token'];
+                const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom'];
                 if (!narrator_ai_provider || !validProviders.includes(narrator_ai_provider)) {
                     return res.status(400).json({ error: 'Valid narrator AI provider is required when narrator is enabled' });
                 }
@@ -106,7 +105,7 @@ module.exports = (db) => {
 
             // Validate narrator settings if enabled
             if (narrator_enabled) {
-                const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom', 'token'];
+                const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom'];
                 if (!narrator_ai_provider || !validProviders.includes(narrator_ai_provider)) {
                     return res.status(400).json({ error: 'Valid narrator AI provider is required when narrator is enabled' });
                 }
@@ -209,73 +208,13 @@ module.exports = (db) => {
             const AIProviderService = require('../services/AIProviderService');
             const userSettings = await db.getUserSettings(req.userId);
 
-            // Check if narrator model is a token model and resolve it
-            let narratorAsCharacter = {
+            const narratorAsCharacter = {
                 name: 'Narrator',
                 ai_provider: scene.narrator_ai_provider,
                 ai_model: scene.narrator_ai_model,
                 temperature: scene.narrator_temperature || 0.7,
                 max_tokens: scene.narrator_max_tokens || 100
             };
-            
-            let modelCost = null;
-            let useServerKeys = false;
-            let adminApiKeys = {};
-            let tokenModel = null; // Declare tokenModel in outer scope for analytics
-            
-            if (scene.narrator_ai_provider === 'token') {
-              // Resolve token model from Supabase
-              const allTokenModels = await supabaseTokenService.getTokenModels(true);
-              tokenModel = allTokenModels.find(m => m.id === scene.narrator_ai_model || m.name === scene.narrator_ai_model);
-              
-              if (!tokenModel) {
-                return res.status(404).json({ 
-                  triggered: false,
-                  error: `Token model not found: ${scene.narrator_ai_model}`
-                });
-              }
-              
-              modelCost = tokenModel.token_cost;
-              useServerKeys = true;
-              
-              // Get admin API keys from Supabase
-              const adminKeys = await supabaseTokenService.getAdminApiKeys(req.userId);
-              
-              adminApiKeys = {
-                openai: adminKeys.openai_key,
-                anthropic: adminKeys.anthropic_key,
-                google: adminKeys.google_key,
-                openrouter: adminKeys.openrouter_key
-              };
-              
-              // Verify admin has the required key
-              if (!adminApiKeys[tokenModel.ai_provider]) {
-                return res.status(400).json({ 
-                  triggered: false,
-                  error: `Admin API key not configured for ${tokenModel.ai_provider}. Please add it in Admin Settings.`
-                });
-              }
-              
-              // Check balance before generating
-              const userBalance = await supabaseTokenService.getUserTokens(req.userId);
-              if (userBalance.balance < modelCost) {
-                return res.status(402).json({ 
-                  triggered: false,
-                  error: `Insufficient tokens for narrator. Need ${modelCost} tokens, you have ${userBalance.balance}.`,
-                  requiredTokens: modelCost
-                });
-              }
-              
-              // Update narrator with actual provider and model
-              narratorAsCharacter = {
-                ...narratorAsCharacter,
-                ai_provider: tokenModel.ai_provider,
-                ai_model: tokenModel.model_id,
-                temperature: tokenModel.temperature,
-                max_tokens: tokenModel.max_tokens
-              };
-
-            }
 
             let narratorPrompt = `You are the narrator for this scene: ${scene.name}
 
@@ -301,26 +240,9 @@ Keep responses brief (1-2 sentences). Focus on what's happening in the scene, no
             const response = await AIProviderService.generateResponse(
                 narratorAsCharacter,
                 [{ role: 'system', content: narratorPrompt }, ...(messages || []).slice(-10)],
-                useServerKeys ? adminApiKeys : (userSettings?.apiKeys || {}),
-                userSettings?.ollamaSettings || {},
-                { useServerKeys: false }
+                userSettings?.apiKeys || {},
+                userSettings?.ollamaSettings || {}
             );
-
-            // Deduct tokens if it was a token model
-            if (useServerKeys && modelCost > 0) {
-              // Calculate estimated API cost
-              const estimatedApiCost = (modelCost / 500) * (tokenModel.provider_cost_per_500_tokens || 0);
-              
-              const result = await supabaseTokenService.deductTokens(
-                req.userId,
-                modelCost,
-                `Narrator in ${scene.name}`,
-                tokenModel.id, // model_id for analytics
-                estimatedApiCost, // api_cost_usd
-                tokenModel.provider_cost_per_500_tokens // provider_cost_per_500_tokens
-              );
-
-            }
 
             res.json({ triggered: true, response, scene: scene.name });
 

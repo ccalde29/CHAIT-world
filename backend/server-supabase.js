@@ -94,9 +94,7 @@ const sceneCommentRoutes = require('./routes/sceneComments')(db.supabase);
 const personasRoutes = require('./routes/personas')(db);
 const relationshipsRoutes = require('./routes/relationships')(db);
 const moderationRoutes = require('./routes/moderation');
-const tokenModelsRoutes = require('./routes/token-models')(db);
-const pricingRoutes = require('./routes/pricing');
-const tokenRoutes = require('./routes/tokens')(db);
+const customModelsRoutes = require('./routes/custom-models')(db);
 
 // Mount routes
 app.use('/api/providers', providerRoutes);
@@ -123,12 +121,8 @@ app.use('/api/scene-comments', requireAuth, sceneCommentRoutes);
 app.use('/api/personas', requireAuth, personasRoutes);
 app.use('/api/characters', requireAuth, relationshipsRoutes);
 app.use('/api/moderation', requireAuth, moderationRoutes);
-app.use('/api/token-models', requireAuth, tokenModelsRoutes);
-app.use('/api/custom-models', requireAuth, tokenModelsRoutes); // Backward compatibility alias
-app.use('/api/pricing', requireAuth, pricingRoutes);
-app.use('/api/tokens', requireAuth, tokenRoutes);
-app.use('/api/admin-keys', requireAuth, require('./routes/admin-keys')(db));
 app.use('/api/images', requireAuth, imageRoutes);
+app.use('/api/custom-models', requireAuth, customModelsRoutes);
 
 // ============================================================================
 // HEALTH & UTILITY ROUTES

@@ -154,6 +154,30 @@ class DatabaseService {
     }
 
     // ============================================================================
+    // CUSTOM MODEL PRESETS
+    // ============================================================================
+
+    async getCustomModels(userId) {
+        return this.localDb.getCustomModels(userId);
+    }
+
+    async getCustomModel(id) {
+        return this.localDb.getCustomModel(id);
+    }
+
+    async createCustomModel(userId, data) {
+        return this.localDb.createCustomModel(userId, data);
+    }
+
+    async updateCustomModel(id, updates) {
+        return this.localDb.updateCustomModel(id, updates);
+    }
+
+    async deleteCustomModel(id) {
+        return this.localDb.deleteCustomModel(id);
+    }
+
+    // ============================================================================
     // USER SETTINGS MANAGEMENT
     // All user settings stored in local SQLite database
     // ============================================================================

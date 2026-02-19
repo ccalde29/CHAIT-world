@@ -15,8 +15,10 @@ All user data (characters, chat sessions, messages, memories) lives in **SQLite 
 
 ```
 Local SQLite  ← characters, sessions, messages, memories, personas, relationships (no login required)
-Supabase      ← community hub (publish/share/comments), admin_users table, tokens/billing
+Supabase      ← community hub (publish/share/comments), admin_users table
 ```
+
+> The token/credit system has been fully removed. Do not reference or recreate any token, billing, or credit logic anywhere in the codebase.
 
 Community content requires **admin approval** (single admin, owner-controlled via the `admin_users` Supabase table + `requireAdmin` middleware). Published content goes through profanity filtering before it's visible.
 
@@ -66,13 +68,17 @@ The main chat endpoint (`POST /api/group-chat`) orchestrates:
 
 Characters with `ai_provider: 'custom'` route via OpenRouter and prepend an admin-controlled system prompt (see `docs/custom_models_guide.md`).
 
-## Token System
+## AI Provider Keys & Custom Models
 
-Token balances and transactions are **Supabase-only** (`SupabaseAdminTokenService`). Token model presets live in `backend/routes/token-models.js`. Admin-controlled keys (used when `options.useServerKeys` is true) are fetched from Supabase instead of the user's stored keys.
+Users supply their own API keys (stored in `user_settings_local.api_keys` JSON blob) or configure a local LLM (Ollama / LM Studio). There is no credit or token billing system. `SupabaseAdminTokenService` is kept only for `isAdmin()`, admin user CRUD, and `getAdminSettings()`/`updateAdminSettings()` — all balance/transaction/token-model methods have been removed. Do not re-add them.
+
+Custom model presets are managed via the **Model Manager** tab in the frontend settings. Each preset defines: `provider`, `model_id`, `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `repetition_penalty`, `stop_sequences`, `max_tokens`, and an optional `custom_system_prompt`. Custom models route via their configured provider using the user's own API key — no server-side key injection.
 
 ## Frontend State Pattern
 
-`MainApp.js` is the root orchestrator. State is split into domain-specific custom hooks (`useChat`, `useCharacters`, `useSettings`, `usePersonas`, `useTokens`) all sharing a single `apiRequest` function created via `createApiClient(user.id)`. Always pass `apiRequest` down from `MainApp` — don't create new client instances in child components.
+`MainApp.js` is the root orchestrator. State is split into domain-specific custom hooks (`useChat`, `useCharacters`, `useSettings`, `usePersonas`) all sharing a single `apiRequest` function created via `createApiClient(user.id)`. Always pass `apiRequest` down from `MainApp` — don't create new client instances in child components.
+
+`useTokens` and `UserCreditsPanel` have been removed. Do not re-add token balance state.
 
 ## Key Constants
 
@@ -119,6 +125,41 @@ All magic numbers live in `backend/constants/defaults.js` — `AI_DEFAULTS`, `RA
 - After any user correction, update `tasks/lessons.md` with the rule that prevents the same mistake
 - Review `tasks/lessons.md` at the start of each session for relevant patterns
 
+## Active Roadmap & Design Decisions
+
+### Stream 1 — Remove Token/Credit System ✅ COMPLETE
+All token/credit code has been removed from frontend and partially from backend. The following backend cleanup tasks are **still pending** — complete these next:
+
+- [ ] Strip `SupabaseAdminTokenService.js`: remove all `token_models` CRUD methods and `admin_api_keys` methods. Keep only: `isAdmin`, `getAdminUsers`, `grantAdmin`, `revokeAdmin`, `getAdminSettings`, `updateAdminSettings`
+- [ ] Clean `backend/routes/scenarios.js`: remove `supabaseTokenService` require, remove `'token'` provider block, remove `useServerKeys`/`modelCost`/`adminApiKeys`/`tokenModel` vars, remove token deduction block, remove `'token'` from `validProviders`
+- [ ] Clean `backend/routes/personas.js`: remove `supabaseTokenService` require, entire `'token'` provider if block, associated vars, token deduction block
+- [ ] Clean `backend/routes/group-chat.js`: remove direct `createClient`/`supabase` init at top (use `db` instead), remove `useServerKeys`/`supabaseTokenService` dead code in error handler, fix `character_relationships` queries to use `db` instead of direct `supabase` client
+- [ ] Delete `backend/routes/admin-keys.js` and remove its registration from `server-supabase.js`
+- [ ] Clean `AIProviderService.js`: remove static `getTokenModels()` method and its JSDoc comment about server keys
+- [ ] Run Supabase SQL to drop dead tables: `DROP TABLE IF EXISTS token_models CASCADE; DROP TABLE IF EXISTS failed_transactions CASCADE; DROP TABLE IF EXISTS admin_api_keys CASCADE; DROP TABLE IF EXISTS user_tokens CASCADE; DROP TABLE IF EXISTS token_transactions CASCADE; DROP TABLE IF EXISTS provider_pricing_cache CASCADE;`
+
+**Do NOT** remove the `'custom'` provider path — it stays, using the user's own OpenRouter key.
+
+### Stream 2 — Admin Panel: Approval Only ✅ COMPLETE
+- `ModerationPanel.js` keeps only `pending` and `reports` tabs
+- Deleted: `TokenModelsPanel.js`, `TokenAnalyticsDashboard.js`, `FailedTransactionsPanel.js`
+- Removed backend routes: `/api/pricing`, token-admin endpoints
+- Deleted: `backend/routes/pricing.js`, `backend/services/LivePricingService.js`
+
+### Stream 3 — Granular Model Parameters ✅ COMPLETE
+- Added columns to `characters` and `custom_models` via `runMigrations()`: `top_p`, `frequency_penalty`, `presence_penalty`, `repetition_penalty`, `stop_sequences` (JSON)
+- Parameters passed through `AIProviderService` per provider
+- Collapsible "Advanced" section added in `CharacterEditor.js`
+- Provider support: `top_p` — all; `frequency_penalty`/`presence_penalty` — OpenAI, OpenRouter, LMStudio; `repetition_penalty` — Ollama, OpenRouter; `stop` — all
+- Model params are also sent to Supabase `community_characters` when publishing
+
+### Stream 4 — Model Manager Tab + UI Design System ✅ COMPLETE
+- **Model Manager** tab added in `SettingsModal.js`: create/edit custom model presets with all advanced params; manage default model per provider
+- Per-provider defaults stored in `user_settings_local.preferences` JSON
+- UI Design System: `frontend/src/styles/ui.js` with named Tailwind class constants; `tailwind.config.js` extended with semantic color tokens
+
+---
+
 ## Database Schema Reference
 
 ### SQLite Tables (`data/local.db`) — defined in `backend/database/schema.sql`
@@ -139,31 +180,32 @@ All personal/app data. No login required.
 | `user_personas` | User-created personas that characters adapt to |
 | `user_images` | Uploaded avatar and background images metadata |
 | `user_settings_local` | API keys (JSON blob), Ollama/LM Studio settings, preferences |
-| `custom_models` | Admin-managed custom model presets |
-| `character_comments` | Local comments on characters (not community) |
-| `scene_comments` | Local comments on scenarios (not community) |
+| `custom_models` | User-managed custom model presets (provider, model_id, temperature, top_p, advanced params) |
+| `character_notes` | Local notes/ratings on characters (private, not community) — was `character_comments` pre-rename |
+| `scene_notes` | Local notes/ratings on scenarios (private, not community) — was `scene_comments` pre-rename |
 | `hidden_default_characters` | Tracks which default characters a user has hidden |
 | `response_feedback` | 1–5 star ratings on AI responses |
 | `schema_version` | Migration tracking |
 
+> **Table rename migration**: `LocalDatabaseService.js` automatically renames `character_comments` → `character_notes` and `scene_comments` → `scene_notes` at startup if the old names exist. This avoids name collision with the Supabase community tables of the same name.
+
 > JSON columns (`tags`, `chat_examples`, `relationships`, `voice_traits`, `speech_patterns`, etc.) are stored as serialized strings — parse/stringify on read/write.
 
-### Supabase Tables — community, admin, and billing only
+### Supabase Tables — community and admin only
+
+All community/social features. Login required.
 
 | Table | Key Columns | Purpose |
 |---|---|---|
 | `community_characters` | `original_character_id`, `creator_user_id`, `moderation_status`, `hidden_fields` (jsonb), `is_locked` | Published characters awaiting/post admin approval |
-| `community_scenes` | `original_scenario_id`, `creator_user_id`, `hidden_fields` (jsonb), `is_locked` | Published scenes awaiting/post admin approval |
+| `community_scenes` | `original_scenario_id`, `creator_user_id`, `moderation_status`, `tags` (jsonb), `favorite_count`, `hidden_fields` (jsonb), `is_locked` | Published scenes awaiting/post admin approval |
 | `character_comments` | `character_id`, `user_id`, `comment`, `is_deleted` | Community comments on published characters |
 | `scene_comments` | `scene_id`, `user_id`, `comment`, `is_deleted` | Community comments on published scenes |
 | `character_imports` | `original_character_id`, `imported_character_id`, `imported_by_user_id` | Tracks when a user imports a community character |
+| `scene_imports` | `original_scenario_id`, `imported_scenario_id`, `imported_by_user_id` | Tracks when a user imports a community scene |
 | `character_favorites` | `user_id`, `character_id` | User favorites on community characters |
-| `character_reports` | `character_id`, `scene_id`, `reporter_user_id`, `report_type`, `status`, `reviewed_by` | Reports against individual characters or scenes |
-| `community_reports` | `community_character_id`, `community_scene_id`, `reporter_user_id`, `report_type`, `status`, `reviewed_by` | Reports against published community content |
+| `scene_favorites` | `user_id`, `scene_id` | User favorites on community scenes |
+| `community_reports` | `community_character_id`, `community_scene_id`, `reporter_user_id`, `report_type`, `status`, `reviewed_by`, `reviewed_at`, `action_taken` | Reports against published community content |
 | `admin_users` | `user_id`, `auto_approve_characters`, `admin_system_prompt` | Single-owner admin access (checked by `requireAdmin` middleware) |
-| `admin_api_keys` | `openai_key`, `anthropic_key`, `google_key`, `openrouter_key` | Server-side API keys used when `useServerKeys` is true |
-| `user_tokens` | `user_id`, `balance`, `lifetime_earned`, `lifetime_purchased`, `last_weekly_refill` | Token balances per user |
-| `token_transactions` | `user_id`, `amount`, `type`, `balance_after`, `model_id`, `api_cost_usd` | Transaction log (`type`: weekly_refill / purchase / admin_grant / admin_deduct / usage) |
-| `token_models` | `name`, `ai_provider`, `model_id`, `token_cost`, `custom_system_prompt`, `is_active` | Admin-defined token-cost model presets |
-| `failed_transactions` | `user_id`, `model_id`, `error_message`, `refunded_credits`, `reviewed` | Failed AI calls that triggered a credit refund |
-| `provider_pricing_cache` | `provider`, `model_identifier`, `cost_per_500_tokens`, `last_updated` | Cached live pricing data per provider/model |
+
+> **Dead Supabase tables** (token system legacy — safe to drop): `token_models`, `failed_transactions`, `admin_api_keys`, `user_tokens`, `token_transactions`, `provider_pricing_cache`. Drop script: `DROP TABLE IF EXISTS token_models, failed_transactions, admin_api_keys, user_tokens, token_transactions, provider_pricing_cache CASCADE;`

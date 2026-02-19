@@ -52,7 +52,9 @@ const CommunityHub = ({
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const [likedCharacters, setLikedCharacters] = useState(new Set());
+  const [likedScenes, setLikedScenes] = useState(new Set());
   const [likingCharacter, setLikingCharacter] = useState(null);
+  const [likingScene, setLikingScene] = useState(null);
   const [unpublishing, setUnpublishing] = useState(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportingCharacter, setReportingCharacter] = useState(null);
@@ -159,9 +161,20 @@ const CommunityHub = ({
     }
   };
 
+  const loadUserSceneFavorites = async () => {
+    try {
+      const response = await apiRequest('/api/community/scene-favorites');
+      const favoriteIds = new Set(response.favorites?.map(f => f.scene_id) || []);
+      setLikedScenes(favoriteIds);
+    } catch (error) {
+      console.error('Failed to load user scene favorites:', error);
+    }
+  };
+
   useEffect(() => {
     loadPopularTags();
     loadUserFavorites();
+    loadUserSceneFavorites();
   }, []);
 
   useEffect(() => {
@@ -257,6 +270,34 @@ const CommunityHub = ({
     }
   };
 
+  const handleLikeScene = async (scene, event) => {
+    if (event) event.stopPropagation();
+    if (likingScene) return;
+
+    const isLiked = likedScenes.has(scene.id);
+    setLikingScene(scene.id);
+
+    try {
+      if (isLiked) {
+        await apiRequest(`/api/community/scenes/${scene.id}/favorite`, { method: 'DELETE' });
+        setLikedScenes(prev => { const next = new Set(prev); next.delete(scene.id); return next; });
+        setScenes(prev => prev.map(s =>
+          s.id === scene.id ? { ...s, favorite_count: (s.favorite_count || 1) - 1 } : s
+        ));
+      } else {
+        await apiRequest(`/api/community/scenes/${scene.id}/favorite`, { method: 'POST' });
+        setLikedScenes(prev => new Set([...prev, scene.id]));
+        setScenes(prev => prev.map(s =>
+          s.id === scene.id ? { ...s, favorite_count: (s.favorite_count || 0) + 1 } : s
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to toggle scene favorite:', error);
+    } finally {
+      setLikingScene(null);
+    }
+  };
+
   const handleImportScene = async (scene) => {
     if (importing) return;
 
@@ -266,16 +307,7 @@ const CommunityHub = ({
       // Track view
       await apiRequest(`/api/community/scenes/${scene.id}/view`, {
         method: 'POST'
-      });
-
-      // Use new prop if available, otherwise use old pattern
-      if (onImportScene) {
-        await onImportScene(scene);
-      } else if (onImport) {
-        const response = await apiRequest(`/api/community/scenes/${scene.id}/import`, {
-          method: 'POST'
-        });
-        await onImport(response);
+      });wait onImport(response);
       } else {
         await apiRequest(`/api/community/scenes/${scene.id}/import`, {
           method: 'POST'
@@ -589,6 +621,21 @@ const CommunityHub = ({
             <Download size={10} />
             <span>{scene.import_count || 0}</span>
           </div>
+          <button
+            onClick={(e) => handleLikeScene(scene, e)}
+            disabled={likingScene === scene.id}
+            className={`flex items-center gap-0.5 transition-colors ${
+              likedScenes.has(scene.id)
+                ? 'text-orange-400 hover:text-orange-300'
+                : 'text-gray-400 hover:text-orange-400'
+            }`}
+          >
+            <Heart
+              size={10}
+              fill={likedScenes.has(scene.id) ? 'currentColor' : 'none'}
+            />
+            <span>{scene.favorite_count || 0}</span>
+          </button>
         </div>
 
         {/* Action Buttons */}
@@ -732,7 +779,7 @@ const CommunityHub = ({
             )}
 
             {/* Stats */}
-            <div className="grid grid-cols-2 gap-4 p-4 bg-white/5 rounded-lg">
+            <div className="grid grid-cols-3 gap-4 p-4 bg-white/5 rounded-lg">
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1 text-gray-400 mb-1">
                   <Eye size={14} />
@@ -746,6 +793,19 @@ const CommunityHub = ({
                 </div>
                 <div className="text-lg font-bold text-white">{selectedScene.import_count || 0}</div>
                 <div className="text-xs text-gray-400">Imports</div>
+              </div>
+              <div className="text-center">
+                <button
+                  onClick={() => handleLikeScene(selectedScene)}
+                  disabled={likingScene === selectedScene.id}
+                  className={`flex flex-col items-center w-full transition-colors ${
+                    likedScenes.has(selectedScene.id) ? 'text-orange-400' : 'text-gray-400 hover:text-orange-400'
+                  }`}
+                >
+                  <Heart size={14} fill={likedScenes.has(selectedScene.id) ? 'currentColor' : 'none'} className="mb-1" />
+                  <div className="text-lg font-bold">{selectedScene.favorite_count || 0}</div>
+                  <div className="text-xs">Favorites</div>
+                </button>
               </div>
             </div>
 
@@ -1069,7 +1129,7 @@ const CommunityHub = ({
                     }`}
                   >
                     {tagData.tag}
-                    <span className="ml-1 text-xs opacity-70">({tagData.usage_count})</span>
+                    <span className="ml-1 text-xs opacity-70">({tagData.count})</span>
                   </button>
                 ))}
               </div>

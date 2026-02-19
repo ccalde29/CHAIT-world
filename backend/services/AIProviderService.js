@@ -92,10 +92,12 @@ class AIProviderService {
       body: JSON.stringify({
         model: model,
         messages: messages,
-        temperature: character.temperature || 0.8,
+        temperature: character.temperature ?? 0.8,
         max_tokens: character.max_tokens || 150,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.3
+        ...(character.top_p != null && { top_p: character.top_p }),
+        ...(character.frequency_penalty != null ? { frequency_penalty: character.frequency_penalty } : { frequency_penalty: 0.3 }),
+        ...(character.presence_penalty != null ? { presence_penalty: character.presence_penalty } : { presence_penalty: 0.6 }),
+        ...(character.stop_sequences?.length && { stop: character.stop_sequences })
       })
     });
     
@@ -136,9 +138,11 @@ class AIProviderService {
       body: JSON.stringify({
         model: model,
         max_tokens: character.max_tokens || 150,
-        temperature: character.temperature || 0.8,
+        temperature: character.temperature ?? 0.8,
         system: systemMessage,
-        messages: conversationMessages
+        messages: conversationMessages,
+        ...(character.top_p != null && { top_p: character.top_p }),
+        ...(character.stop_sequences?.length && { stop_sequences: character.stop_sequences })
       })
     });
     
@@ -171,8 +175,13 @@ class AIProviderService {
       body: JSON.stringify({
         model: model, // e.g., 'anthropic/claude-3.5-sonnet'
         messages: messages,
-        temperature: character.temperature || 0.8,
-        max_tokens: character.max_tokens || 150
+        temperature: character.temperature ?? 0.8,
+        max_tokens: character.max_tokens || 150,
+        ...(character.top_p != null && { top_p: character.top_p }),
+        ...(character.frequency_penalty != null && { frequency_penalty: character.frequency_penalty }),
+        ...(character.presence_penalty != null && { presence_penalty: character.presence_penalty }),
+        ...(character.repetition_penalty != null && { repetition_penalty: character.repetition_penalty }),
+        ...(character.stop_sequences?.length && { stop: character.stop_sequences })
       })
     });
     
@@ -241,8 +250,10 @@ class AIProviderService {
         body: JSON.stringify({
           contents: contents,
           generationConfig: {
-            temperature: character.temperature || 0.8,
-            maxOutputTokens: character.max_tokens || 150
+            temperature: character.temperature ?? 0.8,
+            maxOutputTokens: character.max_tokens || 150,
+            ...(character.top_p != null && { topP: character.top_p }),
+            ...(character.stop_sequences?.length && { stopSequences: character.stop_sequences })
           }
         })
       }
@@ -313,8 +324,13 @@ class AIProviderService {
       body: JSON.stringify({
         model: model,
         prompt: prompt,
-        temperature: character.temperature || 0.8,
-        stream: false
+        temperature: character.temperature ?? 0.8,
+        stream: false,
+        options: {
+          ...(character.top_p != null && { top_p: character.top_p }),
+          ...(character.repetition_penalty != null && { repeat_penalty: character.repetition_penalty }),
+          ...(character.stop_sequences?.length && { stop: character.stop_sequences })
+        }
       })
     });
     
@@ -343,8 +359,12 @@ class AIProviderService {
         body: JSON.stringify({
           model: model,
           messages: messages,
-          temperature: character.temperature || 0.8,
-          max_tokens: character.max_tokens || 150
+          temperature: character.temperature ?? 0.8,
+          max_tokens: character.max_tokens || 150,
+          ...(character.top_p != null && { top_p: character.top_p }),
+          ...(character.frequency_penalty != null && { frequency_penalty: character.frequency_penalty }),
+          ...(character.presence_penalty != null && { presence_penalty: character.presence_penalty }),
+          ...(character.stop_sequences?.length && { stop: character.stop_sequences })
         })
       });
 
@@ -444,9 +464,6 @@ class AIProviderService {
 
         case 'lmstudio':
           return await this.getLMStudioModels(lmStudioSettings);
-
-        case 'token':
-          return await this.getTokenModels();
 
         case 'custom':
           return await this.getCustomModels();
@@ -682,21 +699,12 @@ class AIProviderService {
     );
   }
 
-  static async getCustomModels() {
+  static async getCustomModels(userId) {
     try {
-      const { createClient } = require('@supabase/supabase-js');
-      const supabase = createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_SERVICE_ROLE_KEY
-      );
-
-      const { data: models } = await supabase
-        .from('custom_models')
-        .select('id, name, display_name, description, tags')
-        .eq('is_active', true)
-        .order('display_name');
-
-      return (models || []).map(m => ({
+      const { getInstance } = require('./LocalDatabaseService');
+      const localDb = getInstance();
+      const models = localDb.getCustomModels(userId);
+      return (models || []).filter(m => m.is_active).map(m => ({
         id: m.id,
         name: `${m.display_name}${m.tags?.length ? ' (' + m.tags.join(', ') + ')' : ''}`,
         description: m.description
@@ -707,26 +715,6 @@ class AIProviderService {
     }
   }
 
-  /**
-   * Get server API keys from environment (for token models)
-   */
-  
-  static async getTokenModels() {
-    try {
-      const SupabaseAdminTokenService = require('./SupabaseAdminTokenService');
-      
-      const models = await SupabaseAdminTokenService.getTokenModels(true); // true = active only
-      
-      return (models || []).map(m => ({
-        id: m.id,
-        name: `${m.display_name} (${m.token_cost} tokens)`,
-        description: m.description
-      }));
-    } catch (error) {
-      console.error('Error fetching token models:', error);
-      return [];
-    }
-  }
 }
 
 module.exports = AIProviderService;

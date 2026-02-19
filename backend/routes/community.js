@@ -491,6 +491,48 @@ module.exports = (communityService, characterService, db) => {
     });
 
     /**
+     * Add scene to favorites
+     * POST /api/community/scenes/:id/favorite
+     */
+    router.post('/scenes/:id/favorite', async (req, res) => {
+        try {
+            await communityService.addToSceneFavorites(req.userId, req.params.id);
+            res.json({ message: 'Added to favorites' });
+        } catch (error) {
+            console.error('Error adding scene to favorites:', error);
+            res.status(500).json({ error: 'Failed to add to favorites' });
+        }
+    });
+
+    /**
+     * Remove scene from favorites
+     * DELETE /api/community/scenes/:id/favorite
+     */
+    router.delete('/scenes/:id/favorite', async (req, res) => {
+        try {
+            await communityService.removeFromSceneFavorites(req.userId, req.params.id);
+            res.json({ message: 'Removed from favorites' });
+        } catch (error) {
+            console.error('Error removing scene from favorites:', error);
+            res.status(500).json({ error: 'Failed to remove from favorites' });
+        }
+    });
+
+    /**
+     * Get user's scene favorites
+     * GET /api/community/scene-favorites
+     */
+    router.get('/scene-favorites', async (req, res) => {
+        try {
+            const favorites = await communityService.getUserSceneFavorites(req.userId);
+            res.json({ favorites });
+        } catch (error) {
+            console.error('Error fetching scene favorites:', error);
+            res.status(500).json({ error: 'Failed to fetch favorites' });
+        }
+    });
+
+    /**
      * Report a scene
      * POST /api/community/scenes/:id/report
      */

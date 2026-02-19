@@ -4,11 +4,19 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Key, Zap, CheckCircle, AlertCircle, Eye, EyeOff, Loader, Shield } from 'lucide-react';
+import { X, Settings, Key, Zap, CheckCircle, AlertCircle, Eye, EyeOff, Loader, Shield, Cpu } from 'lucide-react';
+import ModelManager from './ModelManager';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false }) => {
+const TABS = [
+  { id: 'api-keys',      label: 'API Keys',      icon: Key },
+  { id: 'model-manager', label: 'Model Manager', icon: Cpu },
+  { id: 'group-chat',    label: 'Group Chat',    icon: Zap },
+  { id: 'admin',         label: 'Admin',         icon: Shield, adminOnly: true },
+];
+
+const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false, apiRequest }) => {
   
   // ============================================================================
   // STATE MANAGEMENT
@@ -41,7 +49,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
     // Display preferences
     messageDelay: 1200,
     defaultModel: '',
-    defaultProvider: 'token',
+    defaultProvider: 'openai',
 
     // Admin settings
     autoApproveCharacters: false,
@@ -73,11 +81,12 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [activeTab, setActiveTab] = useState('api-keys');
   
   // Model selection state
   const [availableModels, setAvailableModels] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState('token');
+  const [selectedProvider, setSelectedProvider] = useState('openai');
   
   // Track which admin keys are saved
   const [hasSavedAdminKeys, setHasSavedAdminKeys] = useState({
@@ -93,7 +102,9 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
   
   useEffect(() => {
     if (settings) {
-      const savedProvider = settings.defaultProvider || 'token';
+      const savedProvider = (settings.defaultProvider && settings.defaultProvider !== 'token')
+        ? settings.defaultProvider
+        : 'openai';
       
       setFormData({
         openaiKey: settings.apiKeys?.openai || '',
@@ -140,23 +151,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
     setAvailableModels([]);
     
     try {
-      // Handle token models
-      if (provider === 'token') {
-        const response = await fetch(`${API_BASE_URL}/api/token-models`, {
-          headers: { 'user-id': user.id }
-        });
-        const data = await response.json();
-        if (data.models && data.models.length > 0) {
-          const formattedModels = data.models.map(m => ({
-            id: m.id,
-            name: `${m.display_name} (${m.token_cost} tokens)`
-          }));
-          setAvailableModels(formattedModels);
-        }
-        setLoadingModels(false);
-        return;
-      }
-      
       let apiKey = null;
       
       if (settings.apiKeys) {
@@ -549,16 +543,16 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
   
   return (
     <div className={fullScreen 
-      ? "h-full bg-gray-900 overflow-y-auto" 
+      ? "h-full bg-gray-900 flex flex-col" 
       : "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
     }>
       <div className={fullScreen 
-        ? "h-full" 
+        ? "flex flex-col h-full overflow-hidden" 
         : "bg-gray-900 rounded-2xl border border-white/10 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
       }>
         
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-gray-900 z-10">
+        <div className="flex items-center justify-between p-6 border-b border-white/10 bg-gray-900 shrink-0">
           <div className="flex items-center gap-3">
             <Settings className="text-orange-500" size={24} />
             <h2 className="text-xl font-bold text-white">Settings</h2>
@@ -569,6 +563,27 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
           >
             <X size={20} />
           </button>
+        </div>
+
+        {/* Tab Bar */}
+        <div className="flex border-b border-white/10 px-6 bg-gray-900 shrink-0">
+          {TABS.filter(t => !t.adminOnly || settings?.isAdmin).map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-orange-500 text-orange-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                <Icon size={15} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
         
         {/* Success/Error Messages */}
@@ -587,112 +602,26 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
         )}
         
         {/* Content */}
-        <div className="p-6 space-y-8">
-          
-          {/* Group Chat Settings - Moved to top */}
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Zap size={18} className="text-orange-500" />
-              Group Chat Settings
-            </h3>
-            
-            <div className="space-y-4">
-              {/* Default Model */}
+        <div className="p-6 flex-1 overflow-y-auto">
+
+          {/* ── API Keys tab ─────────────────────────────────────────────── */}
+          {activeTab === 'api-keys' && (
+            <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Default Character Model
-                </label>
-                <p className="text-xs text-gray-400 mb-2">
-                  This model will be pre-selected when creating new characters.
+                <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                  <Key size={18} className="text-orange-500" />
+                  AI Provider API Keys
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Configure your API keys for different AI providers. Each character can use a different provider.
                 </p>
-                
-                {/* Provider Selector */}
-                <div className="flex gap-2 mb-2">
-                  <select
-                    value={selectedProvider}
-                    onChange={(e) => {
-                      const newProvider = e.target.value;
-                      setSelectedProvider(newProvider);
-                      setFormData(prev => ({ ...prev, defaultModel: '' }));
-                      loadAvailableModels(newProvider);
-                    }}
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-400"
-                  >
-                    <option value="token">Token Models (Recommended)</option>
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="google">Google AI</option>
-                    <option value="openrouter">OpenRouter</option>
-                    <option value="local">Local (Ollama/LM Studio)</option>
-                  </select>
-                </div>
-                
-                {/* Model Dropdown */}
-                <select
-                  value={formData.defaultModel}
-                  onChange={(e) => handleInputChange('defaultModel', e.target.value)}
-                  disabled={loadingModels || availableModels.length === 0}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-400 disabled:opacity-50"
-                >
-                  <option value="">Select a model...</option>
-                  {availableModels.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
-                
-                {loadingModels && (
-                  <p className="text-xs text-gray-500 mt-1">Loading models...</p>
-                )}
-                
-                {!loadingModels && availableModels.length === 0 && (
-                  <p className="text-xs text-yellow-400 mt-1">
-                    {selectedProvider === 'token' 
-                      ? 'No token models available. Contact admin or create token models in Admin Panel.'
-                      : `Configure your ${selectedProvider} API key below to see available models.`
-                    }
-                  </p>
-                )}
               </div>
 
-              {/* Message Delay */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Message Delay: {formData.messageDelay}ms
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="3000"
-                  step="100"
-                  value={formData.messageDelay}
-                  onChange={(e) => handleInputChange('messageDelay', parseInt(e.target.value))}
-                  className="w-full accent-red-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Delay between character responses for realistic pacing
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          {/* AI Provider Keys Section */}
-          <div className="pt-6 border-t border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Key size={18} className="text-orange-500" />
-              AI Provider API Keys
-            </h3>
-            
-            <p className="text-sm text-gray-400 mb-4">
-              Configure your API keys for different AI providers. Each character can use a different provider.
-            </p>
-            
-            <div className="space-y-4">
-              {renderKeyInput('openai', 'OpenAI API Key', 'sk-...')}
-              {renderKeyInput('anthropic', 'Anthropic API Key', 'sk-ant-...')}
-              {renderKeyInput('openrouter', 'OpenRouter API Key', 'sk-or-...')}
-              {renderKeyInput('google', 'Google API Key', 'AIza...')}
+              <div className="space-y-4">
+                {renderKeyInput('openai', 'OpenAI API Key', 'sk-...')}
+                {renderKeyInput('anthropic', 'Anthropic API Key', 'sk-ant-...')}
+                {renderKeyInput('openrouter', 'OpenRouter API Key', 'sk-or-...')}
+                {renderKeyInput('google', 'Google API Key', 'AIza...')}
               
               {/* Ollama Settings */}
               <div className="pt-4 border-t border-white/10">
@@ -819,26 +748,127 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                   Run models locally with LM Studio. Change to network IP if accessing from another device. <a href="https://lmstudio.ai" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">Learn more</a>
                 </p>
               </div>
+              </div>
+
+              {/* Tips */}
+              <div className="p-4 bg-orange-600/10 border border-orange-500/20 rounded-lg">
+                <h4 className="text-sm font-semibold text-orange-400 mb-2">💡 Tips</h4>
+                <ul className="text-xs text-gray-400 space-y-1">
+                  <li>• You only need keys for providers you want to use</li>
+                  <li>• OpenRouter gives you access to 100+ models with one key</li>
+                  <li>• Ollama is free but requires local installation</li>
+                  <li>• Each character can use a different provider/model</li>
+                </ul>
+              </div>
             </div>
-          </div>
-          
-          {/* Admin Settings - Only show if user is admin */}
-          {settings.isAdmin && (
-            <div className="pt-6 border-t border-white/10">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Shield size={18} className="text-orange-500" />
-                Admin Settings
-              </h3>
+          )}
+
+          {/* ── Model Manager tab ───────────────────────────────────────── */}
+          {activeTab === 'model-manager' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                  <Cpu size={18} className="text-orange-500" />
+                  Model Manager
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Create reusable model presets with custom parameters. Apply them to any character from the Character Editor.
+                </p>
+              </div>
+              <ModelManager apiRequest={apiRequest} />
+            </div>
+          )}
+
+          {/* ── Group Chat tab ───────────────────────────────────────────── */}
+          {activeTab === 'group-chat' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                  <Zap size={18} className="text-orange-500" />
+                  Group Chat Settings
+                </h3>
+                <p className="text-sm text-gray-400">Control pacing and default model selection for group chats.</p>
+              </div>
+
+              <div className="space-y-5">
+                {/* Default Model */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Default Character Model</label>
+                  <p className="text-xs text-gray-400 mb-2">This model will be pre-selected when creating new characters.</p>
+                  <div className="flex gap-2 mb-2">
+                    <select
+                      value={selectedProvider}
+                      onChange={(e) => {
+                        const newProvider = e.target.value;
+                        setSelectedProvider(newProvider);
+                        setFormData(prev => ({ ...prev, defaultModel: '' }));
+                        loadAvailableModels(newProvider);
+                      }}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-400"
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Anthropic</option>
+                      <option value="google">Google AI</option>
+                      <option value="openrouter">OpenRouter</option>
+                      <option value="local">Local (Ollama/LM Studio)</option>
+                    </select>
+                  </div>
+                  <select
+                    value={formData.defaultModel}
+                    onChange={(e) => handleInputChange('defaultModel', e.target.value)}
+                    disabled={loadingModels || availableModels.length === 0}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-400 disabled:opacity-50"
+                  >
+                    <option value="">Select a model...</option>
+                    {availableModels.map((model) => (
+                      <option key={model.id} value={model.id}>{model.name}</option>
+                    ))}
+                  </select>
+                  {loadingModels && <p className="text-xs text-gray-500 mt-1">Loading models...</p>}
+                  {!loadingModels && availableModels.length === 0 && (
+                    <p className="text-xs text-yellow-400 mt-1">
+                      Configure your {selectedProvider} API key in the API Keys tab to see available models.
+                    </p>
+                  )}
+                </div>
+
+                {/* Message Delay */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Message Delay: {formData.messageDelay}ms
+                  </label>
+                  <input
+                    type="range" min="0" max="3000" step="100"
+                    value={formData.messageDelay}
+                    onChange={(e) => handleInputChange('messageDelay', parseInt(e.target.value))}
+                    className="w-full accent-red-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Delay between character responses for realistic pacing</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Admin tab ───────────────────────────────────────────────── */}
+          {activeTab === 'admin' && settings?.isAdmin && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                  <Shield size={18} className="text-orange-500" />
+                  Admin Settings
+                </h3>
+                <p className="text-sm text-gray-400">Server-side keys, moderation preferences, and prompt overrides.</p>
+              </div>
 
               <div className="space-y-6">
                 {/* Admin API Keys Section */}
                 <div className="bg-orange-600/10 border border-orange-500/30 rounded-lg p-4">
                   <h4 className="text-md font-semibold text-orange-400 mb-2 flex items-center gap-2">
                     <Key size={16} />
-                    Admin API Keys for Token Models
+                    Server-Side API Keys
                   </h4>
                   <p className="text-xs text-gray-400 mb-4">
-                    These API keys are used when users chat with token models. Your keys, their tokens.
+                    These API keys are used server-side for custom models with admin-controlled system prompts.
                   </p>
 
                   <div className="space-y-3">
@@ -1016,7 +1046,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false 
                   </div>
                   
                   <p className="text-xs text-gray-500 mt-3">
-                    💡 These keys are encrypted and stored securely in the database. They're used only when users select token models you create.
+                    💡 These keys are encrypted and stored securely in the database. They're used for custom model presets with server-controlled prompts.
                   </p>
                 </div>
 
@@ -1090,20 +1120,10 @@ CORE RULES:
             </div>
           )}
 
-          {/* Info Box */}
-          <div className="p-4 bg-orange-600/10 border border-blue-500/20 rounded-lg">
-            <h4 className="text-sm font-semibold text-orange-400 mb-2">💡 Tips</h4>
-            <ul className="text-xs text-gray-400 space-y-1">
-              <li>• You only need keys for providers you want to use</li>
-              <li>• OpenRouter gives you access to 100+ models with one key</li>
-              <li>• Ollama is free but requires local installation</li>
-              <li>• Each character can use a different provider/model</li>
-            </ul>
-          </div>
         </div>
         
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-white/10 bg-gray-900 sticky bottom-0">
+        <div className="flex items-center justify-between p-6 border-t border-white/10 bg-gray-900 shrink-0">
           <button
             onClick={onClose}
             className="px-6 py-2 text-gray-400 hover:text-white transition-colors"

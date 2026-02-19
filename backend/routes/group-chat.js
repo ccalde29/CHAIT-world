@@ -6,12 +6,9 @@
 const express = require('express');
 const AIProviderService = require('../services/AIProviderService');
 const { aiCallLimiter } = require('../middleware/rateLimiter');
-const { createClient } = require('@supabase/supabase-js');
-
 // Core services
 const MemoryService = require('../services/MemoryService');
 const CharacterLearningService = require('../services/CharacterLearningService');
-const supabaseTokenService = require('../services/SupabaseAdminTokenService');
 
 // New consistency services
 const PromptBuilder = require('../services/PromptBuilder');
@@ -24,12 +21,6 @@ const SessionContinuityService = require('../services/SessionContinuityService')
 // Export function that accepts db parameter
 module.exports = (db) => {
   const router = express.Router();
-  
-  // Initialize Supabase for community features (memory, learning, relationships)
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
   
   const memoryService = new MemoryService(db);
   const learningService = new CharacterLearningService(db);
@@ -226,11 +217,10 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         const charData = {};
 
         // Load relationships
-        const { data: allRelationships } = await supabase
-          .from('character_relationships')
-          .select('*')
-          .eq('character_id', char.id)
-          .eq('user_id', userId);
+        const allRelationships = db.localDb.all(
+          'SELECT * FROM character_relationships WHERE character_id = ? AND user_id = ?',
+          [char.id, userId]
+        );
 
         charData.characterRelationships = allRelationships?.filter(r => r.target_type === 'character') || [];
         charData.userRelationship = allRelationships?.find(r => r.target_type === 'user' && r.target_id === userId) || {
@@ -371,78 +361,14 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         const dynamicTemp = ProviderAdapter.calculateDynamicTemperature(char, charContext);
         const tokenBudget = ProviderAdapter.calculateResponseBudget(char, charContext);
 
-        // Check if this is a token model and resolve it
-        let resolvedChar = { ...char, temperature: dynamicTemp, max_tokens: tokenBudget };
-        let modelCost = null;
-        let useServerKeys = false;
-        let adminApiKeys = {};
-        let tokenModel = null; // Declare tokenModel in outer scope for analytics
-        
-        if (char.ai_provider === 'token') {
-          // Resolve token model from Supabase
-          const allTokenModels = await supabaseTokenService.getTokenModels(true);
-          tokenModel = allTokenModels.find(m => m.id === char.ai_model || m.name === char.ai_model);
-          
-          if (!tokenModel) {
-            throw new Error(`Token model not found: ${char.ai_model}`);
-          }
-          
-          modelCost = tokenModel.token_cost;
-          useServerKeys = true;
-          
-          // Get admin API keys from Supabase
-          const adminKeys = await supabaseTokenService.getAdminApiKeys(userId);
-          
-          adminApiKeys = {
-            openai: adminKeys.openai_key,
-            anthropic: adminKeys.anthropic_key,
-            google: adminKeys.google_key,
-            openrouter: adminKeys.openrouter_key
-          };
-          
-          // Verify admin has the required key for this provider
-          if (!adminApiKeys[tokenModel.ai_provider]) {
-            throw new Error(`Admin API key not configured for ${tokenModel.ai_provider}. Please add it in Admin Settings.`);
-          }
-          
-          // Check balance before generating
-          const userBalance = await supabaseTokenService.getUserTokens(userId);
-          if (userBalance.balance < modelCost) {
-            throw new Error(`Insufficient tokens. Need ${modelCost} tokens, you have ${userBalance.balance}. Please refill or choose a cheaper model.`);
-          }
-          
-          // Update character with actual provider and model
-          resolvedChar = {
-            ...resolvedChar,
-            ai_provider: tokenModel.ai_provider,
-            ai_model: tokenModel.model_id,
-            temperature: tokenModel.temperature,
-            max_tokens: tokenModel.max_tokens
-          };
-        }
+        const resolvedChar = { ...char, temperature: dynamicTemp, max_tokens: tokenBudget };
 
         const rawResponse = await AIProviderService.generateResponse(
           resolvedChar,
           messages,
-          useServerKeys ? adminApiKeys : apiKeys,
-          ollamaSettings,
-          { useServerKeys: false } // Don't use getServerApiKeys, we're passing admin keys directly
+          apiKeys,
+          ollamaSettings
         );
-
-        // Deduct tokens if it was a token model
-        if (useServerKeys && modelCost > 0) {
-          // Calculate estimated API cost (very rough estimate: $0.005 per credit = $0.001 per 100 tokens)
-          const estimatedApiCost = (modelCost / 500) * (tokenModel.provider_cost_per_500_tokens || 0);
-          
-          const result = await supabaseTokenService.deductTokens(
-            userId,
-            modelCost,
-            `Chat with ${char.name}`,
-            tokenModel.id, // model_id for analytics
-            estimatedApiCost, // api_cost_usd
-            tokenModel.provider_cost_per_500_tokens // provider_cost_per_500_tokens
-          );
-        }
 
         // Normalize response
         const response = ProviderAdapter.normalizeResponse(
@@ -575,28 +501,7 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
       } catch (error) {
         console.error(`[Response] Error for ${char.name}:`, error);
-        
-        // If tokens were deducted and request failed, refund and log
-        if (useServerKeys && modelCost > 0) {
-          try {
-            await supabaseTokenService.refundTokens(
-              userId, 
-              modelCost, 
-              `Refund: Failed request to ${char.name} - ${error.message}`
-            );
-            
-            // Log failed transaction for admin review (tokenModel was declared in outer scope)
-            await supabaseTokenService.logFailedTransaction(
-              userId,
-              tokenModel?.id || null,
-              error.message || 'Unknown error',
-              modelCost
-            );
-          } catch (refundError) {
-            console.error('[Token] Failed to refund tokens:', refundError);
-          }
-        }
-        
+
         if (isPrimary) {
           responses.push({
             character: char.id,
