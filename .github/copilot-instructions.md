@@ -125,39 +125,6 @@ All magic numbers live in `backend/constants/defaults.js` — `AI_DEFAULTS`, `RA
 - After any user correction, update `tasks/lessons.md` with the rule that prevents the same mistake
 - Review `tasks/lessons.md` at the start of each session for relevant patterns
 
-## Active Roadmap & Design Decisions
-
-### Stream 1 — Remove Token/Credit System ✅ COMPLETE
-All token/credit code has been removed from frontend and partially from backend. The following backend cleanup tasks are **still pending** — complete these next:
-
-- [ ] Strip `SupabaseAdminTokenService.js`: remove all `token_models` CRUD methods and `admin_api_keys` methods. Keep only: `isAdmin`, `getAdminUsers`, `grantAdmin`, `revokeAdmin`, `getAdminSettings`, `updateAdminSettings`
-- [ ] Clean `backend/routes/scenarios.js`: remove `supabaseTokenService` require, remove `'token'` provider block, remove `useServerKeys`/`modelCost`/`adminApiKeys`/`tokenModel` vars, remove token deduction block, remove `'token'` from `validProviders`
-- [ ] Clean `backend/routes/personas.js`: remove `supabaseTokenService` require, entire `'token'` provider if block, associated vars, token deduction block
-- [ ] Clean `backend/routes/group-chat.js`: remove direct `createClient`/`supabase` init at top (use `db` instead), remove `useServerKeys`/`supabaseTokenService` dead code in error handler, fix `character_relationships` queries to use `db` instead of direct `supabase` client
-- [ ] Delete `backend/routes/admin-keys.js` and remove its registration from `server-supabase.js`
-- [ ] Clean `AIProviderService.js`: remove static `getTokenModels()` method and its JSDoc comment about server keys
-- [ ] Run Supabase SQL to drop dead tables: `DROP TABLE IF EXISTS token_models CASCADE; DROP TABLE IF EXISTS failed_transactions CASCADE; DROP TABLE IF EXISTS admin_api_keys CASCADE; DROP TABLE IF EXISTS user_tokens CASCADE; DROP TABLE IF EXISTS token_transactions CASCADE; DROP TABLE IF EXISTS provider_pricing_cache CASCADE;`
-
-**Do NOT** remove the `'custom'` provider path — it stays, using the user's own OpenRouter key.
-
-### Stream 2 — Admin Panel: Approval Only ✅ COMPLETE
-- `ModerationPanel.js` keeps only `pending` and `reports` tabs
-- Deleted: `TokenModelsPanel.js`, `TokenAnalyticsDashboard.js`, `FailedTransactionsPanel.js`
-- Removed backend routes: `/api/pricing`, token-admin endpoints
-- Deleted: `backend/routes/pricing.js`, `backend/services/LivePricingService.js`
-
-### Stream 3 — Granular Model Parameters ✅ COMPLETE
-- Added columns to `characters` and `custom_models` via `runMigrations()`: `top_p`, `frequency_penalty`, `presence_penalty`, `repetition_penalty`, `stop_sequences` (JSON)
-- Parameters passed through `AIProviderService` per provider
-- Collapsible "Advanced" section added in `CharacterEditor.js`
-- Provider support: `top_p` — all; `frequency_penalty`/`presence_penalty` — OpenAI, OpenRouter, LMStudio; `repetition_penalty` — Ollama, OpenRouter; `stop` — all
-- Model params are also sent to Supabase `community_characters` when publishing
-
-### Stream 4 — Model Manager Tab + UI Design System ✅ COMPLETE
-- **Model Manager** tab added in `SettingsModal.js`: create/edit custom model presets with all advanced params; manage default model per provider
-- Per-provider defaults stored in `user_settings_local.preferences` JSON
-- UI Design System: `frontend/src/styles/ui.js` with named Tailwind class constants; `tailwind.config.js` extended with semantic color tokens
-
 ---
 
 ## Database Schema Reference
@@ -187,8 +154,6 @@ All personal/app data. No login required.
 | `response_feedback` | 1–5 star ratings on AI responses |
 | `schema_version` | Migration tracking |
 
-> **Table rename migration**: `LocalDatabaseService.js` automatically renames `character_comments` → `character_notes` and `scene_comments` → `scene_notes` at startup if the old names exist. This avoids name collision with the Supabase community tables of the same name.
-
 > JSON columns (`tags`, `chat_examples`, `relationships`, `voice_traits`, `speech_patterns`, etc.) are stored as serialized strings — parse/stringify on read/write.
 
 ### Supabase Tables — community and admin only
@@ -208,4 +173,4 @@ All community/social features. Login required.
 | `community_reports` | `community_character_id`, `community_scene_id`, `reporter_user_id`, `report_type`, `status`, `reviewed_by`, `reviewed_at`, `action_taken` | Reports against published community content |
 | `admin_users` | `user_id`, `auto_approve_characters`, `admin_system_prompt` | Single-owner admin access (checked by `requireAdmin` middleware) |
 
-> **Dead Supabase tables** (token system legacy — safe to drop): `token_models`, `failed_transactions`, `admin_api_keys`, `user_tokens`, `token_transactions`, `provider_pricing_cache`. Drop script: `DROP TABLE IF EXISTS token_models, failed_transactions, admin_api_keys, user_tokens, token_transactions, provider_pricing_cache CASCADE;`
+> **Note**: The SQLite tables `character_notes` and `scene_notes` serve a different purpose than the Supabase tables `character_comments` and `scene_comments`. The SQLite tables are private local notes/ratings; the Supabase tables are community comments. Do not confuse them.

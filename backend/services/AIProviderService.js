@@ -15,9 +15,9 @@ class AIProviderService {
    * Main entry point - calls AI based on character's configured provider
    * @param {Object} character - Character object with ai_provider and ai_model
    * @param {Array} messages - Conversation messages in OpenAI format
-   * @param {Object} apiKeys - User's API keys for various providers (or server keys for token models)
+   * @param {Object} apiKeys - User's API keys for various providers
    * @param {Object} ollamaSettings - Ollama configuration
-   * @param {Object} options - Additional options like useServerKeys
+   * @param {Object} options - Additional options
    * @returns {Promise<string>} - AI response text
    */
   static async generateResponse(character, messages, apiKeys = {}, ollamaSettings = {}, options = {}) {

@@ -301,7 +301,7 @@ router.put('/:personaId', async (req, res) => {
     }
 
     // Validate AI provider if provided
-    const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom', 'token'];
+    const validProviders = ['openai', 'anthropic', 'openrouter', 'google', 'ollama', 'lmstudio', 'custom'];
     if (updates.ai_provider && !validProviders.includes(updates.ai_provider)) {
       return res.status(400).json({
         error: `Invalid AI provider. Must be one of: ${validProviders.join(', ')}`
