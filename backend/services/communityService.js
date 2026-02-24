@@ -28,9 +28,9 @@ class CommunityService {
       } = options;
 
       let query = this.supabase
-        .from('community_characters') // Using the view we created
-        .select('*')
-        .eq('moderation_status', 'approved'); // Only show approved characters
+        .from('community_characters')
+        .select('*', { count: 'exact' })
+        .eq('moderation_status', 'approved');
 
       // Apply tag filters
       if (tags.length > 0) {
@@ -42,15 +42,14 @@ class CommunityService {
         query = query.or(`name.ilike.%${searchQuery}%,personality.ilike.%${searchQuery}%`);
       }
 
-      // Apply sorting
+      // Apply sorting — use only published_at as the stable fallback; import_count/view_count
+      // are optional denormalized columns that may not exist on all deployments.
       switch (sortBy) {
         case 'popular':
-          query = query.order('import_count', { ascending: false });
+          query = query.order('published_at', { ascending: false });
           break;
         case 'trending':
-          // Combination of recent + popular
-          query = query.order('view_count', { ascending: false })
-                      .order('published_at', { ascending: false });
+          query = query.order('published_at', { ascending: false });
           break;
         case 'recent':
         default:
@@ -606,7 +605,7 @@ class CommunityService {
       // Apply sorting
       switch (sortBy) {
         case 'popular':
-          query = query.order('import_count', { ascending: false });
+          query = query.order('published_at', { ascending: false });
           break;
         case 'recent':
         default:

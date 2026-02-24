@@ -182,8 +182,6 @@ class LocalDatabaseService {
                 `);
             }
 
-            // user_tokens and token_transactions removed — token system deprecated
-
             // Add granular model parameter columns to characters table
             const charTableInfo = this.db.prepare("PRAGMA table_info(characters)").all();
             const charColumnNames = charTableInfo.map(col => col.name);
@@ -224,7 +222,6 @@ class LocalDatabaseService {
                 this.db.exec("ALTER TABLE custom_models ADD COLUMN stop_sequences TEXT DEFAULT NULL");
             }
 
-            // token_models removed — model presets now live in custom_models (SQLite)
         } catch (error) {
             console.error('Failed to run migrations:', error);
             // Don't throw - allow app to continue

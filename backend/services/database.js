@@ -182,6 +182,11 @@ class DatabaseService {
     // All user settings stored in local SQLite database
     // ============================================================================
 
+    async isAdmin(userId) {
+        if (!this.supabaseAvailable || !this.supabaseService) return false;
+        return this.supabaseService.isAdmin(userId);
+    }
+
     async getUserSettings(userId) {
         const localSettings = this.localDb.getUserSettings(userId);
         

@@ -50,16 +50,9 @@ router.get('/queue', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch moderation queue' });
     }
 
-    // Add report count for each character (if needed later)
-    // For now, just return the characters
-    const queueWithReportCount = queue.map(char => ({
-      ...char,
-      report_count: 0 // TODO: Add actual report count if character_reports table exists
-    }));
-
     res.json({
-      queue: queueWithReportCount || [],
-      total: queueWithReportCount?.length || 0
+      queue: queue || [],
+      total: queue?.length || 0
     });
 
   } catch (error) {

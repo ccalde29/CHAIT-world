@@ -574,17 +574,19 @@ const MainApp = () => {
         )}
       </div>
 
-      {/* Active Chat Panel (Right Sidebar) */}
-      <ActiveChatPanel
-        currentScene={charactersState.findScenarioById(charactersState.currentScenario)}
-        activeCharacters={charactersState.activeCharacters}
-        onRemoveCharacter={(character) => {
-          charactersState.setActiveCharacters(prev => prev.filter(c => c.id !== character.id));
-        }}
-        onChangeScene={() => setShowNewChatModal(true)}
-        isCollapsed={rightPanelCollapsed}
-        onToggleCollapse={() => setRightPanelCollapsed(!rightPanelCollapsed)}
-      />
+      {/* Active Chat Panel (Right Sidebar) — only visible during chat */}
+      {activeView === 'chat' && (
+        <ActiveChatPanel
+          currentScene={charactersState.findScenarioById(charactersState.currentScenario)}
+          activeCharacters={charactersState.activeCharacters}
+          onRemoveCharacter={(character) => {
+            charactersState.setActiveCharacters(prev => prev.filter(c => c.id !== character.id));
+          }}
+          onChangeScene={() => setShowNewChatModal(true)}
+          isCollapsed={rightPanelCollapsed}
+          onToggleCollapse={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+        />
+      )}
 
       {/* Modals */}
       {showNewChatModal && (

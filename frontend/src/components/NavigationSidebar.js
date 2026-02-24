@@ -6,15 +6,12 @@ import {
   MessageSquare,
   Plus,
   Users,
-  Film,
   Globe,
   Settings,
   User,
   LogOut,
   ChevronDown,
   ChevronRight,
-  ChevronLeft,
-  Lock,
   Shield,
   Trash2,
   Menu
@@ -269,7 +266,6 @@ const NavigationSidebar = ({
                   <Icon size={20} />
                   <span className="font-medium">{item.label}</span>
                 </div>
-                {item.locked && <Lock size={16} className="text-gray-400" />}
               </button>
             );
           })}

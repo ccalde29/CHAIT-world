@@ -1,0 +1,181 @@
+Let me do a thorough audit of dead code across the codebase. 
+
+Created 5 todos
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/server-supabase.js)
+
+Good — `pricing.js`, `tokens.js`, `token-models.js` are NOT imported in server-supabase.js. Now let me audit everything broadly in parallel: 
+
+Searched for text `import` (`**/frontend/src/components/MainApp.js`), 20 results
+
+Searched for text `import` (`**/frontend/src/components/SettingsModal.js`), 3 results
+
+Searched for text `import` (`**/frontend/src/components/NavigationSidebar.js`), 4 results
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/frontend/src/components/MainApp.js#1-1), lines 1 to 80
+
+Searched for regex `import|export|function|const.*=` (`**/frontend/src/components/TokenAnalyticsDashboard.js`), no results
+
+Searched for regex `import|export|function|const.*=` (`**/frontend/src/components/UserCreditsPanel.js`), no results
+
+Searched for regex `import|export|function|const.*=` (`**/frontend/src/components/FailedTransactionsPanel.js`), no results
+
+Searched for regex `import|export|function|const.*=` (`**/frontend/src/components/TokenModelsPanel.js`), no results
+
+Searched for regex `import|export|function|const.*=` (`**/frontend/src/hooks/useTokens.js`), no results
+
+Those files are empty. Let me also check if they're imported anywhere, and look at the backend dead route files and services: 
+
+Searched for text `TokenAnalyticsDashboard\|UserCreditsPanel\|FailedTransactionsPanel\|TokenModelsPanel\|useTokens`, no results
+
+Those route files are already gone. The empty frontend components are not imported anywhere either. Now let me check the `SupabaseAdminTokenService`, `LivePricingService`, and `ProviderAdapter` for dead code, and also verify which frontend files are truly empty vs just small: 
+
+Searched for regex `TokenAnalyticsDashboard|UserCreditsPanel|FailedTransactionsPanel|TokenModelsPanel|useTokens|LivePricingService|ProviderAdapter`, 14 results
+
+Ran terminal command: Get-Content "c:\Users\Lizette\OneDrive\Desktop\Projects\CHAIT-world\frontend\src\components\TokenAnalyticsDashboard.js" | Measure-Object -Line; Get-Content "c:\Users\Lizette\OneDrive\Desktop\Projects\CHAIT-world\frontend\src\components\UserCreditsPanel.js" | Measure-Object -Line; Get-Content "c:\Users\Lizette\OneDrive\Desktop\Projects\CHAIT-world\frontend\src\components\FailedTransactionsPanel.js" | Measure-Object -Line; Get-Content "c:\Users\Lizette\OneDrive\Desktop\Projects\CHAIT-world\frontend\src\components\TokenModelsPanel.js" | Measure-Object -Line; Get-Content "c:\Users\Lizette\OneDrive\Desktop\Projects\CHAIT-world\frontend\src\hooks\useTokens.js" | Measure-Object -Line
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/services/SupabaseAdminTokenService.js#1-1), lines 1 to 60
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/services/ProviderAdapter.js#1-1), lines 1 to 60
+
+Good — the dead frontend files don't even exist on disk. Now let me read the full `SupabaseAdminTokenService` to audit what remains, and check what's actually using it: 
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/services/SupabaseAdminTokenService.js#60-60), lines 60 to 141
+
+Searched for text `SupabaseAdminTokenService`, 7 results
+
+The `SupabaseAdminTokenService` is still legitimately used by adminAuth.js, user.js (directly — but the copilot instructions say routes should not import it directly), and database.js. Let me check user.js and database.js to see what's actually used vs dead: 
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/routes/user.js#1-1), lines 1 to 80
+
+Searched for text `supabaseService` (`**/backend/services/database.js`), 9 results
+
+The `SupabaseAdminTokenService` is legitimately active — `isAdmin`, `getAdminSettings`, `updateAdminSettings` are all used. The direct import in user.js is a known violation of the arch rule. Let me check the full user.js to see how else supabaseService is used there, and check `moderation.js` and database.js for anything dead, then sweep all routes and services for dead/unreachable code: 
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/routes/user.js#80-80), lines 80 to 129
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/routes/moderation.js#1-1), lines 1 to 60
+
+Searched for regex `Zap|CheckCircle|AlertCircle|Eye|EyeOff|Loader|Cpu|Settings|Key|X` (`**/frontend/src/components/SettingsModal.js`), 20 results
+
+Let me get the full SettingsModal.js to find which icons are actually used vs dead imports: 
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/frontend/src/components/SettingsModal.js#1-1), lines 1 to 400
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/frontend/src/components/SettingsModal.js#400-400), lines 400 to 754
+
+SettingsModal.js is clean. Now let me audit the stale comment and also look at the user.js route — it imports `SupabaseAdminTokenService` directly (violating arch rules). Let me also check NavigationSidebar.js for dead imports, the moderation.js dead TODO comment, and do a broad sweep for other dead patterns: 
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/frontend/src/components/NavigationSidebar.js#1-1), lines 1 to 100
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/routes/moderation.js#60-60), lines 60 to 432
+
+Searched for regex `TODO|FIXME|HACK|XXX|dead|unused|no longer|not used|commented out|deprecated` (`**/backend/**/*.js`), 2 results
+
+Good findings. Now let me check all remaining things in one sweep:
+
+1. user.js direct import of `SupabaseAdminTokenService` (arch violation — should use `db`)
+2. Stale comment in LocalDatabaseService.js
+3. TODO comment in moderation.js (report_count: 0 — should just be removed since we have `community_reports` table)
+4. Dead `report_count: 0` field in moderation queue
+5. `Capacitor` import in `NavigationSidebar` — check if it's actually used beyond the initial state
+6. `Lock` icon imported in `NavigationSidebar` — check if used 
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/frontend/src/components/NavigationSidebar.js#100-100), lines 100 to 308
+
+Searched for text `token` (`**/backend/services/LocalDatabaseService.js`), 13 results
+
+Now I have a complete picture. Here are the actual dead code items to fix:
+
+1. **`Lock` icon imported in NavigationSidebar.js** — used only via `item.locked` which is never set on any menu item
+2. **`Film` icon imported in NavigationSidebar.js** — not used anywhere
+3. **`report_count: 0` with TODO in moderation.js** — dead placeholder, remove it
+4. **Stale comments in LocalDatabaseService.js lines 185, 227** — just comment noise
+5. **user.js direct import of `SupabaseAdminTokenService`** — arch violation, should route through `db`
+6. **Stale comment block header in SettingsModal.js** — `// ADMIN API KEYS MANAGEMENT` section title with no content under it
+
+Let me also check if `db` has an `isAdmin` method to support fixing the arch violation in user.js: 
+
+Searched for regex `isAdmin|getAdminSettings|updateAdminSettings` (`**/backend/services/database.js`), 6 results
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/services/LocalDatabaseService.js#180-180), lines 180 to 230
+
+database.js already wraps `isAdmin` internally. Let me check if `db` exposes an `isAdmin` method publicly: 
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/services/database.js#160-160), lines 160 to 260
+
+`db` does not expose a public `isAdmin()` method — it's only used internally. The user.js route needs to call `supabaseService.isAdmin()` directly because `db.getUserSettings()` reads `localSettings.isAdmin` from SQLite (which may not be accurate without a Supabase check). Let me check how `localSettings.isAdmin` is set: 
+
+Searched for text `isAdmin` (`**/backend/services/LocalDatabaseService.js`), 2 results
+
+`isAdmin` in SQLite is a local field — not authoritative. The user.js GET `/settings` correctly calls `supabaseService.isAdmin()` instead of trusting the local value. This is actually the right thing to do — it's a security check. The arch guideline says "don't import directly in routes", but user.js does so for a valid reason. The cleanest fix is to expose `isAdmin(userId)` on `DatabaseService` so it goes through the canonical gateway. Let me do that, then fix all the other dead code at once: 
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/services/database.js#1-1), lines 1 to 50
+
+Now I have everything I need. Let me apply all the fixes: 
+
+Using "Multi-Replace String in Files"
+
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+
+```
+The `ChevronLeft` step failed because by the time it ran, `Lock` was already removed but `ChevronLeft` was originally there. Let me check the current state and fix it: 
+
+Searched for regex `ChevronLeft|ChevronRight|ChevronDown` (`**/frontend/src/components/NavigationSidebar.js`), 4 results
+
+`ChevronLeft` was already removed as part of the first replace (since it was between `Lock` and `Shield`). The import list is now correct — `ChevronDown` and `ChevronRight` are both used. Good. Now let me verify the key changes look right: 
+
+Searched for text `import {` (`**/frontend/src/components/NavigationSidebar.js`), 3 results
+
+Searched for text `supabaseService\|SupabaseAdmin\|isAdmin` (`**/backend/routes/user.js`), no results
+
+Searched for text `isAdmin` (`**/backend/services/database.js`), 6 results
+
+Searched for text `isAdmin\|supabase\|require` (`**/backend/routes/user.js`), no results
+
+Read [](file:///c%3A/Users/Lizette/OneDrive/Desktop/Projects/CHAIT-world/backend/routes/user.js#1-1), lines 1 to 30
+
+Everything is clean. Let me do one final sweep for any remaining dead patterns: 
+
+Completed: *Audit backend routes for dead files* (1/5)
+
+Here's everything that was removed:
+
+### Frontend
+- **NavigationSidebar.js**: Removed `Film`, `Lock`, `ChevronLeft` — none were used. Also removed the `{item.locked && <Lock />}` render (no menu item ever has `locked` set).
+
+### Backend routes
+- **moderation.js**: Removed the dead `report_count: 0` placeholder and its TODO comment. The queue now returns characters directly without the unnecessary mapping.
+
+### Backend services
+- **LocalDatabaseService.js**: Removed two stale migration comments (`// user_tokens and token_transactions removed` and `// token_models removed`) — pure noise with no code around them.
+- **database.js**: Added a proper public `isAdmin(userId)` method that delegates to `supabaseService`.
+
+### Backend routes (arch fix)
+- **user.js**: Removed the direct `require('../services/SupabaseAdminTokenService')` import (violated the "all routes through `DatabaseService`" rule). Now calls `db.isAdmin(req.userId)` through the canonical gateway.
+
+### Frontend components
+- **SettingsModal.js**: Removed the orphaned `// ADMIN API KEYS MANAGEMENT` section header comment that had no code under it.
+
+Made changes.

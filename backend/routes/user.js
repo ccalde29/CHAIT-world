@@ -4,7 +4,6 @@
 const express = require('express');
 const router = express.Router();
 const { STRING_LIMITS } = require('../constants/defaults');
-const supabaseService = require('../services/SupabaseAdminTokenService');
 
 module.exports = (db) => {
     /**
@@ -16,7 +15,7 @@ module.exports = (db) => {
             const settings = await db.getUserSettings(req.userId);
             
             // Check admin status from Supabase (server-controlled)
-            const isAdmin = await supabaseService.isAdmin(req.userId);
+            const isAdmin = await db.isAdmin(req.userId);
             
             res.json({ ...settings, isAdmin });
         } catch (error) {
