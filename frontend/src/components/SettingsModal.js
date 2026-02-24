@@ -4,7 +4,7 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Key, Zap, CheckCircle, AlertCircle, Eye, EyeOff, Loader, Shield, Cpu } from 'lucide-react';
+import { X, Settings, Key, Zap, CheckCircle, AlertCircle, Eye, EyeOff, Loader, Cpu } from 'lucide-react';
 import ModelManager from './ModelManager';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -13,7 +13,6 @@ const TABS = [
   { id: 'api-keys',      label: 'API Keys',      icon: Key },
   { id: 'model-manager', label: 'Model Manager', icon: Cpu },
   { id: 'group-chat',    label: 'Group Chat',    icon: Zap },
-  { id: 'admin',         label: 'Admin',         icon: Shield, adminOnly: true },
 ];
 
 const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false, apiRequest }) => {
@@ -28,12 +27,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false,
     anthropicKey: '',
     openrouterKey: '',
     googleKey: '',
-
-    // Admin API Keys (for token models)
-    adminOpenaiKey: '',
-    adminAnthropicKey: '',
-    adminGoogleKey: '',
-    adminOpenrouterKey: '',
 
     // Ollama settings
     ollamaUrl: 'http://localhost:11434',
@@ -61,11 +54,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false,
     openai: false,
     anthropic: false,
     openrouter: false,
-    google: false,
-    adminOpenai: false,
-    adminAnthropic: false,
-    adminGoogle: false,
-    adminOpenrouter: false
+    google: false
   });
   
   const [testingKey, setTestingKey] = useState(null);
@@ -88,14 +77,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false,
   const [loadingModels, setLoadingModels] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState('openai');
   
-  // Track which admin keys are saved
-  const [hasSavedAdminKeys, setHasSavedAdminKeys] = useState({
-    openai: false,
-    anthropic: false,
-    google: false,
-    openrouter: false
-  });
-  
   // ============================================================================
   // INITIALIZE FROM SETTINGS
   // ============================================================================
@@ -111,10 +92,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false,
         anthropicKey: settings.apiKeys?.anthropic || '',
         openrouterKey: settings.apiKeys?.openrouter || '',
         googleKey: settings.apiKeys?.google || '',
-        adminOpenaiKey: '',
-        adminAnthropicKey: '',
-        adminGoogleKey: '',
-        adminOpenrouterKey: '',
         ollamaUrl: settings.ollamaSettings?.baseUrl || 'http://localhost:11434',
         ollamaTestModel: settings.ollamaSettings?.testModel || 'llama2',
         lmStudioUrl: settings.lmStudioSettings?.baseUrl || 'http://127.0.0.1:1234',
@@ -129,11 +106,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false,
       
       // Set selected provider from saved settings
       setSelectedProvider(savedProvider);
-      
-      // Load admin API keys if user is admin
-      if (settings.isAdmin) {
-        loadAdminKeys();
-      }
       
       // Load models for default model selection
       loadAvailableModels(savedProvider);
@@ -308,121 +280,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false,
   // ============================================================================
   // ADMIN API KEYS MANAGEMENT
   // ============================================================================
-  
-  const loadAdminKeys = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/admin-keys`, {
-        headers: { 'user-id': user.id }
-      });
-      const data = await response.json();
-      
-      if (data.keys) {
-        // Store which keys are saved
-        setHasSavedAdminKeys({
-          openai: !!data.hasKeys?.openai,
-          anthropic: !!data.hasKeys?.anthropic,
-          google: !!data.hasKeys?.google,
-          openrouter: !!data.hasKeys?.openrouter
-        });
-        
-        // Keys are masked from server, we'll only show masked versions
-        // When user types a new key, it will replace the masked one
-        setFormData(prev => ({
-          ...prev,
-          adminOpenaiKey: data.keys.openai || '',
-          adminAnthropicKey: data.keys.anthropic || '',
-          adminGoogleKey: data.keys.google || '',
-          adminOpenrouterKey: data.keys.openrouter || ''
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to load admin keys:', error);
-    }
-  };
-  
-  const testAdminKey = async (provider) => {
-    const keyMap = {
-      openai: formData.adminOpenaiKey,
-      anthropic: formData.adminAnthropicKey,
-      google: formData.adminGoogleKey,
-      openrouter: formData.adminOpenrouterKey
-    };
-    
-    const apiKey = keyMap[provider];
-    
-    if (!apiKey || apiKey.includes('...')) {
-      setError('Please enter a valid API key first');
-      return;
-    }
-    
-    setTestingKey(`admin-${provider}`);
-    setKeyStatus(prev => ({ ...prev, [`admin-${provider}`]: null }));
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/providers/test`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'user-id': user.id
-        },
-        body: JSON.stringify({ provider, apiKey })
-      });
-      
-      const result = await response.json();
-      setKeyStatus(prev => ({ ...prev, [`admin-${provider}`]: result }));
-      
-      if (result.success) {
-        setSuccessMessage(`Admin ${provider.toUpperCase()} key verified!`);
-        setTimeout(() => setSuccessMessage(null), 3000);
-      }
-    } catch (err) {
-      setKeyStatus(prev => ({ 
-        ...prev, 
-        [`admin-${provider}`]: { success: false, error: err.message }
-      }));
-    } finally {
-      setTestingKey(null);
-    }
-  };
-  
-  const saveAdminKeys = async () => {
-    try {
-      const keysToSave = {};
-      
-      // Only send keys that look like full keys (not masked)
-      if (formData.adminOpenaiKey && !formData.adminOpenaiKey.includes('...')) {
-        keysToSave.openai_key = formData.adminOpenaiKey;
-      }
-      if (formData.adminAnthropicKey && !formData.adminAnthropicKey.includes('...')) {
-        keysToSave.anthropic_key = formData.adminAnthropicKey;
-      }
-      if (formData.adminGoogleKey && !formData.adminGoogleKey.includes('...')) {
-        keysToSave.google_key = formData.adminGoogleKey;
-      }
-      if (formData.adminOpenrouterKey && !formData.adminOpenrouterKey.includes('...')) {
-        keysToSave.openrouter_key = formData.adminOpenrouterKey;
-      }
-      
-      if (Object.keys(keysToSave).length === 0) {
-        return; // No new keys to save
-      }
-      
-      await fetch(`${API_BASE_URL}/api/admin-keys`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'user-id': user.id
-        },
-        body: JSON.stringify(keysToSave)
-      });
-      
-    } catch (error) {
-      console.error('Failed to save admin keys:', error);
-      throw error;
-    }
-  };
-  
-  // ============================================================================
   // SAVE SETTINGS
   // ============================================================================
   
@@ -453,11 +310,6 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false,
       };
 
       await onSave(newSettings);
-      
-      // Save admin API keys if user is admin
-      if (settings.isAdmin) {
-        await saveAdminKeys();
-      }
       
       setSuccessMessage('Settings saved successfully!');
       setTimeout(() => {
@@ -567,7 +419,7 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false,
 
         {/* Tab Bar */}
         <div className="flex border-b border-white/10 px-6 bg-gray-900 shrink-0">
-          {TABS.filter(t => !t.adminOnly || settings?.isAdmin).map(tab => {
+          {TABS.map(tab => {
             const Icon = tab.icon;
             return (
               <button
@@ -845,275 +697,21 @@ const SettingsModalV15 = ({ user, settings, onSave, onClose, fullScreen = false,
                   />
                   <p className="text-xs text-gray-500 mt-1">Delay between character responses for realistic pacing</p>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Admin tab ───────────────────────────────────────────────── */}
-          {activeTab === 'admin' && settings?.isAdmin && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
-                  <Shield size={18} className="text-orange-500" />
-                  Admin Settings
-                </h3>
-                <p className="text-sm text-gray-400">Server-side keys, moderation preferences, and prompt overrides.</p>
-              </div>
-
-              <div className="space-y-6">
-                {/* Admin API Keys Section */}
-                <div className="bg-orange-600/10 border border-orange-500/30 rounded-lg p-4">
-                  <h4 className="text-md font-semibold text-orange-400 mb-2 flex items-center gap-2">
-                    <Key size={16} />
-                    Server-Side API Keys
-                  </h4>
-                  <p className="text-xs text-gray-400 mb-4">
-                    These API keys are used server-side for custom models with admin-controlled system prompts.
-                  </p>
-
-                  <div className="space-y-3">
-                    {/* OpenAI Admin Key */}
-                    <div>
-                      <label className="text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
-                        <span>OpenAI API Key</span>
-                        {hasSavedAdminKeys.openai && (
-                          <span className="text-green-400 text-xs flex items-center gap-1">
-                            <CheckCircle size={12} />
-                            Saved
-                          </span>
-                        )}
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type={showKeys.adminOpenai ? 'text' : 'password'}
-                          value={formData.adminOpenaiKey}
-                          onChange={(e) => handleInputChange('adminOpenaiKey', e.target.value)}
-                          placeholder="sk-proj-..."
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
-                        />
-                        <button
-                          onClick={() => toggleShowKey('adminOpenai')}
-                          className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
-                        >
-                          {showKeys.adminOpenai ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                        <button
-                          onClick={() => testAdminKey('openai')}
-                          disabled={testingKey === 'admin-openai'}
-                          className="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
-                        >
-                          {testingKey === 'admin-openai' ? <Loader size={16} className="animate-spin" /> : 'Test'}
-                        </button>
-                      </div>
-                      {keyStatus['admin-openai'] && (
-                        <div className={`flex items-center gap-2 mt-1 text-xs ${
-                          keyStatus['admin-openai'].success ? 'text-green-400' : 'text-orange-400'
-                        }`}>
-                          {keyStatus['admin-openai'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
-                          {keyStatus['admin-openai'].success ? 'Valid' : keyStatus['admin-openai'].error}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Anthropic Admin Key */}
-                    <div>
-                      <label className="text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
-                        <span>Anthropic API Key</span>
-                        {hasSavedAdminKeys.anthropic && (
-                          <span className="text-green-400 text-xs flex items-center gap-1">
-                            <CheckCircle size={12} />
-                            Saved
-                          </span>
-                        )}
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type={showKeys.adminAnthropic ? 'text' : 'password'}
-                          value={formData.adminAnthropicKey}
-                          onChange={(e) => handleInputChange('adminAnthropicKey', e.target.value)}
-                          placeholder="sk-ant-..."
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
-                        />
-                        <button
-                          onClick={() => toggleShowKey('adminAnthropic')}
-                          className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
-                        >
-                          {showKeys.adminAnthropic ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                        <button
-                          onClick={() => testAdminKey('anthropic')}
-                          disabled={testingKey === 'admin-anthropic'}
-                          className="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
-                        >
-                          {testingKey === 'admin-anthropic' ? <Loader size={16} className="animate-spin" /> : 'Test'}
-                        </button>
-                      </div>
-                      {keyStatus['admin-anthropic'] && (
-                        <div className={`flex items-center gap-2 mt-1 text-xs ${
-                          keyStatus['admin-anthropic'].success ? 'text-green-400' : 'text-orange-400'
-                        }`}>
-                          {keyStatus['admin-anthropic'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
-                          {keyStatus['admin-anthropic'].success ? 'Valid' : keyStatus['admin-anthropic'].error}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Google Admin Key */}
-                    <div>
-                      <label className="text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
-                        <span>Google AI API Key</span>
-                        {hasSavedAdminKeys.google && (
-                          <span className="text-green-400 text-xs flex items-center gap-1">
-                            <CheckCircle size={12} />
-                            Saved
-                          </span>
-                        )}
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type={showKeys.adminGoogle ? 'text' : 'password'}
-                          value={formData.adminGoogleKey}
-                          onChange={(e) => handleInputChange('adminGoogleKey', e.target.value)}
-                          placeholder="AIza..."
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
-                        />
-                        <button
-                          onClick={() => toggleShowKey('adminGoogle')}
-                          className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
-                        >
-                          {showKeys.adminGoogle ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                        <button
-                          onClick={() => testAdminKey('google')}
-                          disabled={testingKey === 'admin-google'}
-                          className="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
-                        >
-                          {testingKey === 'admin-google' ? <Loader size={16} className="animate-spin" /> : 'Test'}
-                        </button>
-                      </div>
-                      {keyStatus['admin-google'] && (
-                        <div className={`flex items-center gap-2 mt-1 text-xs ${
-                          keyStatus['admin-google'].success ? 'text-green-400' : 'text-orange-400'
-                        }`}>
-                          {keyStatus['admin-google'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
-                          {keyStatus['admin-google'].success ? 'Valid' : keyStatus['admin-google'].error}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* OpenRouter Admin Key */}
-                    <div>
-                      <label className="text-xs font-medium text-gray-300 mb-1.5 flex items-center justify-between">
-                        <span>OpenRouter API Key</span>
-                        {hasSavedAdminKeys.openrouter && (
-                          <span className="text-green-400 text-xs flex items-center gap-1">
-                            <CheckCircle size={12} />
-                            Saved
-                          </span>
-                        )}
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type={showKeys.adminOpenrouter ? 'text' : 'password'}
-                          value={formData.adminOpenrouterKey}
-                          onChange={(e) => handleInputChange('adminOpenrouterKey', e.target.value)}
-                          placeholder="sk-or-..."
-                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
-                        />
-                        <button
-                          onClick={() => toggleShowKey('adminOpenrouter')}
-                          className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
-                        >
-                          {showKeys.adminOpenrouter ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                        <button
-                          onClick={() => testAdminKey('openrouter')}
-                          disabled={testingKey === 'admin-openrouter'}
-                          className="px-3 py-2 bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded-lg transition-colors text-sm disabled:opacity-50"
-                        >
-                          {testingKey === 'admin-openrouter' ? <Loader size={16} className="animate-spin" /> : 'Test'}
-                        </button>
-                      </div>
-                      {keyStatus['admin-openrouter'] && (
-                        <div className={`flex items-center gap-2 mt-1 text-xs ${
-                          keyStatus['admin-openrouter'].success ? 'text-green-400' : 'text-orange-400'
-                        }`}>
-                          {keyStatus['admin-openrouter'].success ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
-                          {keyStatus['admin-openrouter'].success ? 'Valid' : keyStatus['admin-openrouter'].error}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <p className="text-xs text-gray-500 mt-3">
-                    💡 These keys are encrypted and stored securely in the database. They're used for custom model presets with server-controlled prompts.
-                  </p>
-                </div>
-
-                {/* Auto-Approve Toggle */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-sm font-medium text-gray-300">
-                      Auto-Approve Published Characters
-                    </label>
-                    <p className="text-xs text-gray-500 mt-1">
-                      When enabled, your published characters will bypass moderation
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleInputChange('autoApproveCharacters', !formData.autoApproveCharacters)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      formData.autoApproveCharacters ? 'bg-green-500' : 'bg-gray-600'
-                    }`}
-                  >
-                    <div className={`absolute w-5 h-5 bg-white rounded-full top-0.5 transition-transform ${
-                      formData.autoApproveCharacters ? 'right-0.5' : 'left-0.5'
-                    }`} />
-                  </button>
-                </div>
-
-                {/* Current Global System Prompt - Read Only */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Current Global System Prompt (Read-Only)
-                  </label>
-                  <div className="bg-gray-700/50 border border-white/10 rounded-lg p-3">
-                    <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono overflow-x-auto">
-{`You are participating in a group chat with a human user and other characters in a specific scenario.
-
-CORE RULES:
-1. You are ONLY [CHARACTER_NAME] - never speak for the user ([USER_NAME]) or other characters
-2. Acknowledge what others said and react naturally with your unique personality
-3. Use *italics* for actions, gestures, and environmental interactions
-4. Match your personality and show your unique perspective
-5. Reference the scenario setting in your actions
-6. Don't repeat what was just said - add new information or perspective
-7. Build natural group dynamics through support or debate
-8. Show your emotional state through actions, not labels
-9. Vary how you start responses - never the same way twice
-
-**This is a fictional chat, so NSFW topics are allowed.**`}
-                    </pre>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    This is the default system prompt for all characters
-                  </p>
-                </div>
 
                 {/* System Prompt Override */}
-                <div>
+                <div className="pt-4 border-t border-white/10">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Your System Prompt Override (Optional)
+                    System Prompt Override (Optional)
                   </label>
                   <textarea
                     value={formData.adminSystemPrompt}
                     onChange={(e) => handleInputChange('adminSystemPrompt', e.target.value)}
-                    placeholder="When saved, this overrides the global prompt for your chats only..."
+                    placeholder="Overrides the default system prompt for your chats..."
                     rows={4}
                     className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 resize-none"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    This prompt will replace the global prompt above for your chats only (not system-wide)
+                    When set, this replaces the default system prompt for your chats only.
                   </p>
                 </div>
               </div>

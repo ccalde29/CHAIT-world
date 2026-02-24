@@ -307,12 +307,13 @@ const CommunityHub = ({
       // Track view
       await apiRequest(`/api/community/scenes/${scene.id}/view`, {
         method: 'POST'
-      });wait onImport(response);
-      } else {
-        await apiRequest(`/api/community/scenes/${scene.id}/import`, {
-          method: 'POST'
-        });
-      }
+      });
+
+      const response = await apiRequest(`/api/community/scenes/${scene.id}/import`, {
+        method: 'POST'
+      });
+
+      if (onImport) onImport(response);
 
       // Show success feedback
       alert(`Successfully imported ${scene.name}!`);

@@ -31,8 +31,8 @@ const NavigationSidebar = ({
   activeView,
   isAdmin,
   onDeleteSession,
-  refreshTrigger, // Add refresh trigger prop
-  onSessionsLoad // Callback to expose loadSessions function
+  refreshTrigger,
+  onSessionsLoad
 }) => {
   const { user, signOut } = useAuth();
   const [sessions, setSessions] = useState([]);
