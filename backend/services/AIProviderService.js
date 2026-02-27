@@ -49,7 +49,7 @@ class AIProviderService {
           return await this.callLMStudio(model, messages, lmStudioSettings, character);
 
         case 'custom':
-          return await this.callCustomModel(model, messages, apiKeys.openrouter, character);
+          return await this.callCustomModel(model, messages, apiKeys.openrouter, character, apiKeys);
 
         default:
           throw new Error(`Unsupported AI provider: ${provider}`);
@@ -431,7 +431,7 @@ class AIProviderService {
   static getDefaultModel(provider) {
     const defaults = {
       'openai': 'gpt-4o-mini',
-      'anthropic': 'claude-3-5-haiku-20241022',
+      'anthropic': 'claude-haiku-4-5',
       'openrouter': 'openai/gpt-4o-mini',
       'google': 'gemini-2.5-flash',
       'ollama': 'llama2',
@@ -444,7 +444,7 @@ class AIProviderService {
   /**
    * Get available models for a provider
    */
-  static async getAvailableModels(provider, apiKey, ollamaSettings = {}, lmStudioSettings = {}) {
+  static async getAvailableModels(provider, apiKey, ollamaSettings = {}, lmStudioSettings = {}, userId = null) {
     try {
       switch (provider.toLowerCase()) {
         case 'openai':
@@ -466,7 +466,7 @@ class AIProviderService {
           return await this.getLMStudioModels(lmStudioSettings);
 
         case 'custom':
-          return await this.getCustomModels();
+          return await this.getCustomModels(userId);
 
         default:
           return [];
@@ -559,11 +559,9 @@ class AIProviderService {
   
   static getAnthropicModels() {
     return [
-      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Latest)' },
-      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' },
-      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-      { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' }
+      { id: 'claude-opus-4-6', name: 'Claude Opus 4.6 (Most Intelligent)' },
+      { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Balanced)' },
+      { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 (Fastest)' }
     ];
   }
   
@@ -650,53 +648,59 @@ class AIProviderService {
   // CUSTOM MODELS
   // ==========================================================================
 
-  static async callCustomModel(customModelId, messages, openRouterApiKey, character) {
-    if (!openRouterApiKey) {
-      throw new Error('OpenRouter API key required for custom models');
+  static async callCustomModel(presetId, messages, openRouterApiKey, character, apiKeys = {}) {
+    // Look up the preset from local SQLite
+    const { getInstance } = require('./LocalDatabaseService');
+    const localDb = getInstance();
+    const preset = localDb.getCustomModel(presetId);
+
+    if (!preset || !preset.is_active) {
+      throw new Error('Custom model preset not found or inactive');
     }
 
-    const { createClient } = require('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-
-    const { data: customModel, error } = await supabase
-      .from('custom_models')
-      .select('*')
-      .eq('id', customModelId)
-      .eq('is_active', true)
-      .single();
-
-    if (error || !customModel) {
-      throw new Error('Custom model not found or inactive');
-    }
-
+    // Inject optional custom system prompt
     const enhancedMessages = [...messages];
-    if (customModel.custom_system_prompt) {
+    if (preset.custom_system_prompt) {
       const systemIndex = enhancedMessages.findIndex(m => m.role === 'system');
       if (systemIndex >= 0) {
-        // Inject custom system prompt AFTER the default system prompt
         enhancedMessages[systemIndex].content =
-          `${enhancedMessages[systemIndex].content}\n\n${customModel.custom_system_prompt}`;
+          `${enhancedMessages[systemIndex].content}\n\n${preset.custom_system_prompt}`;
       } else {
-        enhancedMessages.unshift({
-          role: 'system',
-          content: customModel.custom_system_prompt
-        });
+        enhancedMessages.unshift({ role: 'system', content: preset.custom_system_prompt });
       }
     }
 
-    return await this.callOpenRouter(
-      customModel.openrouter_model_id,
-      enhancedMessages,
-      openRouterApiKey,
-      {
-        ...character,
-        temperature: customModel.temperature,
-        max_tokens: customModel.max_tokens
-      }
-    );
+    // Build a merged character-like object with preset params overriding character params
+    const mergedCharacter = {
+      ...character,
+      temperature: preset.temperature ?? character.temperature,
+      max_tokens: preset.max_tokens ?? character.max_tokens,
+      top_p: preset.top_p ?? character.top_p ?? null,
+      frequency_penalty: preset.frequency_penalty ?? character.frequency_penalty ?? null,
+      presence_penalty: preset.presence_penalty ?? character.presence_penalty ?? null,
+      repetition_penalty: preset.repetition_penalty ?? character.repetition_penalty ?? null,
+      stop_sequences: preset.stop_sequences ?? character.stop_sequences ?? null,
+    };
+
+    // Route to the preset's configured provider using the user's API key for that provider
+    const mergedApiKeys = { ...apiKeys, openrouter: openRouterApiKey };
+    switch (preset.provider) {
+      case 'openai':
+        return await this.callOpenAI(preset.model_id, enhancedMessages, mergedApiKeys.openai, mergedCharacter);
+      case 'anthropic':
+        return await this.callAnthropic(preset.model_id, enhancedMessages, mergedApiKeys.anthropic, mergedCharacter);
+      case 'openrouter':
+        return await this.callOpenRouter(preset.model_id, enhancedMessages, mergedApiKeys.openrouter, mergedCharacter);
+      case 'google':
+      case 'gemini':
+        return await this.callGemini(preset.model_id, enhancedMessages, mergedApiKeys.google, mergedCharacter);
+      case 'ollama':
+        return await this.callOllama(preset.model_id, enhancedMessages, apiKeys.ollamaSettings || {}, mergedCharacter);
+      case 'lmstudio':
+        return await this.callLMStudio(preset.model_id, enhancedMessages, apiKeys.lmStudioSettings || {}, mergedCharacter);
+      default:
+        throw new Error(`Custom model preset has unsupported provider: ${preset.provider}`);
+    }
   }
 
   static async getCustomModels(userId) {

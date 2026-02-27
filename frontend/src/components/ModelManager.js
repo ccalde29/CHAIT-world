@@ -18,7 +18,6 @@ const PROVIDERS = [
   { value: 'openrouter',label: 'OpenRouter' },
   { value: 'ollama',    label: 'Ollama (local)' },
   { value: 'lmstudio',  label: 'LM Studio (local)' },
-  { value: 'custom',    label: 'Custom (via OpenRouter)' },
 ];
 
 const EMPTY_FORM = {
@@ -58,6 +57,11 @@ const ModelManager = ({ apiRequest }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // id to confirm deletion
 
+  // model dropdown state
+  const [modelOptions, setModelOptions] = useState([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [userSettings, setUserSettings] = useState(null);
+
   // ── data fetching ───────────────────────────────────────────────────────────
 
   const loadModels = useCallback(async () => {
@@ -74,6 +78,58 @@ const ModelManager = ({ apiRequest }) => {
   }, [apiRequest]);
 
   useEffect(() => { loadModels(); }, [loadModels]);
+
+  // fetch model options whenever the provider changes (only when form is open)
+  const fetchModels = useCallback(async (provider, settings) => {
+    if (!provider) {
+      setModelOptions([]);
+      return;
+    }
+    setLoadingModels(true);
+    setModelOptions([]);
+    try {
+      const keys = settings?.apiKeys || {};
+      const apiKey =
+        provider === 'openai'      ? keys.openai :
+        provider === 'anthropic'   ? keys.anthropic :
+        provider === 'openrouter'  ? keys.openrouter :
+        provider === 'google'      ? keys.google :
+        null;
+
+      const data = await apiRequest('/api/providers/models', {
+        method: 'POST',
+        body: JSON.stringify({
+          provider,
+          apiKey,
+          ollamaSettings:   settings?.ollamaSettings,
+          lmStudioSettings: settings?.lmStudioSettings,
+        }),
+      });
+      setModelOptions(data.models || []);
+    } catch {
+      setModelOptions([]);
+    } finally {
+      setLoadingModels(false);
+    }
+  }, [apiRequest]);
+
+  useEffect(() => {
+    if (editingId === null) return;
+    // Load settings once when form opens (needed for API keys)
+    apiRequest('/api/user/settings').then(data => {
+      setUserSettings(data);
+      fetchModels(form.provider, data);
+    }).catch(() => {
+      fetchModels(form.provider, null);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId]);
+
+  useEffect(() => {
+    if (editingId === null) return;
+    fetchModels(form.provider, userSettings);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.provider]);
 
   // ── form helpers ────────────────────────────────────────────────────────────
 
@@ -118,6 +174,10 @@ const ModelManager = ({ apiRequest }) => {
   };
 
   const setField = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleProviderChange = (provider) => {
+    setForm(prev => ({ ...prev, provider, model_id: '' }));
+  };
 
   // auto-slug the name field into `name` identifier
   const handleDisplayNameBlur = () => {
@@ -333,7 +393,7 @@ const ModelManager = ({ apiRequest }) => {
         </label>
         <select
           value={form.provider}
-          onChange={e => setField('provider', e.target.value)}
+          onChange={e => handleProviderChange(e.target.value)}
           className="w-full bg-gray-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-400"
         >
           {PROVIDERS.map(p => (
@@ -345,16 +405,31 @@ const ModelManager = ({ apiRequest }) => {
       {/* Model ID */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">
-          Model ID <span className="text-red-400">*</span>
+          Model <span className="text-red-400">*</span>
         </label>
-        <input
-          type="text"
-          value={form.model_id}
-          onChange={e => setField('model_id', e.target.value)}
-          placeholder="e.g. gpt-4o, claude-3-5-sonnet-20241022"
-          className={`${input.base} font-mono text-sm`}
-        />
-        <p className="text-xs text-gray-600 mt-1">Exact model identifier used by the provider's API.</p>
+        <div className="relative">
+          <select
+            value={form.model_id}
+            onChange={e => setField('model_id', e.target.value)}
+            disabled={loadingModels}
+            className="w-full bg-gray-800 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-red-400 disabled:opacity-50"
+          >
+            <option value="">
+              {loadingModels ? 'Loading models…' : 'Select a model…'}
+            </option>
+            {modelOptions.map(m => (
+              <option key={m.id} value={m.id}>{m.name || m.id}</option>
+            ))}
+          </select>
+          {loadingModels && (
+            <Loader size={14} className="animate-spin text-gray-400 absolute right-8 top-1/2 -translate-y-1/2 pointer-events-none" />
+          )}
+        </div>
+        {!loadingModels && modelOptions.length === 0 && (
+          <p className="text-xs text-yellow-500 mt-1">
+            Could not load models — check your {PROVIDERS.find(p => p.value === form.provider)?.label} API key in the API Keys tab.
+          </p>
+        )}
       </div>
 
       {/* Description */}
@@ -366,6 +441,20 @@ const ModelManager = ({ apiRequest }) => {
           onChange={e => setField('description', e.target.value)}
           placeholder="Short note about when to use this preset"
           className={input.base}
+        />
+      </div>
+
+      {/* Custom System Prompt — moved here, right after Description */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1">
+          System Prompt <span className="text-gray-500 font-normal">(optional)</span>
+        </label>
+        <textarea
+          value={form.custom_system_prompt}
+          onChange={e => setField('custom_system_prompt', e.target.value)}
+          placeholder="Override the default system prompt for characters using this preset…"
+          rows={3}
+          className={`${input.area} text-sm`}
         />
       </div>
 
@@ -405,20 +494,6 @@ const ModelManager = ({ apiRequest }) => {
         <div className="flex justify-between text-xs text-gray-600 mt-1">
           <span>Short (50)</span><span>Long (4000)</span>
         </div>
-      </div>
-
-      {/* Custom System Prompt */}
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
-          Custom System Prompt <span className="text-gray-500 font-normal">(optional)</span>
-        </label>
-        <textarea
-          value={form.custom_system_prompt}
-          onChange={e => setField('custom_system_prompt', e.target.value)}
-          placeholder="Override the default system prompt for characters using this preset…"
-          rows={3}
-          className={`${input.area} text-sm`}
-        />
       </div>
 
       {/* Tags */}

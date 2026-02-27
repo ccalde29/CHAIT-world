@@ -106,7 +106,7 @@ const CharacterEditorV15 = ({
       // Models will be loaded by the useEffect that watches formData.ai_provider
     } else {
       // Create mode - use user's default settings
-      const defaultProvider = userSettings?.defaultProvider || 'token';
+      const defaultProvider = userSettings?.defaultProvider || 'openai';
       setFormData(prev => ({
         ...prev,
         ai_provider: defaultProvider,
@@ -134,33 +134,29 @@ const CharacterEditorV15 = ({
     setError(null);
 
     try {
-      // Handle token models - fetch from token-models endpoint
-      if (provider === 'token') {
-        const response = await fetch(`${API_BASE_URL}/api/token-models`, {
+      // Handle custom model presets - fetch from custom-models endpoint
+      if (provider === 'custom') {
+        const response = await fetch(`${API_BASE_URL}/api/custom-models`, {
           headers: { 'user-id': user.id }
         });
         const data = await response.json();
-        if (data.models && data.models.length > 0) {
-          const formattedModels = data.models.map(m => ({
+        const presets = data.models || [];
+        if (presets.length > 0) {
+          const formattedModels = presets.map(m => ({
             id: m.id,
-            name: `${m.display_name} (${m.token_cost} tokens)`,
-            tier: 'token'
+            name: m.display_name || m.name,
+            tier: 'custom'
           }));
           setAvailableModels(formattedModels);
-          
-          // Only auto-select first model if:
-          // 1. We're creating a new character (not editing), OR
-          // 2. The current model is empty/not set, OR
-          // 3. The current model doesn't exist in the available token models list
+
           const currentModelExists = formattedModels.find(m => m.id === formData.ai_model);
           const shouldSetDefaultModel = !character || !formData.ai_model || !currentModelExists;
-          
           if (shouldSetDefaultModel) {
             setFormData(prev => ({ ...prev, ai_model: formattedModels[0].id }));
           }
         } else {
           setAvailableModels([]);
-          setError('No token models available. Contact admin.');
+          setError('No custom model presets found. Create one in Settings → Model Manager.');
         }
         setLoadingModels(false);
         return;
@@ -270,11 +266,11 @@ const CharacterEditorV15 = ({
     // Set default models for each provider
     const defaultModels = {
       'openai': 'gpt-4o-mini',
-      'anthropic': 'claude-3-5-haiku-20241022',
+      'anthropic': 'claude-haiku-4-5',
       'openrouter': 'openai/gpt-4o-mini',
       'google': 'gemini-1.5-flash-latest',
       'local': 'llama2',
-      'token': '' // Will be set from token model selection
+      'custom': '' // Will be set from custom model preset selection
     };
 
     setFormData(prev => ({
@@ -508,11 +504,11 @@ const CharacterEditorV15 = ({
         color: 'text-cyan-400',
         description: 'Local models (Ollama/LM Studio) - free and private'
       },
-      token: {
-        name: 'Token Model',
-        icon: '🪙',
-        color: 'text-amber-400',
-        description: 'Server-powered models that use token credits'
+      custom: {
+        name: 'Custom Preset',
+        icon: '⚙️',
+        color: 'text-purple-400',
+        description: 'Your saved model presets from Model Manager'
       }
     };
 
@@ -867,7 +863,7 @@ const CharacterEditorV15 = ({
                 Choose between cloud API providers or local models running on your machine.
               </p>
 
-              <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className="grid grid-cols-3 gap-2 mb-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -906,18 +902,18 @@ const CharacterEditorV15 = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (formData.ai_provider !== 'token') {
-                      handleProviderChange('token');
+                    if (formData.ai_provider !== 'custom') {
+                      handleProviderChange('custom');
                     }
                   }}
                   className={`p-3 rounded-lg border transition-all ${
-                    formData.ai_provider === 'token'
-                      ? 'bg-amber-500/20 border-amber-500 text-white'
+                    formData.ai_provider === 'custom'
+                      ? 'bg-purple-500/20 border-purple-500 text-white'
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
                 >
-                  <div className="text-2xl mb-1">🪙</div>
-                  <div className="text-xs font-medium">Token Models</div>
+                  <div className="text-2xl mb-1">⚙️</div>
+                  <div className="text-xs font-medium">Custom Presets</div>
                 </button>
               </div>
 

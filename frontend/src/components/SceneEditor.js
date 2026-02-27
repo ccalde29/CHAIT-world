@@ -84,6 +84,14 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
 
       setLoadingNarratorModels(true);
       try {
+        // Custom presets come from a different endpoint
+        if (formData.narrator_ai_provider === 'custom') {
+          const data = await apiRequest('/api/custom-models');
+          setNarratorModels((data.models || []).map(m => ({ id: m.id, name: m.display_name || m.name })));
+          setLoadingNarratorModels(false);
+          return;
+        }
+
         const requestBody = { provider: formData.narrator_ai_provider };
         
         // Add settings for Ollama and LM Studio
@@ -663,7 +671,7 @@ const SceneEditor = ({ scenarios, onSave, onDelete, onPublish, onUnpublish, onCl
                         <option value="google">Google</option>
                         <option value="ollama">Ollama (Local)</option>
                         <option value="lmstudio">LM Studio (Local)</option>
-                        <option value="token">Token Model</option>
+                        <option value="custom">Custom Preset</option>
                       </select>
                     </div>
 

@@ -234,6 +234,14 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
 
       setLoadingModels(true);
       try {
+        // Custom presets come from a different endpoint
+        if (formData.ai_provider === 'custom') {
+          const data = await apiRequest('/api/custom-models');
+          setAvailableModels((data.models || []).map(m => ({ id: m.id, name: m.display_name || m.name })));
+          setLoadingModels(false);
+          return;
+        }
+
         const requestBody = { provider: formData.ai_provider };
         
         // Add settings for Ollama and LM Studio
@@ -670,7 +678,7 @@ const PersonaManager = ({ personasState, onClose, user, apiRequest, fullScreen =
                   <option value="google">Google</option>
                   <option value="ollama">Ollama (Local)</option>
                   <option value="lmstudio">LM Studio (Local)</option>
-                  <option value="token">Token Model</option>
+                  <option value="custom">Custom Preset</option>
                 </select>
               </div>
 

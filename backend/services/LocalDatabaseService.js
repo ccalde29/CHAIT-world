@@ -206,6 +206,14 @@ class LocalDatabaseService {
             const customModelTableInfo = this.db.prepare("PRAGMA table_info(custom_models)").all();
             const customModelColumnNames = customModelTableInfo.map(col => col.name);
 
+            if (!customModelColumnNames.includes('display_name')) {
+                this.db.exec("ALTER TABLE custom_models ADD COLUMN display_name TEXT");
+                // Backfill display_name from name for existing rows
+                this.db.exec("UPDATE custom_models SET display_name = name WHERE display_name IS NULL");
+            }
+            if (!customModelColumnNames.includes('custom_system_prompt')) {
+                this.db.exec("ALTER TABLE custom_models ADD COLUMN custom_system_prompt TEXT DEFAULT NULL");
+            }
             if (!customModelColumnNames.includes('top_p')) {
                 this.db.exec("ALTER TABLE custom_models ADD COLUMN top_p REAL DEFAULT NULL");
             }

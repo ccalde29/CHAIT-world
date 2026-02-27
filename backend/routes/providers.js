@@ -57,6 +57,7 @@ router.post('/test', async (req, res) => {
 router.post('/models', async (req, res) => {
   try {
     const { provider, apiKey, ollamaSettings, lmStudioSettings } = req.body;
+    const userId = req.headers['user-id'] || null;
 
     if (!provider) {
       return res.status(400).json({ error: 'Provider is required' });
@@ -66,7 +67,8 @@ router.post('/models', async (req, res) => {
       provider,
       apiKey,
       ollamaSettings,
-      lmStudioSettings
+      lmStudioSettings,
+      userId
     );
 
     res.json({ models });
@@ -119,9 +121,9 @@ router.get('/list', (req, res) => {
     {
       id: 'anthropic',
       name: 'Anthropic',
-      description: 'Claude 3 Opus, Sonnet, and Haiku',
+      description: 'Claude Opus 4.6, Sonnet 4.6, and Haiku 4.5',
       requiresKey: true,
-      defaultModel: 'claude-3-haiku-20240307',
+      defaultModel: 'claude-haiku-4-5',
       icon: '🧠',
       websiteUrl: 'https://console.anthropic.com'
     },
@@ -175,7 +177,7 @@ router.get('/recommendations', (req, res) => {
     fastest: [
       { provider: 'openai', model: 'gpt-3.5', description: 'Fast and affordable' },
       { provider: 'google', model: 'gemini-pro', description: 'Quick responses' },
-      { provider: 'anthropic', model: 'claude-3-haiku-20240307', description: 'Speedy Claude' }
+      { provider: 'anthropic', model: 'claude-haiku-4-5', description: 'Speedy Claude' }
     ],
     smartest: [
       { provider: 'openai', model: 'gpt-4-turbo-preview', description: 'Most capable GPT' },
