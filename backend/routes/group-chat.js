@@ -6,6 +6,7 @@
 const express = require('express');
 const AIProviderService = require('../services/AIProviderService');
 const { aiCallLimiter } = require('../middleware/rateLimiter');
+const PersonalityEvolutionService = require('../services/PersonalityEvolutionService');
 // Core services
 const MemoryService = require('../services/MemoryService');
 const CharacterLearningService = require('../services/CharacterLearningService');
@@ -255,9 +256,19 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           activeSessionId
         );
         
-        // Load memories about other characters (from buildCharacterContext)
-        if (charData.context && charData.context.characterMemories) {
-          charData.characterMemories = charData.context.characterMemories;
+        // Load memories about other characters in this session
+        if (char.memory_enabled !== false) {
+          const charToCharMemories = {};
+          for (const otherChar of respondingCharacters) {
+            if (otherChar.id === char.id) continue;
+            const filtered = await memoryService.db.getMemoriesByCharacter(
+              char.id, userId, 3, { target_type: 'character', target_entity: otherChar.id }
+            );
+            if (filtered.length > 0) charToCharMemories[otherChar.id] = filtered;
+          }
+          charData.characterMemories = charToCharMemories;
+        } else {
+          charData.characterMemories = {};
         }
         
         // Load topic engagement
@@ -409,91 +420,93 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
         // Process memories and relationships
         try {
-          // Check if AI memory extraction is enabled
-          const useAIMemories = userSettings?.use_ai_memory_extraction || false;
-          
-          let newMemories;
-          if (useAIMemories) {
-            newMemories = await memoryService.extractMemoriesWithAI(
-              userMessage,
-              response,
-              char,
-              userPersona,
-              userId,
-              apiKeys
-            );
-          } else {
-            newMemories = memoryService.analyzeConversationForMemories(
-              userMessage,
-              response,
-              userPersona,
-              userId
-            );
-          }
-
-          for (const mem of newMemories) {
-            await memoryService.addCharacterMemory(char.id, userId, mem);
-          }
-
-          const currentRelationship = await memoryService.getCharacterRelationship(char.id, userId);
-          const relationshipUpdate = memoryService.calculateRelationshipUpdate(
-            currentRelationship,
-            userMessage,
-            response
-          );
-
-          await memoryService.updateCharacterRelationship(char.id, userId, relationshipUpdate);
-          
-          // Store character-to-character memories
-          const otherCharacterResponses = responses
-            .filter(r => r.character !== char.id)
-            .map(r => ({
-              character: r.character,
-              content: r.response
-            }));
-          
-          if (otherCharacterResponses.length > 0) {
-            const charactersMap = {};
-            characters.forEach(c => { charactersMap[c.id] = c; });
+          if (char.memory_enabled !== false) {
+            // Check if AI memory extraction is enabled
+            const useAIMemories = userSettings?.use_ai_memory_extraction || false;
             
-            const charToCharMemories = memoryService.analyzeCharacterInteractions(
-              char.id,
-              otherCharacterResponses,
-              charactersMap
-            );
-            
-            for (const mem of charToCharMemories) {
+            let newMemories;
+            if (useAIMemories) {
+              newMemories = await memoryService.extractMemoriesWithAI(
+                userMessage,
+                response,
+                char,
+                userPersona,
+                userId,
+                apiKeys
+              );
+            } else {
+              newMemories = memoryService.analyzeConversationForMemories(
+                userMessage,
+                response,
+                userPersona,
+                userId
+              );
+            }
+
+            for (const mem of newMemories) {
               await memoryService.addCharacterMemory(char.id, userId, mem);
+            }
+
+            const currentRelationship = await memoryService.getCharacterRelationship(char.id, userId);
+            const relationshipUpdate = memoryService.calculateRelationshipUpdate(
+              currentRelationship,
+              userMessage,
+              response
+            );
+            await memoryService.updateCharacterRelationship(char.id, userId, relationshipUpdate);
+
+            // Store character-to-character memories
+            const otherCharacterResponses = responses
+              .filter(r => r.character !== char.id)
+              .map(r => ({ character: r.character, content: r.response }));
+
+            if (otherCharacterResponses.length > 0) {
+              const charactersMap = {};
+              characters.forEach(c => { charactersMap[c.id] = c; });
+              const charToCharMemories = memoryService.analyzeCharacterInteractions(
+                char.id,
+                otherCharacterResponses,
+                charactersMap
+              );
+              for (const mem of charToCharMemories) {
+                await memoryService.addCharacterMemory(char.id, userId, mem);
+              }
             }
           }
         } catch (memErr) {
           console.error(`[Memory] Error for ${char.name}:`, memErr);
         }
 
+        // Personality evolution: increment counter, fire non-blocking compile when threshold hit
+        try {
+          if (char.memory_enabled !== false) {
+            const freshChar = db.localDb.incrementCompileCounter(char.id);
+            const interval = freshChar?.memory_compile_interval || char.memory_compile_interval || 20;
+            const count = freshChar?.messages_since_compile || 0;
+            if (count >= interval) {
+              PersonalityEvolutionService.compileGrowth(char, userId, db, apiKeys, ollamaSettings)
+                .catch(e => console.error(`[Evolution] Compile failed for ${char.name}:`, e));
+            }
+          }
+        } catch (evoErr) {
+          console.error(`[Evolution] Counter error for ${char.name}:`, evoErr);
+        }
+
         // Track learning
         try {
-          await learningService.recordInteraction(userId, char.id, {
-            userMessage,
-            characterResponse: response,
-            userPersona
-          });
-          
-          // Track topics discussed
-          const topicKeywords = extractTopicsFromText(userMessage + ' ' + response);
-          
-          for (const topic of topicKeywords) {
-            // Determine interest delta based on message length and engagement
-            const interestDelta = response.length > 100 ? 0.15 : 0.05;
+          if (char.memory_enabled !== false) {
+            await learningService.recordInteraction(userId, char.id, {
+              userMessage,
+              characterResponse: response,
+              userPersona
+            });
             
-            // Determine emotional association
-            const emotionalAssociation = detectEmotionInText(response);
-            
-            await db.createOrUpdateTopicEngagement(
-              char.id,
-              topic,
-              interestDelta,
-              emotionalAssociation
-            );
+            const topicKeywords = extractTopicsFromText(userMessage + ' ' + response);
+            for (const topic of topicKeywords) {
+              const interestDelta = response.length > 100 ? 0.15 : 0.05;
+              const emotionalAssociation = detectEmotionInText(response);
+              await db.createOrUpdateTopicEngagement(char.id, topic, interestDelta, emotionalAssociation);
+            }
           }
         } catch (learnErr) {
           console.error(`[Learning] Error for ${char.name}:`, learnErr);

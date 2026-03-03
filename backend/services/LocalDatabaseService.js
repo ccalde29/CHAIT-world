@@ -230,6 +230,30 @@ class LocalDatabaseService {
                 this.db.exec("ALTER TABLE custom_models ADD COLUMN stop_sequences TEXT DEFAULT NULL");
             }
 
+            // Personality evolution columns on characters
+            if (!charColumnNames.includes('personality_size')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN personality_size TEXT DEFAULT 'small'");
+            }
+            if (!charColumnNames.includes('personality_growth')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN personality_growth TEXT DEFAULT NULL");
+            }
+            if (!charColumnNames.includes('memory_compile_interval')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN memory_compile_interval INTEGER DEFAULT 20");
+            }
+            if (!charColumnNames.includes('messages_since_compile')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN messages_since_compile INTEGER DEFAULT 0");
+            }
+            if (!charColumnNames.includes('personality_compiled_at')) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN personality_compiled_at DATETIME DEFAULT NULL");
+            }
+
+            // compiled flag on character_memories
+            const memTableInfo2 = this.db.prepare("PRAGMA table_info(character_memories)").all();
+            const memColumnNames2 = memTableInfo2.map(col => col.name);
+            if (!memColumnNames2.includes('compiled')) {
+                this.db.exec("ALTER TABLE character_memories ADD COLUMN compiled INTEGER DEFAULT 0");
+            }
+
         } catch (error) {
             console.error('Failed to run migrations:', error);
             // Don't throw - allow app to continue
@@ -318,10 +342,11 @@ class LocalDatabaseService {
                 ai_provider, ai_model, fallback_provider, fallback_model,
                 voice_traits, speech_patterns, avatar_image_url, avatar_image_filename,
                 uses_custom_image, is_default, original_id,
-                top_p, frequency_penalty, presence_penalty, repetition_penalty, stop_sequences
+                top_p, frequency_penalty, presence_penalty, repetition_penalty, stop_sequences,
+                personality_size, memory_compile_interval
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?
             )
         `);
 
@@ -358,7 +383,9 @@ class LocalDatabaseService {
             characterData.frequency_penalty ?? null,
             characterData.presence_penalty ?? null,
             characterData.repetition_penalty ?? null,
-            characterData.stop_sequences ? JSON.stringify(characterData.stop_sequences) : null
+            characterData.stop_sequences ? JSON.stringify(characterData.stop_sequences) : null,
+            characterData.personality_size || 'small',
+            characterData.memory_compile_interval || 20
         );
 
         // Get the created character
@@ -394,7 +421,8 @@ class LocalDatabaseService {
             'ai_provider', 'ai_model', 'fallback_provider', 'fallback_model',
             'voice_traits', 'speech_patterns', 'avatar_image_url', 'avatar_image_filename',
             'uses_custom_image',
-            'top_p', 'frequency_penalty', 'presence_penalty', 'repetition_penalty', 'stop_sequences'
+            'top_p', 'frequency_penalty', 'presence_penalty', 'repetition_penalty', 'stop_sequences',
+            'personality_size', 'personality_growth', 'memory_compile_interval', 'messages_since_compile'
         ];
 
         const setClauses = [];
@@ -437,6 +465,53 @@ class LocalDatabaseService {
         this.ensureInitialized();
         const stmt = this.db.prepare('DELETE FROM characters WHERE id = ?');
         return stmt.run(characterId);
+    }
+
+    // ============================================================================
+    // PERSONALITY EVOLUTION HELPERS
+    // ============================================================================
+
+    incrementCompileCounter(characterId) {
+        this.ensureInitialized();
+        this.db.prepare(
+            'UPDATE characters SET messages_since_compile = messages_since_compile + 1 WHERE id = ?'
+        ).run(characterId);
+        return this.getCharacter(characterId);
+    }
+
+    getUncompiledMemories(characterId, userId) {
+        this.ensureInitialized();
+        return this.all(
+            `SELECT * FROM character_memories
+             WHERE character_id = ? AND user_id = ? AND compiled = 0
+             ORDER BY importance_score DESC, created_at DESC`,
+            [characterId, userId]
+        );
+    }
+
+    markMemoriesAsCompiled(characterId, userId) {
+        this.ensureInitialized();
+        this.db.prepare(
+            'UPDATE character_memories SET compiled = 1 WHERE character_id = ? AND user_id = ? AND compiled = 0'
+        ).run(characterId, userId);
+    }
+
+    savePersonalityGrowth(characterId, growthText) {
+        this.ensureInitialized();
+        this.db.prepare(
+            `UPDATE characters
+             SET personality_growth = ?, messages_since_compile = 0, personality_compiled_at = CURRENT_TIMESTAMP
+             WHERE id = ?`
+        ).run(growthText, characterId);
+    }
+
+    clearPersonalityGrowth(characterId) {
+        this.ensureInitialized();
+        this.db.prepare(
+            `UPDATE characters
+             SET personality_growth = NULL, messages_since_compile = 0, personality_compiled_at = NULL
+             WHERE id = ?`
+        ).run(characterId);
     }
 
     // ============================================================================

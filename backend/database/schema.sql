@@ -37,7 +37,12 @@ CREATE TABLE IF NOT EXISTS characters (
     fallback_provider TEXT,
     fallback_model TEXT,
     voice_traits TEXT DEFAULT '{"humor": 0.5, "optimism": 0.5, "formality": 0.5, "verbosity": 0.5, "directness": 0.5, "emotiveness": 0.5, "intellectualism": 0.5}', -- JSON string
-    speech_patterns TEXT DEFAULT '{"uses_slang": false, "avoided_words": [], "favored_phrases": [], "punctuation_style": "casual", "uses_contractions": true, "typical_sentence_length": "medium"}' -- JSON string
+    speech_patterns TEXT DEFAULT '{"uses_slang": false, "avoided_words": [], "favored_phrases": [], "punctuation_style": "casual", "uses_contractions": true, "typical_sentence_length": "medium"}', -- JSON string
+    personality_size TEXT DEFAULT 'small' CHECK(personality_size IN ('small', 'medium', 'large')),
+    personality_growth TEXT DEFAULT NULL,        -- AI-compiled growth text (max 250/500/1000 chars)
+    memory_compile_interval INTEGER DEFAULT 20 CHECK(memory_compile_interval IN (10, 20, 30)),
+    messages_since_compile INTEGER DEFAULT 0,
+    personality_compiled_at DATETIME DEFAULT NULL
 );
 
 CREATE INDEX idx_characters_user ON characters(user_id);
@@ -146,6 +151,7 @@ CREATE TABLE IF NOT EXISTS character_memories (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     embedding_hash TEXT,
     tags TEXT, -- JSON array
+    compiled INTEGER DEFAULT 0, -- 1 = included in a personality_growth compile, pruned from active retrieval
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
     FOREIGN KEY (related_session_id) REFERENCES chat_sessions(id) ON DELETE SET NULL
 );

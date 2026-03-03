@@ -82,7 +82,7 @@ const groupChatRoutes = require('./routes/group-chat')(db);
 
 // New modular routes
 const chatSessionRoutes = require('./routes/chat-sessions')(db);
-const characterRoutes = require('./routes/characters')(characterService);
+const characterRoutes = require('./routes/characters')(characterService, db);
 const communityRoutes = require('./routes/community')(communityService, characterService, db);
 const userRoutes = require('./routes/user')(db);
 const scenarioRoutes = require('./routes/scenarios')(db);

@@ -99,6 +99,11 @@ class PromptBuilder {
       layer += `${character.personality}\n\n`;
     }
 
+    // Evolved personality growth (AI-compiled from past experiences)
+    if (character.personality_growth) {
+      layer += `[Through experience: ${character.personality_growth}]\n\n`;
+    }
+
     // Appearance (if relevant for self-awareness)
     if (character.appearance) {
       layer += `Your appearance: ${character.appearance}\n`;
@@ -291,7 +296,7 @@ class PromptBuilder {
 
     // Add top memories about user
     for (const memory of memories.slice(0, 8)) {
-      layer += `- ${memory.memory_content}\n`;
+      layer += `- ${memory.content || memory.memory_content}\n`;
     }
 
     // Add memories about other characters
@@ -303,7 +308,7 @@ class PromptBuilder {
         if (charMems && charMems.length > 0) {
           layer += `\nAbout ${otherChar.name}:\n`;
           for (const mem of charMems.slice(0, 3)) {
-            layer += `- ${mem.memory_content}\n`;
+            layer += `- ${mem.content || mem.memory_content}\n`;
           }
         }
       }

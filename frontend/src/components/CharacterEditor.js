@@ -53,7 +53,12 @@ const CharacterEditorV15 = ({
     // AI Provider settings
     ai_provider: null,
     ai_model: '',
-    localType: 'ollama' // For local provider sub-type
+    localType: 'ollama', // For local provider sub-type
+
+    // Personality evolution
+    personality_size: 'small',
+    memory_compile_interval: 20,
+    personality_growth: ''
   });
   
   const [tagInput, setTagInput] = useState('');
@@ -62,6 +67,8 @@ const CharacterEditorV15 = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showAdvancedParams, setShowAdvancedParams] = useState(false);
+  const [compiling, setCompiling] = useState(false);
+  const [compileMessage, setCompileMessage] = useState(null);
 
   // Relationships state
   const [availableCharacters, setAvailableCharacters] = useState([]);
@@ -101,7 +108,10 @@ const CharacterEditorV15 = ({
         uses_custom_image: character.uses_custom_image || false,
         ai_provider: character.ai_provider || 'openai',
         ai_model: character.ai_model || '',  // Will be set by loadAvailableModels
-        localType: character.ai_provider === 'local' ? (character.ai_model?.includes('lmstudio') ? 'lmstudio' : 'ollama') : 'ollama'
+        localType: character.ai_provider === 'local' ? (character.ai_model?.includes('lmstudio') ? 'lmstudio' : 'ollama') : 'ollama',
+        personality_size: character.personality_size || 'small',
+        memory_compile_interval: character.memory_compile_interval || 20,
+        personality_growth: character.personality_growth || ''
       });
       // Models will be loaded by the useEffect that watches formData.ai_provider
     } else {
@@ -440,6 +450,51 @@ const CharacterEditorV15 = ({
     }
   }, [character?.id, loadCharacterRelationships, loadAvailableCharactersForRelationships]);
 
+  // ============================================================================
+  // PERSONALITY EVOLUTION HANDLERS
+  // ============================================================================
+
+  const handleCompileNow = async () => {
+    if (!character?.id) return;
+    setCompiling(true);
+    setCompileMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/characters/${character.id}/compile`, {
+        method: 'POST',
+        headers: { 'user-id': user.id, 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setCompileMessage({ type: 'success', text: data.message });
+        if (data.growth) {
+          setFormData(prev => ({ ...prev, personality_growth: data.growth }));
+        }
+      } else {
+        setCompileMessage({ type: 'error', text: data.error || 'Compile failed' });
+      }
+    } catch (err) {
+      setCompileMessage({ type: 'error', text: 'Network error during compile' });
+    } finally {
+      setCompiling(false);
+    }
+  };
+
+  const handleClearGrowth = async () => {
+    if (!character?.id) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/characters/${character.id}/clear-growth`, {
+        method: 'POST',
+        headers: { 'user-id': user.id, 'Content-Type': 'application/json' }
+      });
+      if (response.ok) {
+        setFormData(prev => ({ ...prev, personality_growth: '' }));
+        setCompileMessage({ type: 'success', text: 'Growth cleared' });
+      }
+    } catch (err) {
+      setCompileMessage({ type: 'error', text: 'Failed to clear growth' });
+    }
+  };
+
   const handleSave = async () => {
     if (!validateForm()) return;
     
@@ -662,25 +717,61 @@ const CharacterEditorV15 = ({
 
             {/* Personality */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Personality & Background *
-                <span className={`ml-2 text-xs ${
-                  formData.personality.length > 500 ? 'text-orange-400' : 'text-gray-500'
-                }`}>
-                  ({formData.personality.length} / 500 characters)
-                </span>
-              </label>
-              <p className="text-xs text-gray-400 mb-2">
-                This is the core of your character. Describe their personality traits, background story, speaking style, interests, and how they interact with others. Be specific and detailed - this directly shapes how the AI will roleplay this character.
-              </p>
-              <textarea
-                value={formData.personality}
-                onChange={(e) => handleInputChange('personality', e.target.value)}
-                placeholder="Describe who this character is, their personality traits, background, speaking style, interests, etc."
-                rows={6}
-                maxLength={500}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[140px]"
-              />
+              {(() => {
+                const sizeLimits = { small: 500, medium: 1000, large: 2000 };
+                const maxPersonality = sizeLimits[formData.personality_size] || 500;
+                return (
+                  <>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Personality & Background *
+                      <span className={`ml-2 text-xs ${
+                        formData.personality.length > maxPersonality ? 'text-orange-400' : 'text-gray-500'
+                      }`}>
+                        ({formData.personality.length} / {maxPersonality} characters)
+                      </span>
+                    </label>
+                    <p className="text-xs text-gray-400 mb-2">
+                      This is the core of your character. Describe their personality traits, background story, speaking style, interests, and how they interact with others. Be specific and detailed - this directly shapes how the AI will roleplay this character.
+                    </p>
+                    <textarea
+                      value={formData.personality}
+                      onChange={(e) => handleInputChange('personality', e.target.value)}
+                      placeholder="Describe who this character is, their personality traits, background, speaking style, interests, etc."
+                      rows={6}
+                      maxLength={maxPersonality}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[140px]"
+                    />
+
+                    {/* Personality Size selector */}
+                    <div className="mt-3">
+                      <p className="text-xs text-gray-400 mb-2">
+                        <span className="font-medium text-gray-300">Personality size</span> — sets the character limit for this field and the growth buffer (+50%).
+                      </p>
+                      <div className="flex gap-2">
+                        {[
+                          { value: 'small',  label: 'Small',  cap: 500  },
+                          { value: 'medium', label: 'Medium', cap: 1000 },
+                          { value: 'large',  label: 'Large',  cap: 2000 }
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => handleInputChange('personality_size', opt.value)}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                              formData.personality_size === opt.value
+                                ? 'bg-orange-600/30 border-orange-500 text-orange-300'
+                                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                            }`}
+                          >
+                            {opt.label}
+                            <span className="block text-gray-500 font-normal">{opt.cap} chars</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
             
             {/* Tags */}
@@ -1112,6 +1203,77 @@ const CharacterEditorV15 = ({
                 </span>
               </p>
             </div>
+
+            {/* Personality Growth Compile Interval */}
+            {formData.memory_enabled && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <Brain size={14} className="inline mr-1 text-orange-400" />
+                  Personality Growth Interval
+                </label>
+                <p className="text-xs text-gray-400 mb-2">
+                  After this many messages, memories are compiled into the character's personality growth. The character grows and changes over time based on your conversations.
+                </p>
+                <select
+                  value={formData.memory_compile_interval}
+                  onChange={(e) => handleInputChange('memory_compile_interval', parseInt(e.target.value))}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-2.5 text-white text-sm focus:outline-none focus:border-orange-400"
+                >
+                  <option value={10} className="bg-gray-800">Every 10 messages (fast evolution)</option>
+                  <option value={20} className="bg-gray-800">Every 20 messages (balanced)</option>
+                  <option value={30} className="bg-gray-800">Every 30 messages (slow, deep evolution)</option>
+                </select>
+              </div>
+            )}
+
+            {/* Personality Growth — read-only display + controls (edit mode only) */}
+            {character?.id && (
+              <div className="rounded-lg border border-white/10 bg-white/3 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-300 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-orange-400" />
+                    Personality Growth
+                  </label>
+                  <div className="flex gap-2">
+                    {formData.personality_growth && (
+                      <button
+                        type="button"
+                        onClick={handleClearGrowth}
+                        className="text-xs px-2.5 py-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/20 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCompileNow}
+                      disabled={compiling}
+                      className="text-xs px-2.5 py-1 rounded bg-orange-600/20 text-orange-300 hover:bg-orange-600/30 border border-orange-500/20 transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {compiling ? <RefreshCw size={11} className="animate-spin" /> : <Brain size={11} />}
+                      {compiling ? 'Compiling…' : 'Compile Now'}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  AI-generated growth built from memories. Compiled automatically every {formData.memory_compile_interval} messages.
+                </p>
+                {formData.personality_growth ? (
+                  <p className="text-sm text-gray-300 bg-white/5 rounded p-3 italic leading-relaxed">
+                    {formData.personality_growth}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500 italic">
+                    No growth compiled yet. Chat with this character to build memories, then compile.
+                  </p>
+                )}
+                {compileMessage && (
+                  <p className={`text-xs ${compileMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                    {compileMessage.text}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Advanced Model Parameters — collapsible */}
             <div className="pt-4 border-t border-white/10">

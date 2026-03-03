@@ -3,8 +3,9 @@
 
 const express = require('express');
 const router = express.Router();
+const PersonalityEvolutionService = require('../services/PersonalityEvolutionService');
 
-module.exports = (characterService) => {
+module.exports = (characterService, db) => {
     /**
      * Get all characters
      * GET /api/characters
@@ -154,6 +155,61 @@ module.exports = (characterService) => {
         } catch (error) {
             console.error('Error deleting character:', error);
             res.status(500).json({ error: 'Failed to delete character' });
+        }
+    });
+
+    /**
+     * Manually compile personality growth from uncompiled memories
+     * POST /api/characters/:id/compile
+     */
+    router.post('/:id/compile', async (req, res) => {
+        try {
+            if (!db) {
+                return res.status(500).json({ error: 'Database not available' });
+            }
+            const character = db.localDb.getCharacter(req.params.id);
+            if (!character) {
+                return res.status(404).json({ error: 'Character not found' });
+            }
+
+            const userSettings = await db.getUserSettings(req.userId);
+            const apiKeys = userSettings?.apiKeys || {};
+            const ollamaSettings = userSettings?.ollamaSettings || {};
+            ollamaSettings.lmStudioSettings = userSettings?.lmStudioSettings || {};
+
+            const growthText = await PersonalityEvolutionService.compileGrowth(
+                character,
+                req.userId,
+                db,
+                apiKeys,
+                ollamaSettings
+            );
+
+            if (growthText === null) {
+                return res.json({ message: 'Not enough memories to compile yet (need at least 3)', growth: null });
+            }
+
+            res.json({ message: 'Personality growth compiled successfully', growth: growthText });
+        } catch (error) {
+            console.error('Error compiling personality growth:', error);
+            res.status(500).json({ error: 'Failed to compile personality growth' });
+        }
+    });
+
+    /**
+     * Clear personality growth and reset compile counter
+     * POST /api/characters/:id/clear-growth
+     */
+    router.post('/:id/clear-growth', async (req, res) => {
+        try {
+            if (!db) {
+                return res.status(500).json({ error: 'Database not available' });
+            }
+            db.localDb.clearPersonalityGrowth(req.params.id);
+            res.json({ message: 'Personality growth cleared' });
+        } catch (error) {
+            console.error('Error clearing personality growth:', error);
+            res.status(500).json({ error: 'Failed to clear personality growth' });
         }
     });
 
