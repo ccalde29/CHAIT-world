@@ -71,14 +71,23 @@ class LocalDatabaseService {
                 return;
             }
 
-            // Read and execute schema file
+            // Fresh install — read and execute the full schema inside a transaction
+            // so a partial failure doesn't leave the DB in a broken state
             const schemaPath = path.join(__dirname, '../database/schema.sql');
+            if (!fs.existsSync(schemaPath)) {
+                throw new Error(`Schema file not found at: ${schemaPath}`);
+            }
             const schema = fs.readFileSync(schemaPath, 'utf8');
-            
-            // Execute schema (split by semicolon and execute each statement)
-            this.db.exec(schema);
+
+            // Run entire schema as a single transaction
+            const runSchema = this.db.transaction(() => {
+                this.db.exec(schema);
+            });
+            runSchema();
+
+            console.log('[DB] Schema initialized successfully from schema.sql');
         } catch (error) {
-            console.error('Failed to initialize schema:', error);
+            console.error('[DB] Failed to initialize schema:', error);
             throw error;
         }
     }
