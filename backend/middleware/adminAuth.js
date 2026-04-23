@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const supabaseService = require('../services/SupabaseAdminTokenService');
 
 // Lazy-load Supabase client to ensure environment variables are loaded
 let supabase = null;
@@ -20,7 +21,7 @@ function getSupabase() {
 
 /**
  * Middleware to check if user has admin privileges
- * Uses the is_admin flag from user_settings table
+ * Uses Supabase admin_users table (secure, server-controlled)
  *
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -37,22 +38,10 @@ async function requireAdmin(req, res, next) {
       });
     }
 
-    // Check if user has admin privileges
-    const { data: userSettings, error } = await getSupabase()
-      .from('user_settings')
-      .select('is_admin')
-      .eq('user_id', userId)
-      .single();
+    // Check if user has admin privileges from Supabase (secure)
+    const isAdmin = await supabaseService.isAdmin(userId);
 
-    if (error) {
-      console.error('[AdminAuth] Error checking admin status:', error);
-      return res.status(500).json({
-        error: 'Internal server error',
-        message: 'Failed to verify admin status'
-      });
-    }
-
-    if (!userSettings || !userSettings.is_admin) {
+    if (!isAdmin) {
       console.warn(`[AdminAuth] Unauthorized admin access attempt by user: ${userId}`);
       return res.status(403).json({
         error: 'Forbidden',
@@ -61,7 +50,7 @@ async function requireAdmin(req, res, next) {
     }
 
     // User is admin, proceed to next middleware
-    console.log(`[AdminAuth] Admin access granted to user: ${userId}`);
+
     next();
 
   } catch (error) {
@@ -90,19 +79,8 @@ async function checkAdmin(req, res, next) {
       return next();
     }
 
-    // Check if user has admin privileges
-    const { data: userSettings, error } = await getSupabase()
-      .from('user_settings')
-      .select('is_admin')
-      .eq('user_id', userId)
-      .single();
-
-    if (error || !userSettings) {
-      req.isAdmin = false;
-      return next();
-    }
-
-    req.isAdmin = userSettings.is_admin || false;
+    // Check admin status from Supabase
+    req.isAdmin = await supabaseService.isAdmin(userId);
     next();
 
   } catch (error) {

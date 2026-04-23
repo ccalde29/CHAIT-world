@@ -1,8 +1,8 @@
 // components/ChatInterface.js
 // Chat UI component - messages display and input
 
-import React from 'react';
-import { Send, AlertCircle, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { Send, AlertCircle, Sparkles, Edit2, Check, X } from 'lucide-react';
 
 const ChatInterface = ({
   messages,
@@ -13,11 +13,16 @@ const ChatInterface = ({
   messagesEndRef,
   userPersona,
   findCharacterById,
+  editingMessageId,
   onInputChange,
   onSendMessage,
   onKeyPress,
-  onGeneratePersonaResponse
+  onGeneratePersonaResponse,
+  onEditMessage,
+  onStartEdit,
+  onCancelEdit
 }) => {
+  const [editContent, setEditContent] = useState('');
   return (
     <div className="flex-1 flex flex-col bg-gray-900 min-h-0">
       {/* Messages Area */}
@@ -35,8 +40,28 @@ const ChatInterface = ({
             if (message.type === 'system') {
               return (
                 <div key={message.id} className="flex justify-center my-6">
-                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg px-6 py-4 max-w-2xl">
+                  <div className="bg-orange-600/10 border border-orange-500/30 rounded-lg px-6 py-4 max-w-2xl">
                     <p className="text-gray-300 text-center italic">{message.content}</p>
+                  </div>
+                </div>
+              );
+            }
+
+            // Handle narrator messages
+            if (message.type === 'narrator') {
+              return (
+                <div key={message.id} className="flex justify-center my-4">
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-6 py-3 max-w-3xl">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-amber-400">NARRATOR</span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(message.timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-gray-300 italic">{message.content}</p>
                   </div>
                 </div>
               );
@@ -68,7 +93,7 @@ const ChatInterface = ({
               ? messagePersona?.name || 'You'
               : character?.name || 'Character';
             const colorClass = isUser
-              ? messagePersona?.color || 'from-blue-500 to-indigo-500'
+              ? messagePersona?.color || 'bg-orange-600'
               : character?.color || 'from-gray-500 to-slate-500';
 
             // Check for custom images
@@ -81,7 +106,7 @@ const ChatInterface = ({
                 className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
               >
                 {/* Avatar */}
-                <div className={`flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br ${colorClass} flex items-center justify-center text-white text-xl`}>
+                <div className={`flex-shrink-0 w-10 h-10 rounded-full ${colorClass} flex items-center justify-center text-white text-xl`}>
                   {(hasUserImage || hasCharacterImage) ? (
                     <img
                       src={hasUserImage ? messagePersona.avatar_image_url : character.avatar_image_url}
@@ -106,15 +131,65 @@ const ChatInterface = ({
                       })}
                     </span>
                   </div>
-                  <div
-                    className={`inline-block max-w-[80%] rounded-2xl px-4 py-2 ${
-                      isUser
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white/5 text-gray-100'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                  </div>
+                  {editingMessageId === message.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-400"
+                        rows={3}
+                        autoFocus
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            onEditMessage(message.id, editContent);
+                            setEditContent('');
+                          }}
+                          disabled={!editContent.trim()}
+                          className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <Check size={14} />
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            onCancelEdit();
+                            setEditContent('');
+                          }}
+                          className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm flex items-center gap-1"
+                        >
+                          <X size={14} />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="inline-block">
+                      <div
+                        className={`rounded-2xl px-4 py-2 ${
+                          isUser
+                            ? 'bg-orange-700 text-white'
+                            : 'bg-white/5 text-gray-100'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      </div>
+                      {isUser && (
+                        <button
+                          onClick={() => {
+                            onStartEdit(message.id);
+                            setEditContent(message.content);
+                          }}
+                          disabled={isGenerating}
+                          className="mt-1 text-xs text-gray-400 hover:text-white flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <Edit2 size={12} />
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -125,8 +200,8 @@ const ChatInterface = ({
 
       {/* Error Display */}
       {error && (
-        <div className="px-6 py-3 bg-red-500/10 border-t border-red-500/20">
-          <div className="flex items-center gap-2 text-red-400">
+        <div className="px-6 py-3 bg-orange-600/10 border-t border-orange-500/20">
+          <div className="flex items-center gap-2 text-orange-400">
             <AlertCircle size={16} />
             <span className="text-sm">{error}</span>
           </div>
@@ -148,9 +223,13 @@ const ChatInterface = ({
           {userPersona?.persona && (
             <button
               onClick={onGeneratePersonaResponse}
-              disabled={isGenerating || generatingPersonaResponse}
-              className="px-4 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              title="Generate auto-response for your persona"
+              disabled={isGenerating || generatingPersonaResponse || !userPersona?.persona?.ai_model}
+              className="px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              title={
+                !userPersona?.persona?.ai_model
+                  ? "Configure AI model in Persona Manager to enable auto-responses"
+                  : "Generate an AI response as your persona"
+              }
             >
               <Sparkles size={18} />
               {generatingPersonaResponse ? 'Generating...' : 'Auto'}
@@ -159,7 +238,7 @@ const ChatInterface = ({
           <button
             onClick={onSendMessage}
             disabled={isGenerating || !userInput.trim()}
-            className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Send size={18} />
             {isGenerating ? 'Sending...' : 'Send'}

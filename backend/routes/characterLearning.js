@@ -6,9 +6,9 @@
 const express = require('express');
 const CharacterLearningService = require('../services/CharacterLearningService');
 
-module.exports = (supabase) => {
+module.exports = (db) => {
   const router = express.Router();
-  const learningService = new CharacterLearningService(supabase);
+  const learningService = new CharacterLearningService(db);
 
   /**
    * Get learning data for a specific character

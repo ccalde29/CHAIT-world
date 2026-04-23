@@ -2,8 +2,9 @@
 // Handles character memory and relationship operations
 
 class MemoryService {
-    constructor(supabaseClient) {
-        this.supabase = supabaseClient;
+    constructor(db) {
+        // Accept DatabaseService instance
+        this.db = db;
     }
 
     // ============================================================================
@@ -15,18 +16,7 @@ class MemoryService {
      */
     async getCharacterMemories(characterId, userId, limit = 10) {
         try {
-            const { data, error } = await this.supabase
-                .from('character_memories')
-                .select('*')
-                .eq('character_id', characterId)
-                .eq('user_id', userId)
-                .order('importance_score', { ascending: false })
-                .order('last_accessed', { ascending: false })
-                .limit(limit);
-
-            if (error) throw error;
-            return data || [];
-
+            return await this.db.getMemoriesByCharacter(characterId, userId, limit);
         } catch (error) {
             console.error('Database error getting character memories:', error);
             throw error;
@@ -38,29 +28,22 @@ class MemoryService {
      */
     async addCharacterMemory(characterId, userId, memoryData) {
         try {
-            console.log('>� Adding memory for character:', characterId);
-
-            const { data, error } = await this.supabase
-                .from('character_memories')
-                .insert({
-                    character_id: characterId,
-                    user_id: userId,
-                    memory_type: memoryData.type || 'fact',
-                    target_entity: memoryData.target_entity || userId,
-                    memory_content: memoryData.content,
-                    importance_score: memoryData.importance_score || 0.5
-                })
-                .select()
-                .single();
-
-            if (error) {
-                console.error('L Error adding memory:', error);
-                throw error;
+            // Map 'fact' to 'semantic' for database constraint
+            let memoryType = memoryData.type || 'semantic';
+            if (memoryType === 'fact') {
+                memoryType = 'semantic';
             }
-
-            console.log(' Memory added successfully');
-            return data;
-
+            // Ensure valid memory type
+            if (!['episodic', 'semantic', 'emotional', 'relational'].includes(memoryType)) {
+                memoryType = 'semantic';
+            }
+            
+            const memory = await this.db.createMemory(characterId, userId, {
+                memory_type: memoryType,
+                content: memoryData.content,
+                importance_score: memoryData.importance_score || 0.5
+            });
+            return memory;
         } catch (error) {
             console.error('Database error adding character memory:', error);
             // Don't throw - memory creation shouldn't break chat
@@ -73,24 +56,13 @@ class MemoryService {
      */
     async clearCharacterMemories(characterId, userId) {
         try {
-            const { error: memError } = await this.supabase
-                .from('character_memories')
-                .delete()
-                .eq('character_id', characterId)
-                .eq('user_id', userId);
-
-            if (memError) throw memError;
-
-            const { error: relError } = await this.supabase
-                .from('character_relationships')
-                .delete()
-                .eq('character_id', characterId)
-                .eq('user_id', userId);
-
-            if (relError && relError.code !== 'PGRST116') throw relError;
-
+            await this.db.clearMemoriesForCharacter(characterId, userId);
+            // Also clear relationships
+            const relationships = await this.db.getRelationshipsForCharacter(characterId, userId);
+            for (const rel of relationships) {
+                await this.db.deleteRelationship(characterId, userId, rel.target_id);
+            }
             return { success: true };
-
         } catch (error) {
             console.error('Database error clearing memories:', error);
             throw error;
@@ -106,18 +78,9 @@ class MemoryService {
      */
     async getCharacterRelationship(characterId, userId) {
         try {
-            const { data, error } = await this.supabase
-                .from('character_relationships')
-                .select('*')
-                .eq('character_id', characterId)
-                .eq('user_id', userId)
-                .single();
-
-            if (error && error.code !== 'PGRST116') {
-                throw error;
-            }
-
-            if (!data) {
+            const relationship = await this.db.getRelationship(characterId, userId, 'user');
+            
+            if (!relationship) {
                 return {
                     relationship_type: 'neutral',
                     trust_level: 0.5,
@@ -127,8 +90,7 @@ class MemoryService {
                 };
             }
 
-            return data;
-
+            return relationship;
         } catch (error) {
             console.error('Database error getting character relationship:', error);
             throw error;
@@ -140,38 +102,16 @@ class MemoryService {
      */
     async updateCharacterRelationship(characterId, userId, relationshipData) {
         try {
-            console.log('💞 Updating relationship for character:', characterId);
-
-            // Ensure we include the target fields used by the DB unique constraint
-            // and provide sensible defaults for missing metrics.
-            const payload = {
-                character_id: characterId,
-                user_id: userId,
+            const relationship = await this.db.createOrUpdateRelationship(characterId, userId, {
                 target_type: 'user',
                 target_id: userId,
                 relationship_type: relationshipData.relationship_type || 'neutral',
                 trust_level: relationshipData.trust_level ?? 0.5,
                 familiarity_level: relationshipData.familiarity_level ?? 0.1,
-                emotional_bond: relationshipData.emotional_bond ?? 0.0,
-                last_interaction: new Date().toISOString(),
-                interaction_count: relationshipData.interaction_count || 1
-            };
-
-            // Use explicit onConflict to match the DB unique constraint
-            const { data, error } = await this.supabase
-                .from('character_relationships')
-                .upsert(payload, { onConflict: 'character_id,user_id,target_type,target_id' })
-                .select()
-                .single();
-
-            if (error) {
-                console.error('Error updating relationship:', error);
-                throw error;
-            }
-
-            console.log('Relationship updated successfully', data);
-            return data;
-
+                emotional_bond: relationshipData.emotional_bond ?? 0.0
+            });
+            
+            return relationship;
         } catch (error) {
             console.error('Database error updating character relationship:', error);
             // Don't throw - relationship update shouldn't break chat
@@ -180,12 +120,71 @@ class MemoryService {
     }
 
     /**
+     * Analyze character interactions for character-to-character memories
+     * @param {string} characterId - The character observing/learning
+     * @param {Array} otherCharacterMessages - Recent messages from other characters
+     * @param {Object} charactersMap - Map of character IDs to character objects
+     * @returns {Array} - Memories about other characters
+     */
+    analyzeCharacterInteractions(characterId, otherCharacterMessages, charactersMap) {
+        const memories = [];
+        
+        for (const msg of otherCharacterMessages) {
+            const otherCharId = msg.character;
+            const otherChar = charactersMap[otherCharId];
+            if (!otherChar || otherCharId === characterId) continue;
+            
+            const otherCharName = otherChar.name;
+            const content = msg.content.toLowerCase();
+            
+            // Pattern detection for character traits
+            const patterns = [
+                { pattern: /\*.*?(?:smiles|laughs|giggles|chuckles)\*/, type: 'relational', 
+                  content: `${otherCharName} tends to express joy and humor frequently`, importance: 0.6 },
+                { pattern: /\*.*?(?:frowns|sighs|looks away|crosses arms)\*/, type: 'emotional',
+                  content: `${otherCharName} showed signs of discomfort or disagreement`, importance: 0.6 },
+                { pattern: /(?:i think|i believe|in my opinion|personally)/i, type: 'relational',
+                  content: `${otherCharName} prefers expressing personal opinions`, importance: 0.5 },
+                { pattern: /(?:absolutely|definitely|clearly|obviously)/i, type: 'relational',
+                  content: `${otherCharName} communicates with strong conviction`, importance: 0.5 },
+                { pattern: /(?:maybe|perhaps|possibly|i guess)/i, type: 'relational',
+                  content: `${otherCharName} tends to be tentative in statements`, importance: 0.5 }
+            ];
+            
+            // Check for trait patterns
+            for (const {pattern, type, content: memContent, importance} of patterns) {
+                if (pattern.test(content)) {
+                    memories.push({
+                        type: type,
+                        content: memContent,
+                        importance_score: importance,
+                        target_type: 'character',
+                        target_entity: otherCharId
+                    });
+                }
+            }
+            
+            // Detect strong emotions/reactions in longer messages
+            if (content.length > 100 && /[!?]{2,}/.test(msg.content)) {
+                const preview = msg.content.replace(/\*/g, '').substring(0, 80);
+                memories.push({
+                    type: 'emotional',
+                    content: `${otherCharName} expressed strong emotions: "${preview}..."`,
+                    importance_score: 0.7,
+                    target_type: 'character',
+                    target_entity: otherCharId
+                });
+            }
+        }
+        
+        return memories;
+    }
+
+    /**
      * Build character context with all relevant data
      */
     async buildCharacterContext(characterId, userId, sessionId = null, otherCharacters = []) {
         try {
-            console.log('🔍 Building context for character:', characterId);
-
             const [memories, relationship] = await Promise.all([
                 this.getCharacterMemories(characterId, userId, 5),
                 this.getCharacterRelationship(characterId, userId)
@@ -194,24 +193,36 @@ class MemoryService {
             // Get recent messages from other characters in this session
             let recentCharacterMessages = [];
             if (sessionId && otherCharacters.length > 0) {
-                const { data: messages } = await this.supabase
-                    .from('messages')
-                    .select('*')
-                    .eq('session_id', sessionId)
-                    .in('character_id', otherCharacters)
-                    .order('timestamp', { ascending: false })
-                    .limit(5);
+                const allMessages = await this.db.getMessagesForSession(sessionId, userId);
+                recentCharacterMessages = allMessages
+                    .filter(m => otherCharacters.includes(m.character_id))
+                    .slice(-5);
+            }
 
-                recentCharacterMessages = messages || [];
+            // Load memories about other active characters
+            const characterMemories = {};
+            for (const otherCharId of otherCharacters) {
+                if (otherCharId === characterId) continue;
+                
+                const charMemories = await this.db.getMemoriesByCharacter(
+                    characterId,
+                    userId,
+                    3,
+                    { target_type: 'character', target_entity: otherCharId }
+                );
+                
+                if (charMemories.length > 0) {
+                    characterMemories[otherCharId] = charMemories;
+                }
             }
 
             const context = {
                 memories,
                 relationship,
+                characterMemories,
                 otherCharacterMessages: recentCharacterMessages
             };
 
-            console.log(' Context built successfully');
             return context;
 
         } catch (error) {
@@ -242,13 +253,13 @@ class MemoryService {
         const memories = [];
         const userText = userMessage.toLowerCase();
 
-        console.log('🔍 Analyzing conversation for memories...');
-
         // Enhanced pattern matching
         const patterns = [
             { pattern: /my name is (\w+)/i, type: 'identity', importance: 0.9 },
+            { pattern: /(?:call me|they call me|i go by) (\w+)/i, type: 'identity', importance: 0.9 },
             { pattern: /i'm (\d+) years? old/i, type: 'demographic', importance: 0.8 },
             { pattern: /i work (?:as|at) ([\w\s]+)/i, type: 'profession', importance: 0.8 },
+            { pattern: /(?:my job is|i'm employed as|i code|i teach) ([\w\s]+)/i, type: 'profession', importance: 0.8 },
             { pattern: /i live in ([\w\s]+)/i, type: 'location', importance: 0.7 },
             { pattern: /i'm from ([\w\s]+)/i, type: 'origin', importance: 0.7 },
             { pattern: /my favorite ([\w\s]+) is ([\w\s]+)/i, type: 'preference', importance: 0.6 },
@@ -278,8 +289,6 @@ class MemoryService {
                     importance_score: importance,
                     target_entity: userId
                 });
-
-                console.log(' Found memory:', memoryContent);
             }
         });
 
@@ -299,11 +308,89 @@ class MemoryService {
             memories.forEach(memory => {
                 memory.importance_score = Math.min(1.0, memory.importance_score + 0.1);
             });
-            console.log(' Boosted memory importance (character showed understanding)');
         }
 
-        console.log(`=� Total memories found: ${memories.length}`);
         return memories;
+    }
+
+    /**
+     * Use AI to extract memories from conversation using character's selected model
+     */
+    async extractMemoriesWithAI(userMessage, characterResponse, character, userPersona, userId, apiConfig) {
+        const characterName = character.name;
+        const prompt = `You are analyzing a conversation to extract what a character should remember.
+
+CONVERSATION:
+User (${userPersona?.name || 'User'}): "${userMessage}"
+${characterName}: "${characterResponse}"
+
+TASK: Extract 0-3 important memories that ${characterName} should store about ${userPersona?.name || 'the user'}.
+
+RULES:
+1. Only extract FACTUAL information (preferences, background, emotions, goals, interests)
+2. Ignore casual small talk
+3. Paraphrase naturally - don't quote verbatim
+4. Return NOTHING if there's nothing worth remembering
+
+FORMAT YOUR RESPONSE AS JSON:
+[
+  {
+    "type": "identity|demographic|preference|emotion|goal|interest|personal_fact",
+    "content": "Clear, concise memory statement",
+    "importance": 0.0-1.0
+  }
+]
+
+Return ONLY the JSON array, nothing else.`;
+
+        try {
+            const AIProviderService = require('./AIProviderService');
+            
+            const messages = [
+                { role: 'system', content: 'You are a memory extraction system. Output only valid JSON.' },
+                { role: 'user', content: prompt }
+            ];
+            
+            // Use character's configured model with lower temperature and token limit for extraction
+            const memoryCharacter = {
+                ai_provider: character.ai_provider,
+                ai_model: character.ai_model,
+                temperature: 0.3,
+                max_tokens: 300
+            };
+            
+            let responseText;
+            
+            try {
+                responseText = await AIProviderService.generateResponse(
+                    memoryCharacter,
+                    messages,
+                    apiConfig,
+                    {},
+                    {}
+                );
+            } catch (error) {
+                return this.analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId);
+            }
+            
+            const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) {
+                return this.analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId);
+            }
+            
+            const memories = JSON.parse(jsonMatch[0]);
+            
+            return memories.map(mem => ({
+                type: mem.type || 'semantic',
+                content: mem.content,
+                importance_score: mem.importance || 0.5,
+                target_entity: userId
+            }));
+            
+        } catch (error) {
+            console.error('[Memory] AI extraction failed:', error);
+            return this.analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId);
+        }
     }
 
     /**
@@ -315,8 +402,6 @@ class MemoryService {
         let trustChange = 0.0;
 
         const userText = userMessage.toLowerCase();
-
-        console.log('💞 Calculating relationship update...');
 
         // Positive interactions (2-3x stronger)
         if (userText.match(/(?:thank you|thanks|appreciate|love|like|great|wonderful|amazing)/)) {
@@ -352,8 +437,6 @@ class MemoryService {
         const newEmotionalBond = Math.max(-1, Math.min(1, currentRelationship.emotional_bond + emotionalChange));
 
         const relationshipType = this.determineRelationshipType(newEmotionalBond, newFamiliarity);
-
-        console.log(` Relationship updated: ${relationshipType} (trust: ${newTrust.toFixed(2)}, familiarity: ${newFamiliarity.toFixed(2)})`);
 
         return {
             relationship_type: relationshipType,

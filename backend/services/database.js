@@ -4,18 +4,14 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { getInstance: getLocalDb } = require('./LocalDatabaseService');
-const ChatService = require('./ChatService');
-const UserSettingsService = require('./UserSettingsService');
-const ScenarioService = require('./ScenarioService');
 const MemoryService = require('./MemoryService');
-const ImageService = require('./ImageService');
+const fs = require('fs');
+const path = require('path');
 
 class DatabaseService {
     constructor(options = {}) {
-        // Determine deployment mode: 'web' or 'local'
-        // - 'web': Use Supabase for everything (traditional web app)
-        // - 'local': Use SQLite for local data, Supabase only for community features
-        this.mode = options.mode || process.env.DEPLOYMENT_MODE || 'web';
+        // Always use local mode: SQLite for local data, Supabase only for community features
+        this.mode = 'local';
         
         const supabaseUrl = process.env.SUPABASE_URL;
         const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -25,60 +21,43 @@ class DatabaseService {
             try {
                 this.supabase = createClient(supabaseUrl, supabaseServiceKey);
                 this.supabaseAvailable = true;
-                console.log(`[Database] Supabase initialized for ${this.mode} mode`);
+                
+                // Load Supabase admin/token service only if env vars are set
+                this.supabaseService = require('./SupabaseAdminTokenService');
+                
             } catch (error) {
                 console.error('[Database] Failed to initialize Supabase:', error);
                 this.supabaseAvailable = false;
-                if (this.mode === 'web') {
-                    throw new Error('Failed to initialize Supabase for web mode');
-                }
             }
         } else {
             this.supabaseAvailable = false;
-            if (this.mode === 'web') {
-                throw new Error('Missing Supabase environment variables for web mode');
-            }
-            console.warn('[Database] Supabase not configured - running in offline-only mode');
+            console.warn('[Database] Supabase not configured');
         }
 
-        // Initialize local database for local mode
-        if (this.mode === 'local') {
-            try {
-                this.localDb = getLocalDb(options.localDbPath);
-                this.localDb.initialize();
-                console.log('[Database] SQLite initialized for local mode');
-            } catch (error) {
-                console.error('[Database] Failed to initialize SQLite:', error);
-                throw error; // Local mode requires SQLite
-            }
+        // Initialize local SQLite database
+        try {
+            this.localDb = getLocalDb(options.localDbPath);
+            this.localDb.initialize();
+        } catch (error) {
+            console.error('[Database] Failed to initialize SQLite:', error);
+            throw error;
         }
 
-        // Initialize Supabase-based services (for web mode or community operations)
+        // Initialize MemoryService with this DatabaseService instance
         if (this.supabaseAvailable) {
-            this.chatService = new ChatService(this.supabase);
-            this.userSettingsService = new UserSettingsService(this.supabase);
-            this.scenarioService = new ScenarioService(this.supabase);
-            this.memoryService = new MemoryService(this.supabase);
-            this.imageService = new ImageService(this.supabase);
+            this.memoryService = new MemoryService(this);
         }
     }
 
     /**
-     * Check if we're in local mode
+     * Check if we're in local mode (always true now)
      */
     isLocalMode() {
-        return this.mode === 'local';
+        return true;
     }
 
     /**
-     * Check if we're in web mode
-     */
-    isWebMode() {
-        return this.mode === 'web';
-    }
-
-    /**
-     * Check if Supabase is available (for community features)
+     * Check if Supabase is available (for community features only)
      */
     isCommunityAvailable() {
         return this.supabaseAvailable;
@@ -86,563 +65,300 @@ class DatabaseService {
 
     // ============================================================================
     // CHAT SESSION & MESSAGE MANAGEMENT
-    // Local mode: SQLite | Web mode: Supabase
+    // Always uses local SQLite database
     // ============================================================================
 
     async createChatSession(userId, sessionData) {
-        if (this.isLocalMode()) {
-            return this.localDb.createChatSession(userId, sessionData);
-        }
-        return this.chatService.createChatSession(userId, sessionData);
+        return this.localDb.createChatSession(userId, sessionData);
     }
 
     async saveChatMessage(sessionId, messageData) {
-        if (this.isLocalMode()) {
-            return this.localDb.createMessage(messageData);
-        }
-        return this.chatService.saveChatMessage(sessionId, messageData);
+        // Ensure session_id is in messageData for local mode
+        const dataWithSession = { ...messageData, session_id: sessionId };
+        return this.localDb.createMessage(dataWithSession);
     }
 
     async getChatSession(userId, sessionId) {
-        if (this.isLocalMode()) {
-            return this.localDb.getChatSession(sessionId);
-        }
-        return this.chatService.getChatSession(userId, sessionId);
+        return this.localDb.getChatSession(sessionId);
     }
 
     async getChatHistory(userId, limit = 20) {
-        if (this.isLocalMode()) {
-            return this.localDb.getChatSessionsByUser(userId, limit);
-        }
-        return this.chatService.getChatHistory(userId, limit);
+        return this.localDb.getChatSessionsByUser(userId, limit);
     }
 
     async updateChatSessionActivity(sessionId) {
-        if (this.isLocalMode()) {
-            return this.localDb.updateChatSession(sessionId, { 
-                last_activity: new Date().toISOString() 
-            });
-        }
-        return this.chatService.updateChatSessionActivity(sessionId);
+        return this.localDb.updateChatSession(sessionId, { 
+            last_activity: new Date().toISOString() 
+        });
     }
 
     async updateChatSession(userId, sessionId, updates) {
-        if (this.isLocalMode()) {
-            return this.localDb.updateChatSession(sessionId, updates);
-        }
-        return this.chatService.updateChatSession(userId, sessionId, updates);
+        return this.localDb.updateChatSession(sessionId, updates);
     }
 
     async deleteChatSession(userId, sessionId) {
-        if (this.isLocalMode()) {
-            return this.localDb.deleteChatSession(sessionId);
-        }
-        return this.chatService.deleteChatSession(userId, sessionId);
+        return this.localDb.deleteChatSession(sessionId);
     }
 
     async getChatMessages(sessionId, limit = 100) {
-        if (this.isLocalMode()) {
-            return this.localDb.getMessagesBySession(sessionId, limit);
-        }
-        // For web mode, use existing chat service method
-        return this.chatService.getChatMessages(sessionId, limit);
+        return this.localDb.getMessagesBySession(sessionId, limit);
     }
 
     // ============================================================================
     // CHARACTER MANAGEMENT
-    // Local mode: SQLite | Web mode: Supabase
-    // Note: Character CRUD is local, but publish/import are community operations
+    // All character CRUD uses local SQLite database
+    // Publish/import operations use Supabase for community features
     // ============================================================================
 
     async createCharacter(userId, characterData) {
-        if (this.isLocalMode()) {
-            return this.localDb.createCharacter(userId, characterData);
-        }
-        // For web mode, use existing character service
-        throw new Error('Character creation in web mode needs CharacterService');
+        return this.localDb.createCharacter(userId, characterData);
     }
 
     async getCharacter(characterId) {
-        if (this.isLocalMode()) {
-            return this.localDb.getCharacter(characterId);
-        }
-        // For web mode, use existing character service
-        throw new Error('Character retrieval in web mode needs CharacterService');
+        return this.localDb.getCharacter(characterId);
     }
 
     async getCharacters(userId) {
-        if (this.isLocalMode()) {
-            return this.localDb.getCharactersByUser(userId);
-        }
-        // For web mode, use existing character service
-        throw new Error('Characters retrieval in web mode needs CharacterService');
+        return this.localDb.getCharactersByUser(userId);
     }
 
     async updateCharacter(characterId, updates) {
-        if (this.isLocalMode()) {
-            return this.localDb.updateCharacter(characterId, updates);
-        }
-        // For web mode, use existing character service
-        throw new Error('Character update in web mode needs CharacterService');
+        return this.localDb.updateCharacter(characterId, updates);
     }
 
     async deleteCharacter(characterId) {
-        if (this.isLocalMode()) {
-            return this.localDb.deleteCharacter(characterId);
+        // Get character data before deletion to access image filename
+        const character = this.localDb.getCharacter(characterId);
+        
+        // Delete associated image file if it exists
+        if (character && character.uses_custom_image && character.avatar_image_filename) {
+            const imagePath = path.join(__dirname, '../../data/uploads', character.avatar_image_filename);
+            try {
+                if (fs.existsSync(imagePath)) {
+                    fs.unlinkSync(imagePath);
+                }
+            } catch (error) {
+                console.error('Error deleting character avatar:', error);
+            }
         }
-        // For web mode, use existing character service
-        throw new Error('Character deletion in web mode needs CharacterService');
+        
+        return this.localDb.deleteCharacter(characterId);
     }
 
     async hideDefaultCharacter(userId, characterId) {
-        if (this.isLocalMode()) {
-            // Store in local SQLite hidden_default_characters table
-            this.localDb.run(
-                'INSERT OR REPLACE INTO hidden_default_characters (user_id, character_id) VALUES (?, ?)',
-                [userId, characterId]
-            );
-            return true;
-        }
+        this.localDb.run(
+            'INSERT OR REPLACE INTO hidden_default_characters (user_id, character_id) VALUES (?, ?)',
+            [userId, characterId]
+        );
+        return true;
+    }
 
-        // Web mode: use Supabase
-        try {
-            const { error } = await this.supabase
-            .from('hidden_default_characters')
-            .upsert({
-                user_id: userId,
-                character_id: characterId
-            });
+    // ============================================================================
+    // CUSTOM MODEL PRESETS
+    // ============================================================================
 
-            if (error) throw error;
-            return true;
+    async getCustomModels(userId) {
+        return this.localDb.getCustomModels(userId);
+    }
 
-        } catch (error) {
-            console.error('Database error hiding character:', error);
-            throw error;
-        }
+    async getCustomModel(id) {
+        return this.localDb.getCustomModel(id);
+    }
+
+    async createCustomModel(userId, data) {
+        return this.localDb.createCustomModel(userId, data);
+    }
+
+    async updateCustomModel(id, updates) {
+        return this.localDb.updateCustomModel(id, updates);
+    }
+
+    async deleteCustomModel(id) {
+        return this.localDb.deleteCustomModel(id);
     }
 
     // ============================================================================
     // USER SETTINGS MANAGEMENT
-    // Local mode: SQLite for API keys/preferences, Supabase for auth/admin
-    // Web mode: Supabase only
+    // All user settings stored in local SQLite database
     // ============================================================================
 
+    async isAdmin(userId) {
+        if (!this.supabaseAvailable || !this.supabaseService) return false;
+        return this.supabaseService.isAdmin(userId);
+    }
+
     async getUserSettings(userId) {
-        if (this.isLocalMode()) {
-            // Get local settings from SQLite
-            const localSettings = this.localDb.get(
-                'SELECT * FROM user_settings_local WHERE user_id = ?',
-                [userId]
-            );
-
-            if (localSettings) {
-                return {
-                    ...localSettings,
-                    api_keys: this.localDb.safeJsonParse(localSettings.api_keys, {}),
-                    ollama_settings: this.localDb.safeJsonParse(localSettings.ollama_settings, {}),
-                    lmstudio_settings: this.localDb.safeJsonParse(localSettings.lmstudio_settings, {}),
-                    preferences: this.localDb.safeJsonParse(localSettings.preferences, {})
-                };
+        const localSettings = this.localDb.getUserSettings(userId);
+        
+        // If user is admin and Supabase is available, fetch admin-specific settings from Supabase
+        if (localSettings.isAdmin && this.supabaseAvailable && this.supabaseService) {
+            try {
+                const adminSettings = await this.supabaseService.getAdminSettings(userId);
+                localSettings.autoApproveCharacters = adminSettings.auto_approve_characters;
+                localSettings.adminSystemPrompt = adminSettings.admin_system_prompt;
+            } catch (error) {
+                console.error('[Database] Error fetching admin settings:', error);
+                // Keep local defaults if Supabase fetch fails
+                localSettings.autoApproveCharacters = false;
+                localSettings.adminSystemPrompt = null;
             }
-
-            // Return defaults if no settings exist
-            return {
-                user_id: userId,
-                api_keys: {},
-                ollama_settings: { baseUrl: 'http://localhost:11434', models: [] },
-                lmstudio_settings: { baseUrl: 'http://localhost:1234', models: [] },
-                preferences: {
-                    responseDelay: true,
-                    showTypingIndicator: true,
-                    maxCharactersInGroup: 5,
-                    theme: 'dark',
-                    fontSize: 'medium'
-                }
-            };
         }
-        return this.userSettingsService.getUserSettings(userId);
+        
+        return localSettings;
     }
 
     async updateUserSettings(userId, updates) {
-        if (this.isLocalMode()) {
-            // Check if settings exist
-            const existing = this.localDb.get(
-                'SELECT id FROM user_settings_local WHERE user_id = ?',
-                [userId]
-            );
-
-            if (existing) {
-                // Update existing settings
-                const setClauses = [];
-                const values = [];
-
-                for (const [key, value] of Object.entries(updates)) {
-                    if (['api_keys', 'ollama_settings', 'lmstudio_settings', 'preferences'].includes(key)) {
-                        setClauses.push(`${key} = ?`);
-                        values.push(JSON.stringify(value));
-                    } else if (['default_provider', 'default_model', 'active_persona_id'].includes(key)) {
-                        setClauses.push(`${key} = ?`);
-                        values.push(value);
-                    }
+        // Save local settings (API keys, preferences, etc.)
+        const result = this.localDb.updateUserSettings(userId, updates);
+        
+        // If updating admin settings and Supabase is available, save them to Supabase
+        if ((updates.autoApproveCharacters !== undefined || updates.adminSystemPrompt !== undefined) 
+            && this.supabaseAvailable && this.supabaseService) {
+            try {
+                const isAdmin = await this.supabaseService.isAdmin(userId);
+                if (isAdmin) {
+                    await this.supabaseService.updateAdminSettings(userId, {
+                        auto_approve_characters: updates.autoApproveCharacters,
+                        admin_system_prompt: updates.adminSystemPrompt
+                    });
                 }
-
-                if (setClauses.length > 0) {
-                    values.push(userId);
-                    this.localDb.run(
-                        `UPDATE user_settings_local SET ${setClauses.join(', ')} WHERE user_id = ?`,
-                        values
-                    );
-                }
-            } else {
-                // Insert new settings
-                this.localDb.run(
-                    `INSERT INTO user_settings_local (user_id, api_keys, ollama_settings, lmstudio_settings, preferences, default_provider, default_model)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                        userId,
-                        JSON.stringify(updates.api_keys || {}),
-                        JSON.stringify(updates.ollama_settings || {}),
-                        JSON.stringify(updates.lmstudio_settings || {}),
-                        JSON.stringify(updates.preferences || {}),
-                        updates.default_provider || 'openai',
-                        updates.default_model || null
-                    ]
-                );
+            } catch (error) {
+                console.error('[Database] Error updating admin settings:', error);
+                // Continue even if Supabase update fails
             }
-
-            return this.getUserSettings(userId);
         }
-        return this.userSettingsService.updateUserSettings(userId, updates);
+        
+        return result;
     }
 
     // ============================================================================
     // USER PERSONA MANAGEMENT
-    // Local mode: SQLite | Web mode: Supabase
+    // All personas stored in local SQLite database
     // ============================================================================
 
     async getUserPersona(userId) {
-        if (this.isLocalMode()) {
-            const personas = this.localDb.all(
-                'SELECT * FROM user_personas WHERE user_id = ? ORDER BY created_at DESC',
-                [userId]
-            );
-            return { personas: personas || [] };
-        }
-        return this.userSettingsService.getUserPersona(userId);
+        const personas = this.localDb.all(
+            'SELECT * FROM user_personas WHERE user_id = ? ORDER BY created_at DESC',
+            [userId]
+        );
+        return { personas: personas || [] };
+    }
+
+    async getPersona(personaId, userId) {
+        return this.localDb.get(
+            'SELECT * FROM user_personas WHERE id = ? AND user_id = ?',
+            [personaId, userId]
+        );
     }
 
     async createOrUpdateUserPersona(userId, personaData) {
-        if (this.isLocalMode()) {
-            if (personaData.id) {
-                // Update existing persona
-                this.localDb.run(
-                    'UPDATE user_personas SET name = ?, description = ?, avatar = ? WHERE id = ? AND user_id = ?',
-                    [personaData.name, personaData.description, personaData.avatar, personaData.id, userId]
-                );
-            } else {
-                // Create new persona
-                const result = this.localDb.run(
-                    'INSERT INTO user_personas (user_id, name, description, avatar) VALUES (?, ?, ?, ?)',
-                    [userId, personaData.name, personaData.description || null, personaData.avatar || null]
-                );
-                personaData.id = result.lastInsertRowid;
-            }
-            return this.getUserPersona(userId);
+        if (personaData.id) {
+            // Update existing persona
+            this.localDb.run(
+                'UPDATE user_personas SET name = ?, description = ?, avatar = ? WHERE id = ? AND user_id = ?',
+                [personaData.name, personaData.description, personaData.avatar, personaData.id, userId]
+            );
+        } else {
+            // Create new persona
+            const result = this.localDb.run(
+                'INSERT INTO user_personas (user_id, name, description, avatar) VALUES (?, ?, ?, ?)',
+                [userId, personaData.name, personaData.description || null, personaData.avatar || null]
+            );
+            personaData.id = result.lastInsertRowid;
         }
-        return this.userSettingsService.createOrUpdateUserPersona(userId, personaData);
+        return this.getUserPersona(userId);
     }
 
     async deleteUserPersona(userId) {
-        if (this.isLocalMode()) {
-            this.localDb.run('DELETE FROM user_personas WHERE user_id = ?', [userId]);
-            return { success: true };
-        }
-        return this.userSettingsService.deleteUserPersona(userId);
+        this.localDb.run('DELETE FROM user_personas WHERE user_id = ?', [userId]);
+        return { success: true };
     }
 
     // ============================================================================
     // SCENARIO MANAGEMENT
-    // Local mode: SQLite | Web mode: Supabase
+    // All scenarios stored in local SQLite database
     // ============================================================================
 
+    async getScenario(userId, scenarioId) {
+        return this.localDb.getScenario(scenarioId);
+    }
+
     async getScenarios(userId) {
-        if (this.isLocalMode()) {
-            return this.localDb.getScenariosByUser(userId);
-        }
-        return this.scenarioService.getScenarios(userId);
+        const scenarios = this.localDb.getScenariosByUser(userId);
+        return { scenarios, total: scenarios.length };
     }
 
     async createScenario(userId, scenarioData) {
-        if (this.isLocalMode()) {
-            return this.localDb.createScenario(userId, scenarioData);
-        }
-        return this.scenarioService.createScenario(userId, scenarioData);
+        return this.localDb.createScenario(userId, scenarioData);
     }
 
     async updateScenario(userId, scenarioId, updates) {
-        if (this.isLocalMode()) {
-            return this.localDb.updateScenario(scenarioId, updates);
-        }
-        return this.scenarioService.updateScenario(userId, scenarioId, updates);
+        return this.localDb.updateScenario(scenarioId, updates);
     }
 
     async deleteScenario(userId, scenarioId) {
-        if (this.isLocalMode()) {
-            return this.localDb.deleteScenario(scenarioId);
-        }
-        return this.scenarioService.deleteScenario(userId, scenarioId);
-    }
-
-    // ============================================================================
-    // CHARACTER MEMORY MANAGEMENT
-    // Local mode: SQLite | Web mode: Supabase
-    // TODO: Implement full memory operations in LocalDatabaseService
-    // ============================================================================
-
-    async getCharacterMemories(characterId, userId, limit = 10) {
-        if (this.isLocalMode()) {
-            const memories = this.localDb.all(
-                'SELECT * FROM character_memories WHERE character_id = ? AND user_id = ? ORDER BY importance_score DESC, last_accessed DESC LIMIT ?',
-                [characterId, userId, limit]
-            );
-            return memories.map(mem => ({
-                ...mem,
-                tags: this.localDb.safeJsonParse(mem.tags, [])
-            }));
-        }
-        return this.memoryService.getCharacterMemories(characterId, userId, limit);
-    }
-
-    async addCharacterMemory(characterId, userId, memoryData) {
-        if (this.isLocalMode()) {
-            const result = this.localDb.run(
-                `INSERT INTO character_memories (
-                    character_id, user_id, memory_type, content, importance_score,
-                    emotional_valence, related_session_id, tags
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    characterId,
-                    userId,
-                    memoryData.memory_type || 'episodic',
-                    memoryData.content,
-                    memoryData.importance_score || 0.5,
-                    memoryData.emotional_valence || 0.0,
-                    memoryData.related_session_id || null,
-                    JSON.stringify(memoryData.tags || [])
-                ]
-            );
-            return { id: result.lastInsertRowid, ...memoryData };
-        }
-        return this.memoryService.addCharacterMemory(characterId, userId, memoryData);
-    }
-
-    async clearCharacterMemories(characterId, userId) {
-        if (this.isLocalMode()) {
-            this.localDb.run(
-                'DELETE FROM character_memories WHERE character_id = ? AND user_id = ?',
-                [characterId, userId]
-            );
-            return { success: true };
-        }
-        return this.memoryService.clearCharacterMemories(characterId, userId);
-    }
-
-    async getCharacterRelationship(characterId, userId) {
-        if (this.isLocalMode()) {
-            const relationship = this.localDb.get(
-                'SELECT * FROM character_relationships WHERE character_id = ? AND user_id = ? AND target_type = ?',
-                [characterId, userId, 'user']
-            );
-            return relationship || null;
-        }
-        return this.memoryService.getCharacterRelationship(characterId, userId);
-    }
-
-    async updateCharacterRelationship(characterId, userId, relationshipData) {
-        if (this.isLocalMode()) {
-            const existing = this.localDb.get(
-                'SELECT id FROM character_relationships WHERE character_id = ? AND user_id = ? AND target_type = ?',
-                [characterId, userId, 'user']
-            );
-
-            if (existing) {
-                // Update existing relationship
-                const setClauses = [];
-                const values = [];
-
-                for (const [key, value] of Object.entries(relationshipData)) {
-                    if (['relationship_type', 'trust_level', 'familiarity_level', 'emotional_bond', 'custom_context'].includes(key)) {
-                        setClauses.push(`${key} = ?`);
-                        values.push(value);
-                    }
+        // Get scenario data before deletion to access image filename
+        const scenario = this.localDb.getScenario(scenarioId);
+        
+        // Delete associated image file if it exists
+        if (scenario && scenario.uses_custom_background && scenario.background_image_filename) {
+            const imagePath = path.join(__dirname, '../../data/uploads', scenario.background_image_filename);
+            try {
+                if (fs.existsSync(imagePath)) {
+                    fs.unlinkSync(imagePath);
                 }
-
-                if (setClauses.length > 0) {
-                    setClauses.push('interaction_count = interaction_count + 1');
-                    setClauses.push('last_interaction = CURRENT_TIMESTAMP');
-                    values.push(existing.id);
-                    this.localDb.run(
-                        `UPDATE character_relationships SET ${setClauses.join(', ')} WHERE id = ?`,
-                        values
-                    );
-                }
-            } else {
-                // Create new relationship
-                this.localDb.run(
-                    `INSERT INTO character_relationships (
-                        character_id, user_id, target_type, relationship_type,
-                        trust_level, familiarity_level, emotional_bond, custom_context
-                    ) VALUES (?, ?, 'user', ?, ?, ?, ?, ?)`,
-                    [
-                        characterId,
-                        userId,
-                        relationshipData.relationship_type || 'neutral',
-                        relationshipData.trust_level || 0.5,
-                        relationshipData.familiarity_level || 0.1,
-                        relationshipData.emotional_bond || 0.0,
-                        relationshipData.custom_context || null
-                    ]
-                );
+            } catch (error) {
+                console.error('Error deleting scene background:', error);
             }
-
-            return this.getCharacterRelationship(characterId, userId);
         }
-        return this.memoryService.updateCharacterRelationship(characterId, userId, relationshipData);
-    }
-
-    async buildCharacterContext(characterId, userId, sessionId = null, otherCharacters = []) {
-        if (this.isLocalMode()) {
-            // Build context from local database
-            const memories = await this.getCharacterMemories(characterId, userId, 10);
-            const relationship = await this.getCharacterRelationship(characterId, userId);
-            const personaResult = await this.getUserPersona(userId);
-            
-            return {
-                memories,
-                relationship,
-                userPersona: personaResult.personas?.[0] || null,
-                sessionState: null // TODO: Implement session state retrieval
-            };
-        }
-
-        // Get user persona first
-        const userPersonaResult = await this.userSettingsService.getUserPersona(userId);
-
-        // Build character context from memory service
-        const context = await this.memoryService.buildCharacterContext(
-            characterId,
-            userId,
-            sessionId,
-            otherCharacters
-        );
-
-        // Add user persona to context
-        return {
-            ...context,
-            userPersona: userPersonaResult.persona
-        };
-    }
-
-    analyzeConversationForMemories(userMessage, characterResponse, userPersona, userId) {
-        // This is a utility method that doesn't directly access the database
-        // Can be used in both modes
-        if (this.isWebMode()) {
-            return this.memoryService.analyzeConversationForMemories(
-                userMessage,
-                characterResponse,
-                userPersona,
-                userId
-            );
-        }
-        // For local mode, return basic memory analysis
-        return {
-            shouldCreateMemory: true,
-            memoryType: 'episodic',
-            importanceScore: 0.5,
-            emotionalValence: 0.0
-        };
-    }
-
-    calculateRelationshipUpdate(currentRelationship, userMessage, characterResponse) {
-        // Utility method for both modes
-        if (this.isWebMode()) {
-            return this.memoryService.calculateRelationshipUpdate(
-                currentRelationship,
-                userMessage,
-                characterResponse
-            );
-        }
-        // Basic relationship update for local mode
-        return {
-            trust_level: (currentRelationship?.trust_level || 0.5) + 0.01,
-            familiarity_level: (currentRelationship?.familiarity_level || 0.1) + 0.02,
-            emotional_bond: currentRelationship?.emotional_bond || 0.0
-        };
-    }
-
-    determineRelationshipType(emotionalBond, familiarityLevel) {
-        // Utility method for both modes
-        if (this.isWebMode()) {
-            return this.memoryService.determineRelationshipType(emotionalBond, familiarityLevel);
-        }
-        // Simple determination for local mode
-        if (familiarityLevel < 0.3) return 'stranger';
-        if (familiarityLevel < 0.6) return 'acquaintance';
-        if (emotionalBond > 0.5) return 'friend';
-        return 'neutral';
+        
+        return this.localDb.deleteScenario(scenarioId);
     }
 
     // ============================================================================
     // IMAGE MANAGEMENT
-    // Local mode: File system | Web mode: Supabase Storage
-    // TODO: Implement local file storage for images
+    // Uses local file system storage
     // ============================================================================
 
+    async saveImageMetadata(userId, imageData) {
+        const result = this.localDb.run(
+            'INSERT INTO user_images (user_id, filename, url, image_type, associated_id) VALUES (?, ?, ?, ?, ?)',
+            [userId, imageData.filename, imageData.url, imageData.type || 'avatar', imageData.associated_id || null]
+        );
+        return { id: result.lastInsertRowid, ...imageData };
+    }
+
     async updateCharacterImage(userId, characterId, imageData) {
-        if (this.isLocalMode()) {
-            // For local mode, images are stored in file system
-            // Store metadata in SQLite user_images table
-            const result = this.localDb.run(
-                'INSERT INTO user_images (user_id, filename, url, image_type, associated_id) VALUES (?, ?, ?, ?, ?)',
-                [userId, imageData.filename, imageData.url, 'avatar', characterId]
-            );
-            return { id: result.lastInsertRowid, ...imageData };
-        }
-        return this.imageService.updateCharacterImage(userId, characterId, imageData);
+        // Store metadata in SQLite user_images table
+        const result = this.localDb.run(
+            'INSERT INTO user_images (user_id, filename, url, image_type, associated_id) VALUES (?, ?, ?, ?, ?)',
+            [userId, imageData.filename, imageData.url, 'avatar', characterId]
+        );
+        return { id: result.lastInsertRowid, ...imageData };
     }
 
     async updateUserPersonaImage(userId, imageData) {
-        if (this.isLocalMode()) {
-            const result = this.localDb.run(
-                'INSERT INTO user_images (user_id, filename, url, image_type, associated_id) VALUES (?, ?, ?, ?, ?)',
-                [userId, imageData.filename, imageData.url, 'avatar', userId]
-            );
-            return { id: result.lastInsertRowid, ...imageData };
-        }
-        return this.imageService.updateUserPersonaImage(userId, imageData);
+        const result = this.localDb.run(
+            'INSERT INTO user_images (user_id, filename, url, image_type, associated_id) VALUES (?, ?, ?, ?, ?)',
+            [userId, imageData.filename, imageData.url, 'avatar', userId]
+        );
+        return { id: result.lastInsertRowid, ...imageData };
     }
 
     async updateScenarioImage(userId, scenarioId, imageData) {
-        if (this.isLocalMode()) {
-            const result = this.localDb.run(
-                'INSERT INTO user_images (user_id, filename, url, image_type, associated_id) VALUES (?, ?, ?, ?, ?)',
-                [userId, imageData.filename, imageData.url, 'background', scenarioId]
-            );
-            return { id: result.lastInsertRowid, ...imageData };
-        }
-        return this.imageService.updateScenarioImage(userId, scenarioId, imageData);
+        const result = this.localDb.run(
+            'INSERT INTO user_images (user_id, filename, url, image_type, associated_id) VALUES (?, ?, ?, ?, ?)',
+            [userId, imageData.filename, imageData.url, 'background', scenarioId]
+        );
+        return { id: result.lastInsertRowid, ...imageData };
     }
 
     async deleteImage(userId, filename, type) {
-        if (this.isLocalMode()) {
-            this.localDb.run(
-                'DELETE FROM user_images WHERE user_id = ? AND filename = ? AND image_type = ?',
-                [userId, filename, type]
-            );
-            return { success: true };
-        }
-        return this.imageService.deleteImage(userId, filename, type);
+        this.localDb.run(
+            'DELETE FROM user_images WHERE user_id = ? AND filename = ? AND image_type = ?',
+            [userId, filename, type]
+        );
+        return { success: true };
     }
 
     // ============================================================================
@@ -656,8 +372,7 @@ class DatabaseService {
     async publishCharacter(userId, characterId, publishData) {
         if (!this.isCommunityAvailable()) {
             const error = new Error('Community features require internet connection');
-            error.code = 'OFFLINE';
-            error.offline = true;
+            error.code = 'COMMUNITY_UNAVAILABLE';
             throw error;
         }
 
@@ -668,26 +383,31 @@ class DatabaseService {
                 throw new Error('Publishing to community requires authenticated user with valid UUID. Please sign in to publish.');
             }
 
-            // Get the character from the appropriate database
-            let character;
-            if (this.isLocalMode()) {
-                character = this.localDb.getCharacter(characterId);
-            } else {
-                // Web mode: get from Supabase
-                const { data, error } = await this.supabase
-                    .from('characters')
-                    .select('*')
-                    .eq('id', characterId)
-                    .eq('user_id', userId)
-                    .single();
-                
-                if (error) throw error;
-                character = data;
-            }
+            // Get the character from local database
+            const character = this.localDb.getCharacter(characterId);
 
             if (!character) {
                 throw new Error('Character not found');
             }
+
+            // Upload avatar image to Supabase storage if custom image is used
+            let avatarImageUrl = character.avatar_image_url;
+            if (character.uses_custom_image && character.avatar_image_filename) {
+                const ImageService = require('./ImageService');
+                const imageService = new ImageService(this.supabase);
+                const publicUrl = await imageService.uploadLocalImageToSupabase(
+                    character.avatar_image_filename,
+                    'character-avatars',
+                    userId
+                );
+                if (publicUrl) {
+                    avatarImageUrl = publicUrl;
+                }
+            }
+
+            // Get user settings to check auto_approve_characters setting
+            const userSettings = await this.getUserSettings(userId);
+            const moderationStatus = userSettings?.autoApproveCharacters ? 'approved' : 'pending';
 
             // Prepare community character data
             const communityData = {
@@ -707,12 +427,12 @@ class DatabaseService {
                 max_tokens: character.max_tokens,
                 context_window: character.context_window,
                 memory_enabled: character.memory_enabled,
-                avatar_image_url: character.avatar_image_url,
+                avatar_image_url: avatarImageUrl,
                 avatar_image_filename: character.avatar_image_filename,
                 uses_custom_image: character.uses_custom_image,
                 is_locked: publishData.isLocked || false,
                 hidden_fields: publishData.hiddenFields || [],
-                moderation_status: 'approved' // Auto-approve for now
+                moderation_status: moderationStatus
             };
 
             // Check if already published
@@ -747,17 +467,8 @@ class DatabaseService {
                 result = data;
             }
 
-            // Mark as published in local database
-            if (this.isLocalMode()) {
-                // For local mode, we could add a flag, but it's not critical
-                // The source of truth for publication is in Supabase
-            } else {
-                // Web mode: update character's is_public flag
-                await this.supabase
-                    .from('characters')
-                    .update({ is_public: true })
-                    .eq('id', characterId);
-            }
+            // Character is published in Supabase community_characters table
+            // Local database remains as-is (source of truth for user's local characters)
 
             return result;
         } catch (error) {
@@ -772,13 +483,12 @@ class DatabaseService {
     async importCharacterFromCommunity(userId, communityCharacterId) {
         if (!this.isCommunityAvailable()) {
             const error = new Error('Community features require internet connection');
-            error.code = 'OFFLINE';
-            error.offline = true;
+            error.code = 'COMMUNITY_UNAVAILABLE';
             throw error;
         }
 
         try {
-            // Get character from community
+            // Get character from Supabase community
             const { data: communityChar, error } = await this.supabase
                 .from('community_characters')
                 .select('*')
@@ -787,57 +497,212 @@ class DatabaseService {
 
             if (error) throw error;
 
-            // Import to local database (if in local mode)
-            if (this.isLocalMode()) {
-                const characterData = {
-                    name: communityChar.name,
-                    personality: communityChar.personality,
-                    age: communityChar.age,
-                    sex: communityChar.sex,
-                    appearance: communityChar.appearance,
-                    background: communityChar.background,
-                    avatar: communityChar.avatar,
-                    color: communityChar.color,
-                    chat_examples: communityChar.chat_examples,
-                    tags: communityChar.tags,
-                    temperature: communityChar.temperature,
-                    max_tokens: communityChar.max_tokens,
-                    context_window: communityChar.context_window,
-                    memory_enabled: communityChar.memory_enabled,
-                    avatar_image_url: communityChar.avatar_image_url,
-                    avatar_image_filename: communityChar.avatar_image_filename,
-                    uses_custom_image: communityChar.uses_custom_image
-                };
-
-                return this.localDb.createCharacter(userId, characterData);
+            // Download avatar image if it has a custom image
+            let avatarImageFilename = communityChar.avatar_image_filename;
+            let avatarImageUrl = communityChar.avatar_image_url;
+            
+            if (communityChar.uses_custom_image && communityChar.avatar_image_url) {
+                const ImageService = require('./ImageService');
+                const imageService = new ImageService(this.supabase);
+                const downloadedFilename = await imageService.downloadImageFromUrl(
+                    communityChar.avatar_image_url,
+                    userId
+                );
+                
+                if (downloadedFilename) {
+                    avatarImageFilename = downloadedFilename;
+                    // Use local path for imported character
+                    avatarImageUrl = `/uploads/${downloadedFilename}`;
+                }
             }
 
-            // For web mode, create in Supabase characters table
-            return communityChar;
+            // Import to local SQLite database with defaults for locked/hidden fields
+            const characterData = {
+                name: communityChar.name,
+                personality: communityChar.personality || 'A mysterious character with hidden traits.',
+                age: communityChar.age,
+                sex: communityChar.sex,
+                appearance: communityChar.appearance || 'Their appearance is a mystery.',
+                background: communityChar.background || 'Their past is shrouded in mystery.',
+                avatar: communityChar.avatar,
+                color: communityChar.color,
+                chat_examples: communityChar.chat_examples,
+                tags: communityChar.tags,
+                temperature: communityChar.temperature,
+                max_tokens: communityChar.max_tokens,
+                context_window: communityChar.context_window,
+                memory_enabled: communityChar.memory_enabled,
+                avatar_image_url: avatarImageUrl,
+                avatar_image_filename: avatarImageFilename,
+                uses_custom_image: communityChar.uses_custom_image,
+                original_id: communityChar.id // Track where it came from
+            };
+
+            return this.localDb.createCharacter(userId, characterData);
         } catch (error) {
             console.error('Error importing character:', error);
-            // Check if it's a network error
-            if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.message?.includes('fetch failed')) {
-                const offlineError = new Error('Unable to import character - no internet connection');
-                offlineError.code = 'OFFLINE';
-                offlineError.offline = true;
-                throw offlineError;
-            }
             throw error;
         }
+    }
+
+    // ============================================================================
+    // RELATIONSHIP OPERATIONS
+    // Always uses local SQLite database
+    // ============================================================================
+
+    async getRelationship(characterId, userId, targetType = 'user') {
+        return this.localDb.getRelationship(characterId, userId, targetType);
+    }
+
+    async getRelationshipsForCharacter(characterId, userId, targetType = null) {
+        const relationships = this.localDb.getRelationshipsForCharacter(characterId, userId, targetType);
+        return relationships || [];
+    }
+
+    async createOrUpdateRelationship(characterId, userId, relationshipData) {
+        return this.localDb.createOrUpdateRelationship(characterId, userId, relationshipData);
+    }
+
+    async deleteRelationship(characterId, userId, targetId) {
+        return this.localDb.deleteRelationship(characterId, userId, targetId);
+    }
+
+    async importSceneFromCommunity(userId, communitySceneId) {
+        if (!this.isCommunityAvailable()) {
+            const error = new Error('Community features require internet connection');
+            error.code = 'COMMUNITY_UNAVAILABLE';
+            throw error;
+        }
+
+        try {
+            // Get scene from Supabase community
+            const { data: communityScene, error } = await this.supabase
+                .from('community_scenes')
+                .select('*')
+                .eq('id', communitySceneId)
+                .single();
+
+            if (error) throw error;
+
+            // Download background image if it has a custom background
+            let backgroundImageFilename = communityScene.background_image_filename;
+            let backgroundImageUrl = communityScene.background_image_url;
+            
+            if (communityScene.uses_custom_background && communityScene.background_image_url) {
+                const ImageService = require('./ImageService');
+                const imageService = new ImageService(this.supabase);
+                const downloadedFilename = await imageService.downloadImageFromUrl(
+                    communityScene.background_image_url,
+                    userId
+                );
+                
+                if (downloadedFilename) {
+                    backgroundImageFilename = downloadedFilename;
+                    // Use local path for imported scene
+                    backgroundImageUrl = `/uploads/${downloadedFilename}`;
+                }
+            }
+
+            // Import to local SQLite database
+            const sceneData = {
+                name: communityScene.title || communityScene.name || 'Imported Scene',
+                description: communityScene.description || 'An imported community scene.',
+                initial_message: communityScene.initial_message || 'Welcome to this scene!',
+                atmosphere: communityScene.category || communityScene.atmosphere || 'neutral',
+                tags: communityScene.tags,
+                background_image_url: backgroundImageUrl,
+                background_image_filename: backgroundImageFilename,
+                uses_custom_background: communityScene.uses_custom_background,
+                original_id: communityScene.id // Track where it came from
+            };
+
+            return this.localDb.createScenario(userId, sceneData);
+        } catch (error) {
+            console.error('Error importing scene:', error);
+            throw error;
+        }
+    }
+
+    // ============================================================================
+    // MEMORY OPERATIONS
+    // All memory operations use local SQLite database
+    // ============================================================================
+
+    async getMemoriesByCharacter(characterId, userId, limit = 20) {
+        return this.localDb.getMemoriesByCharacter(characterId, userId, limit);
+    }
+
+    async getCharacterMemories(characterId, userId, limit = 20) {
+        return this.localDb.getMemoriesByCharacter(characterId, userId, limit);
+    }
+
+    async getMemoriesAcrossSessions(characterId, userId, limit = 15) {
+        return this.localDb.getMemoriesAcrossSessions(characterId, userId, limit);
+    }
+
+    async createMemory(characterId, userId, memoryData) {
+        return this.localDb.createMemory(characterId, userId, memoryData);
+    }
+
+    async updateMemoryAccess(memoryId) {
+        return this.localDb.updateMemoryAccess(memoryId);
+    }
+
+    async getCharacterRelationship(characterId, userId) {
+        return this.localDb.getRelationship(characterId, userId, 'user');
+    }
+
+    async clearCharacterMemories(characterId, userId) {
+        await this.localDb.clearMemoriesForCharacter(characterId, userId);
+        // Also clear the relationship
+        await this.localDb.deleteRelationship(characterId, userId, userId);
     }
 
     /**
      * Get database statistics
      */
     getStats() {
-        if (this.isLocalMode()) {
-            return this.localDb.getStats();
-        }
-        return {
-            mode: 'web',
-            message: 'Stats not available in web mode'
-        };
+        return this.localDb.getStats();
+    }
+
+    // ============================================================================
+    // CHARACTER LEARNING OPERATIONS
+    // ============================================================================
+
+    getCharacterLearning(characterId, learningType = null) {
+        return this.localDb.getCharacterLearning(characterId, learningType);
+    }
+
+    createOrUpdateLearning(characterId, learningType, patternData, confidenceScore = 0.5) {
+        return this.localDb.createOrUpdateLearning(characterId, learningType, patternData, confidenceScore);
+    }
+
+    incrementLearningUsage(learningId) {
+        return this.localDb.incrementLearningUsage(learningId);
+    }
+
+    deleteLearningPatterns(characterId, learningType = null) {
+        return this.localDb.deleteLearningPatterns(characterId, learningType);
+    }
+
+    // ============================================================================
+    // TOPIC ENGAGEMENT OPERATIONS
+    // ============================================================================
+
+    getTopicEngagement(characterId, topic = null) {
+        return this.localDb.getTopicEngagement(characterId, topic);
+    }
+
+    getTopInterests(characterId, limit = 10) {
+        return this.localDb.getTopInterests(characterId, limit);
+    }
+
+    createOrUpdateTopicEngagement(characterId, topic, interestDelta = 0.1, emotionalAssociation = 0.0) {
+        return this.localDb.createOrUpdateTopicEngagement(characterId, topic, interestDelta, emotionalAssociation);
+    }
+
+    deleteTopicEngagement(characterId, topic = null) {
+        return this.localDb.deleteTopicEngagement(characterId, topic);
     }
 }
 

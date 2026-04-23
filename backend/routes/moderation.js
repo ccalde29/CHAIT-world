@@ -50,16 +50,9 @@ router.get('/queue', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch moderation queue' });
     }
 
-    // Add report count for each character (if needed later)
-    // For now, just return the characters
-    const queueWithReportCount = queue.map(char => ({
-      ...char,
-      report_count: 0 // TODO: Add actual report count if character_reports table exists
-    }));
-
     res.json({
-      queue: queueWithReportCount || [],
-      total: queueWithReportCount?.length || 0
+      queue: queue || [],
+      total: queue?.length || 0
     });
 
   } catch (error) {
@@ -100,7 +93,7 @@ router.get('/stats', requireAdmin, async (req, res) => {
         .eq('status', 'pending');
       unresolvedReports = count || 0;
     } catch (error) {
-      console.log('[Moderation] Error fetching community reports count:', error);
+      // Error fetching community reports count
     }
 
     // Total community characters
@@ -113,10 +106,8 @@ router.get('/stats', requireAdmin, async (req, res) => {
       .from('community_scenes')
       .select('*', { count: 'exact', head: true });
 
-    // Total users (with settings)
-    const { count: totalUsers } = await getSupabase()
-      .from('user_settings')
-      .select('*', { count: 'exact', head: true });
+    // Total users — user_settings is SQLite-only, count not available from Supabase
+    const totalUsers = 0;
 
     // Get top characters by imports
     const { data: topCharacters } = await getSupabase()
@@ -289,7 +280,6 @@ router.post('/reports/:reportId/resolve', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to update report' });
     }
 
-    console.log(`[Moderation] Report ${reportId} (${report.report_type}) resolved with action: ${action}`);
     res.json({
       message: 'Report resolved successfully',
       report: updatedReport,
@@ -336,7 +326,6 @@ router.post('/approve/:characterId', requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Community character not found' });
     }
 
-    console.log(`[Moderation] Community character ${characterId} approved by admin ${userId}`);
     res.json({
       message: 'Character approved successfully',
       character
@@ -377,13 +366,6 @@ router.post('/reject/:characterId', requireAdmin, async (req, res) => {
 
     if (!character) {
       return res.status(404).json({ error: 'Community character not found' });
-    }
-
-    // Log the rejection reason if provided
-    if (reason) {
-      console.log(`[Moderation] Community character ${characterId} rejected by admin ${userId}. Reason: ${reason}`);
-    } else {
-      console.log(`[Moderation] Community character ${characterId} rejected by admin ${userId}`);
     }
 
     res.json({
@@ -428,7 +410,6 @@ router.post('/bulk-approve', requireAdmin, async (req, res) => {
       return res.status(500).json({ error: 'Failed to bulk approve characters' });
     }
 
-    console.log(`[Moderation] ${characters.length} community characters bulk approved by admin ${userId}`);
     res.json({
       message: `${characters.length} characters approved successfully`,
       count: characters.length

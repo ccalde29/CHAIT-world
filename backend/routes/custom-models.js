@@ -1,235 +1,87 @@
-// ============================================================================
-// Custom Models Routes (Admin Only)
-// Manage admin-created AI model presets with custom system prompts
-// ============================================================================
+// backend/routes/custom-models.js
+// CRUD routes for local custom model presets
 
 const express = require('express');
-const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
-const { requireAdmin } = require('../middleware/adminAuth');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+module.exports = (db) => {
+    const router = express.Router();
 
-/**
- * GET /api/custom-models
- * Get all active custom models (available to all users)
- */
-router.get('/', async (req, res) => {
-  try {
-    const { data: models, error } = await supabase
-      .from('custom_models')
-      .select('*')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+    // GET /api/custom-models — list all presets for the current user
+    router.get('/', async (req, res) => {
+        try {
+            const models = await db.getCustomModels(req.userId);
+            res.json({ models });
+        } catch (err) {
+            console.error('[custom-models] GET /', err);
+            res.status(500).json({ error: 'Failed to fetch custom models' });
+        }
+    });
 
-    if (error) {
-      console.error('[CustomModels] Error fetching models:', error);
-      return res.status(500).json({ error: 'Failed to fetch custom models' });
-    }
+    // GET /api/custom-models/:id
+    router.get('/:id', async (req, res) => {
+        try {
+            const model = await db.getCustomModel(req.params.id);
+            if (!model) return res.status(404).json({ error: 'Model not found' });
+            res.json(model);
+        } catch (err) {
+            console.error('[custom-models] GET /:id', err);
+            res.status(500).json({ error: 'Failed to fetch model' });
+        }
+    });
 
-    res.json({ models: models || [] });
+    // POST /api/custom-models — create a preset
+    router.post('/', async (req, res) => {
+        try {
+            const { name, display_name, description, provider, model_id,
+                    custom_system_prompt, temperature, max_tokens,
+                    top_p, frequency_penalty, presence_penalty, repetition_penalty,
+                    stop_sequences, tags } = req.body;
 
-  } catch (error) {
-    console.error('[CustomModels] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+            if (!name || !provider || !model_id) {
+                return res.status(400).json({ error: 'name, provider, and model_id are required' });
+            }
 
-/**
- * GET /api/custom-models/admin
- * Get all custom models including inactive (admin only)
- */
-router.get('/admin', requireAdmin, async (req, res) => {
-  try {
-    const { data: models, error } = await supabase
-      .from('custom_models')
-      .select('*')
-      .order('created_at', { ascending: false });
+            const model = await db.createCustomModel(req.userId, {
+                name, display_name, description, provider, model_id,
+                custom_system_prompt, temperature, max_tokens,
+                top_p, frequency_penalty, presence_penalty, repetition_penalty,
+                stop_sequences, tags
+            });
 
-    if (error) {
-      console.error('[CustomModels] Error fetching admin models:', error);
-      return res.status(500).json({ error: 'Failed to fetch models' });
-    }
+            res.status(201).json(model);
+        } catch (err) {
+            console.error('[custom-models] POST /', err);
+            res.status(500).json({ error: 'Failed to create model' });
+        }
+    });
 
-    res.json({ models: models || [] });
+    // PUT /api/custom-models/:id — update a preset
+    router.put('/:id', async (req, res) => {
+        try {
+            const existing = await db.getCustomModel(req.params.id);
+            if (!existing) return res.status(404).json({ error: 'Model not found' });
 
-  } catch (error) {
-    console.error('[CustomModels] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+            const model = await db.updateCustomModel(req.params.id, req.body);
+            res.json(model);
+        } catch (err) {
+            console.error('[custom-models] PUT /:id', err);
+            res.status(500).json({ error: 'Failed to update model' });
+        }
+    });
 
-/**
- * POST /api/custom-models
- * Create a new custom model (admin only)
- */
-router.post('/', requireAdmin, async (req, res) => {
-  try {
-    const userId = req.headers['user-id'];
-    const {
-      name,
-      display_name,
-      description,
-      openrouter_model_id,
-      custom_system_prompt,
-      temperature,
-      max_tokens,
-      tags
-    } = req.body;
+    // DELETE /api/custom-models/:id
+    router.delete('/:id', async (req, res) => {
+        try {
+            const existing = await db.getCustomModel(req.params.id);
+            if (!existing) return res.status(404).json({ error: 'Model not found' });
 
-    // Validation
-    if (!name || !display_name || !openrouter_model_id) {
-      return res.status(400).json({
-        error: 'Name, display name, and OpenRouter model ID are required'
-      });
-    }
+            await db.deleteCustomModel(req.params.id);
+            res.json({ success: true });
+        } catch (err) {
+            console.error('[custom-models] DELETE /:id', err);
+            res.status(500).json({ error: 'Failed to delete model' });
+        }
+    });
 
-    // Validate temperature
-    if (temperature !== undefined && (temperature < 0 || temperature > 2.0)) {
-      return res.status(400).json({
-        error: 'Temperature must be between 0.0 and 2.0'
-      });
-    }
-
-    // Validate max_tokens
-    if (max_tokens !== undefined && (max_tokens < 50 || max_tokens > 1000)) {
-      return res.status(400).json({
-        error: 'Max tokens must be between 50 and 1000'
-      });
-    }
-
-    const { data: model, error } = await supabase
-      .from('custom_models')
-      .insert({
-        created_by_admin_id: userId,
-        name: name.trim(),
-        display_name: display_name.trim(),
-        description: description?.trim(),
-        openrouter_model_id: openrouter_model_id.trim(),
-        custom_system_prompt: custom_system_prompt?.trim(),
-        temperature: temperature !== undefined ? temperature : 0.8,
-        max_tokens: max_tokens !== undefined ? max_tokens : 150,
-        tags: tags || [],
-        is_active: true
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === '23505') { // Unique violation
-        return res.status(400).json({ error: 'A model with this name already exists' });
-      }
-      console.error('[CustomModels] Error creating model:', error);
-      return res.status(500).json({ error: 'Failed to create custom model' });
-    }
-
-    console.log(`[CustomModels] Admin ${userId} created custom model: ${model.name}`);
-    res.status(201).json({ model, message: 'Custom model created successfully' });
-
-  } catch (error) {
-    console.error('[CustomModels] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * PUT /api/custom-models/:id
- * Update a custom model (admin only)
- */
-router.put('/:id', requireAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body;
-
-    // Remove fields that shouldn't be updated directly
-    delete updates.id;
-    delete updates.created_by_admin_id;
-    delete updates.created_at;
-
-    // Validate temperature if provided
-    if (updates.temperature !== undefined && (updates.temperature < 0 || updates.temperature > 2.0)) {
-      return res.status(400).json({
-        error: 'Temperature must be between 0.0 and 2.0'
-      });
-    }
-
-    // Validate max_tokens if provided
-    if (updates.max_tokens !== undefined && (updates.max_tokens < 50 || updates.max_tokens > 1000)) {
-      return res.status(400).json({
-        error: 'Max tokens must be between 50 and 1000'
-      });
-    }
-
-    // Add updated_at timestamp
-    updates.updated_at = new Date().toISOString();
-
-    const { data: model, error } = await supabase
-      .from('custom_models')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === '23505') { // Unique violation
-        return res.status(400).json({ error: 'A model with this name already exists' });
-      }
-      console.error('[CustomModels] Error updating model:', error);
-      return res.status(500).json({ error: 'Failed to update custom model' });
-    }
-
-    if (!model) {
-      return res.status(404).json({ error: 'Custom model not found' });
-    }
-
-    console.log(`[CustomModels] Updated model: ${model.name}`);
-    res.json({ model, message: 'Custom model updated successfully' });
-
-  } catch (error) {
-    console.error('[CustomModels] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * DELETE /api/custom-models/:id
- * Delete a custom model (admin only)
- */
-router.delete('/:id', requireAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Check if model exists first
-    const { data: existing } = await supabase
-      .from('custom_models')
-      .select('name')
-      .eq('id', id)
-      .single();
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Custom model not found' });
-    }
-
-    const { error } = await supabase
-      .from('custom_models')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('[CustomModels] Error deleting model:', error);
-      return res.status(500).json({ error: 'Failed to delete custom model' });
-    }
-
-    console.log(`[CustomModels] Deleted model: ${existing.name}`);
-    res.json({ success: true, message: 'Custom model deleted successfully' });
-
-  } catch (error) {
-    console.error('[CustomModels] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-module.exports = router;
+    return router;
+};

@@ -28,9 +28,9 @@ class CommunityService {
       } = options;
 
       let query = this.supabase
-        .from('community_characters') // Using the view we created
-        .select('*')
-        .eq('moderation_status', 'approved'); // Only show approved characters
+        .from('community_characters')
+        .select('*', { count: 'exact' })
+        .eq('moderation_status', 'approved');
 
       // Apply tag filters
       if (tags.length > 0) {
@@ -42,15 +42,14 @@ class CommunityService {
         query = query.or(`name.ilike.%${searchQuery}%,personality.ilike.%${searchQuery}%`);
       }
 
-      // Apply sorting
+      // Apply sorting — use only published_at as the stable fallback; import_count/view_count
+      // are optional denormalized columns that may not exist on all deployments.
       switch (sortBy) {
         case 'popular':
-          query = query.order('import_count', { ascending: false });
+          query = query.order('published_at', { ascending: false });
           break;
         case 'trending':
-          // Combination of recent + popular
-          query = query.order('view_count', { ascending: false })
-                      .order('published_at', { ascending: false });
+          query = query.order('published_at', { ascending: false });
           break;
         case 'recent':
         default:
@@ -80,14 +79,40 @@ class CommunityService {
    */
   async getPopularTags(limit = 20) {
     try {
-      const { data, error } = await this.supabase
-        .rpc('get_popular_tags', { tag_limit: limit });
+      // Get tags from community characters and scenes
+      const { data: characters, error: charError } = await this.supabase
+        .from('community_characters')
+        .select('tags');
 
-      if (error) throw error;
-      return data || [];
+      const { data: scenes, error: sceneError } = await this.supabase
+        .from('community_scenes')
+        .select('tags');
+
+      if (charError && sceneError) {
+        throw charError || sceneError;
+      }
+
+      // Combine and count tags
+      const tagCounts = {};
+      const allTags = [
+        ...((characters || []).flatMap(c => c.tags || [])),
+        ...((scenes || []).flatMap(s => s.tags || []))
+      ];
+
+      allTags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      });
+
+      // Sort by count and return top tags
+      const sortedTags = Object.entries(tagCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([tag, count]) => ({ tag, count }));
+
+      return sortedTags;
     } catch (error) {
       console.error('Error getting popular tags:', error);
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -355,6 +380,22 @@ class CommunityService {
       // Handle content locking options
       const { isLocked = false, hiddenFields = [] } = options;
 
+      // Upload avatar image to Supabase storage if custom image is used
+      let avatarImageUrl = character.avatar_image_url;
+      if (character.uses_custom_image && character.avatar_image_filename) {
+        const ImageService = require('./ImageService');
+        const imageService = new ImageService(this.supabase);
+        const publicUrl = await imageService.uploadLocalImageToSupabase(
+          character.avatar_image_filename,
+          'character-avatars',
+          userId
+        );
+        if (publicUrl) {
+          avatarImageUrl = publicUrl;
+
+        }
+      }
+
       // Create community copy with hidden fields set to NULL
       const communityData = {
         original_character_id: characterId,
@@ -373,12 +414,17 @@ class CommunityService {
         max_tokens: character.max_tokens,
         context_window: character.context_window,
         memory_enabled: character.memory_enabled,
-        avatar_image_url: character.avatar_image_url,
+        avatar_image_url: avatarImageUrl,
         avatar_image_filename: character.avatar_image_filename,
         uses_custom_image: character.uses_custom_image,
         is_locked: isLocked,
         hidden_fields: hiddenFields,
-        moderation_status: moderationStatus
+        moderation_status: moderationStatus,
+        top_p: character.top_p ?? null,
+        frequency_penalty: character.frequency_penalty ?? null,
+        presence_penalty: character.presence_penalty ?? null,
+        repetition_penalty: character.repetition_penalty ?? null,
+        stop_sequences: character.stop_sequences ?? null
       };
 
       // Insert into community_characters table
@@ -393,7 +439,6 @@ class CommunityService {
         throw error;
       }
 
-      console.log(`Character published to community: ${data.id} (status: ${moderationStatus})`);
       return {
         ...data,
         requiresModeration: moderationStatus === 'pending'
@@ -560,7 +605,7 @@ class CommunityService {
       // Apply sorting
       switch (sortBy) {
         case 'popular':
-          query = query.order('import_count', { ascending: false });
+          query = query.order('published_at', { ascending: false });
           break;
         case 'recent':
         default:
@@ -577,8 +622,6 @@ class CommunityService {
         throw error;
       }
 
-      console.log(`Community scenes fetched: ${data?.length || 0} scenes, total: ${count}`);
-
       return {
         scenes: data || [],
         total: count || 0,
@@ -593,22 +636,44 @@ class CommunityService {
   /**
    * Publish scene to community
    */
-  async publishScene(userId, sceneId, options = {}) {
+  async publishScene(userId, sceneId, options = {}, localScene = null) {
     try {
-      // Get the scene from user's scenarios table
-      const { data: scene, error: fetchError } = await this.supabase
-        .from('scenarios')
-        .select('*')
-        .eq('id', sceneId)
-        .eq('user_id', userId)
-        .single();
+      // If localScene is provided, use it; otherwise try to fetch from Supabase (legacy)
+      let scene = localScene;
+      
+      if (!scene) {
+        // Try Supabase for backwards compatibility
+        const { data: supabaseScene, error: fetchError } = await this.supabase
+          .from('scenarios')
+          .select('*')
+          .eq('id', sceneId)
+          .eq('user_id', userId)
+          .single();
 
-      if (fetchError || !scene) {
-        throw new Error('Scene not found or you are not the owner');
+        if (fetchError || !supabaseScene) {
+          throw new Error('Scene not found or you are not the owner');
+        }
+        scene = supabaseScene;
       }
 
       // Handle content locking options
       const { isLocked = false, hiddenFields = [] } = options;
+
+      // Upload background image to Supabase storage if custom background is used
+      let backgroundImageUrl = scene.background_image_url;
+      if (scene.uses_custom_background && scene.background_image_filename) {
+        const ImageService = require('./ImageService');
+        const imageService = new ImageService(this.supabase);
+        const publicUrl = await imageService.uploadLocalImageToSupabase(
+          scene.background_image_filename,
+          'scene-backgrounds',
+          userId
+        );
+        if (publicUrl) {
+          backgroundImageUrl = publicUrl;
+
+        }
+      }
 
       // Create community copy with hidden fields set to NULL
       const communityData = {
@@ -618,7 +683,7 @@ class CommunityService {
         description: hiddenFields.includes('description') ? null : scene.description,
         initial_message: scene.initial_message,
         atmosphere: scene.atmosphere,
-        background_image_url: scene.background_image_url,
+        background_image_url: backgroundImageUrl,
         background_image_filename: scene.background_image_filename,
         uses_custom_background: scene.uses_custom_background,
         is_locked: isLocked,
@@ -637,7 +702,6 @@ class CommunityService {
         throw error;
       }
 
-      console.log('Scene published to community:', data.id);
       return data;
     } catch (error) {
       console.error('Error publishing scene:', error);
@@ -719,10 +783,90 @@ class CommunityService {
         })
         .eq('id', communitySceneId);
 
+      // Track the import
+      try {
+        await this.supabase
+          .from('scene_imports')
+          .insert({
+            original_scene_id: communityScene.original_scenario_id,
+            imported_scene_id: newScene.id,
+            imported_by_user_id: userId
+          });
+      } catch (importTrackError) {
+        console.warn('Could not track scene import:', importTrackError.message);
+      }
+
       return newScene;
     } catch (error) {
       console.error('Error importing scene:', error);
       throw error;
+    }
+  }
+
+  // ============================================================================
+  // SCENE FAVORITES
+  // ============================================================================
+
+  async addToSceneFavorites(userId, sceneId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('scene_favorites')
+        .insert({ user_id: userId, scene_id: sceneId })
+        .select()
+        .single();
+      if (error && error.code !== '23505') throw error; // ignore duplicate
+      return data;
+    } catch (error) {
+      console.error('Error adding scene to favorites:', error);
+      return null;
+    }
+  }
+
+  async removeFromSceneFavorites(userId, sceneId) {
+    try {
+      const { error } = await this.supabase
+        .from('scene_favorites')
+        .delete()
+        .eq('user_id', userId)
+        .eq('scene_id', sceneId);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error removing scene from favorites:', error);
+      return true;
+    }
+  }
+
+  async getUserSceneFavorites(userId, limit = 50) {
+    try {
+      if (!userId || userId === 'undefined' || userId === 'anonymous') return [];
+      const { data, error } = await this.supabase
+        .from('scene_favorites')
+        .select('scene_id, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error getting user scene favorites:', error);
+      return [];
+    }
+  }
+
+  async isSceneFavorited(userId, sceneId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('scene_favorites')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('scene_id', sceneId)
+        .single();
+      if (error && error.code !== 'PGRST116') throw error;
+      return !!data;
+    } catch (error) {
+      console.error('Error checking scene favorite status:', error);
+      return false;
     }
   }
 

@@ -19,7 +19,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
     interests: [],
     communication_style: '',
     avatar: '👤',
-    color: 'from-blue-500 to-indigo-500'
+    color: 'bg-orange-600'
   });
   
   const [saving, setSaving] = useState(false);
@@ -29,16 +29,16 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
 
   // Pre-defined color options
   const colorOptions = [
-    { name: 'Blue Indigo', value: 'from-blue-500 to-indigo-500' },
-    { name: 'Purple Pink', value: 'from-purple-500 to-pink-500' },
-    { name: 'Green Teal', value: 'from-green-500 to-teal-500' },
-    { name: 'Orange Red', value: 'from-orange-500 to-red-500' },
-    { name: 'Yellow Amber', value: 'from-yellow-500 to-amber-500' },
-    { name: 'Cyan Blue', value: 'from-cyan-500 to-blue-500' },
-    { name: 'Rose Pink', value: 'from-rose-500 to-pink-500' },
-    { name: 'Emerald Green', value: 'from-emerald-500 to-green-500' },
-    { name: 'Violet Purple', value: 'from-violet-500 to-purple-500' },
-    { name: 'Gray Slate', value: 'from-gray-500 to-slate-500' }
+    { name: 'Orange Light', value: 'bg-orange-500' },
+    { name: 'Orange', value: 'bg-orange-600' },
+    { name: 'Orange Dark', value: 'bg-orange-700' },
+    { name: 'Gray Light', value: 'bg-gray-600' },
+    { name: 'Gray', value: 'bg-gray-700' },
+    { name: 'Gray Dark', value: 'bg-gray-800' },
+    { name: 'Black Orange', value: 'bg-orange-900' },
+    { name: 'Warm Gray', value: 'bg-gray-500' },
+    { name: 'Deep Orange', value: 'bg-orange-800' },
+    { name: 'Stone', value: 'bg-gray-700' }
   ];
 
   // Popular emoji options for user avatars
@@ -90,7 +90,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
         interests: persona.interests || [],
         communication_style: persona.communication_style || '',
         avatar: persona.avatar || '👤',
-        color: persona.color || 'from-blue-500 to-indigo-500'
+        color: persona.color || 'bg-orange-600'
       });
     } else {
       // Reset to defaults
@@ -100,7 +100,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
         interests: [],
         communication_style: '',
         avatar: '👤',
-        color: 'from-blue-500 to-indigo-500'
+        color: 'bg-orange-600'
       });
     }
     setValidationErrors({});
@@ -215,7 +215,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <User className="text-blue-400" size={24} />
+            <User className="text-orange-400" size={24} />
             <h2 className="text-xl font-bold text-white">
               Your Persona
             </h2>
@@ -232,7 +232,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
         <div className="p-6 space-y-6">
           {/* Persona Preview */}
           <div className="flex items-center gap-4 p-4 bg-white/5 rounded-lg border border-white/10">
-            <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${formData.color} flex items-center justify-center text-2xl`}>
+            <div className={`w-12 h-12 rounded-full ${formData.color} flex items-center justify-center text-2xl`}>
               {formData.avatar}
             </div>
             <div>
@@ -245,7 +245,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
               {formData.interests.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {formData.interests.slice(0, 5).map((interest, index) => (
-                    <span key={index} className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded">
+                    <span key={index} className="text-xs bg-orange-600/20 text-orange-300 px-2 py-1 rounded">
                       {interest}
                     </span>
                   ))}
@@ -258,8 +258,8 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
           </div>
 
           {/* Info Box */}
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-blue-300 mb-2">💡 What is a User Persona?</h4>
+          <div className="bg-orange-600/10 border border-blue-500/20 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-orange-300 mb-2">💡 What is a User Persona?</h4>
             <p className="text-xs text-blue-200">
               Your persona represents how you present yourself in conversations. It helps AI characters understand your personality, interests, and communication style, allowing them to respond more naturally and build better relationships with you over time.
             </p>
@@ -270,7 +270,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Your Name *
               <span className={`ml-2 text-xs ${
-                formData.name.length > 100 ? 'text-red-400' : 'text-gray-500'
+                formData.name.length > 100 ? 'text-orange-400' : 'text-gray-500'
               }`}>
                 ({formData.name.length} / 100 characters)
               </span>
@@ -282,11 +282,11 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
               placeholder="How would you like to be addressed?"
               maxLength={100}
               className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
-                getFieldError('name') ? 'border-red-400' : 'border-white/10 focus:border-blue-400'
+                getFieldError('name') ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
               }`}
             />
             {getFieldError('name') && (
-              <p className="text-red-400 text-xs mt-1">{getFieldError('name')}</p>
+              <p className="text-orange-400 text-xs mt-1">{getFieldError('name')}</p>
             )}
           </div>
 
@@ -334,7 +334,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
                 <button
                   key={index}
                   onClick={() => handleInputChange('color', option.value)}
-                  className={`h-12 rounded-lg bg-gradient-to-r ${option.value} border-2 transition-all ${
+                  className={`h-12 rounded-lg ${option.value} border-2 transition-all ${
                     formData.color === option.value ? 'border-white' : 'border-transparent hover:border-white/50'
                   }`}
                   title={option.name}
@@ -368,7 +368,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Personality Description *
               <span className={`ml-2 text-xs ${
-                formData.personality.length > 500 ? 'text-red-400' : 'text-gray-500'
+                formData.personality.length > 500 ? 'text-orange-400' : 'text-gray-500'
               }`}>
                 ({formData.personality.length} / 500 characters)
               </span>
@@ -380,11 +380,11 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
               rows={6}
               maxLength={500}
               className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none resize-none ${
-                getFieldError('personality') ? 'border-red-400' : 'border-white/10 focus:border-blue-400'
+                getFieldError('personality') ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
               }`}
             />
             {getFieldError('personality') && (
-              <p className="text-red-400 text-xs mt-1">{getFieldError('personality')}</p>
+              <p className="text-orange-400 text-xs mt-1">{getFieldError('personality')}</p>
             )}
             <p className="text-xs text-gray-500 mt-1">This helps AI characters understand and respond to you better</p>
           </div>
@@ -401,12 +401,12 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
                 {formData.interests.map((interest, index) => (
                   <span
                     key={index}
-                    className="flex items-center gap-1 bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-sm"
+                    className="flex items-center gap-1 bg-orange-600/20 text-orange-300 px-2 py-1 rounded-full text-sm"
                   >
                     {interest}
                     <button
                       onClick={() => removeInterest(interest)}
-                      className="text-blue-300 hover:text-white"
+                      className="text-orange-300 hover:text-white"
                     >
                       <X size={12} />
                     </button>
@@ -423,11 +423,11 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
                 onChange={(e) => setCurrentInterest(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && addInterest()}
                 placeholder="Add an interest..."
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400"
               />
               <button
                 onClick={addInterest}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
               >
                 Add
               </button>
@@ -443,7 +443,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
                     onClick={() => addCommonInterest(interest)}
                     className={`text-xs px-2 py-1 rounded transition-colors ${
                       formData.interests.includes(interest)
-                        ? 'bg-blue-500/30 text-blue-300 cursor-default'
+                        ? 'bg-orange-600/30 text-orange-300 cursor-default'
                         : 'bg-white/10 text-gray-300 hover:bg-white/20'
                     }`}
                     disabled={formData.interests.includes(interest)}
@@ -468,11 +468,11 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
               placeholder="e.g., casual and friendly, formal and direct, humorous and relaxed..."
               maxLength={100}
               className={`w-full bg-white/5 border rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none ${
-                getFieldError('communication_style') ? 'border-red-400' : 'border-white/10 focus:border-blue-400'
+                getFieldError('communication_style') ? 'border-red-400' : 'border-white/10 focus:border-orange-400'
               }`}
             />
             {getFieldError('communication_style') && (
-              <p className="text-red-400 text-xs mt-1">{getFieldError('communication_style')}</p>
+              <p className="text-orange-400 text-xs mt-1">{getFieldError('communication_style')}</p>
             )}
             <p className="text-xs text-gray-500 mt-1">{formData.communication_style.length}/100 characters</p>
           </div>
@@ -507,7 +507,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
                   interests: [],
                   communication_style: '',
                   avatar: '👤',
-                  color: 'from-blue-500 to-indigo-500'
+                  color: 'bg-orange-600'
                 });
                 setValidationErrors({});
               }}
@@ -518,7 +518,7 @@ const UserPersonaEditor = ({ onSave, onClose, userPersona = null }) => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all"
+              className="px-6 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all"
             >
               {saving ? 'Saving...' : 'Save Persona'}
             </button>

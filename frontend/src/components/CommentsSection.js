@@ -108,7 +108,7 @@ const CommentsSection = ({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-        <MessageCircle size={16} className="text-blue-400" />
+        <MessageCircle size={16} className="text-orange-400" />
         <h3 className="text-sm font-medium text-white">
           Comments ({comments.length})
         </h3>
@@ -122,7 +122,7 @@ const CommentsSection = ({
           placeholder="Add a comment..."
           rows={3}
           maxLength={1000}
-          className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-400 resize-none text-sm"
+          className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-orange-400 resize-none text-sm"
         />
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500">
@@ -131,7 +131,7 @@ const CommentsSection = ({
           <button
             type="submit"
             disabled={!newComment.trim() || submitting}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm"
           >
             <Send size={14} />
             {submitting ? 'Posting...' : 'Post Comment'}
@@ -143,7 +143,7 @@ const CommentsSection = ({
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {loading ? (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-400 mx-auto"></div>
             <p className="text-sm text-gray-400 mt-2">Loading comments...</p>
           </div>
         ) : comments.length === 0 ? (
@@ -156,7 +156,7 @@ const CommentsSection = ({
             <div key={comment.id} className="bg-white/5 border border-white/10 rounded-lg p-3">
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-xs text-white font-bold">
+                  <div className="w-6 h-6 rounded-full bg-orange-600 flex items-center justify-center text-xs text-white font-bold">
                     {comment.display_name?.[0]?.toUpperCase() || '?'}
                   </div>
                   <div>
@@ -172,14 +172,14 @@ const CommentsSection = ({
                       setEditingComment(comment.id);
                       setEditText(comment.comment);
                     }}
-                    className="p-1 text-gray-400 hover:text-blue-400 transition-colors"
+                    className="p-1 text-gray-400 hover:text-orange-400 transition-colors"
                     title="Edit comment"
                   >
                     <Edit2 size={12} />
                   </button>
                   <button
                     onClick={() => handleDeleteComment(comment.id)}
-                    className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                    className="p-1 text-gray-400 hover:text-orange-400 transition-colors"
                     title="Delete comment"
                   >
                     <Trash2 size={12} />
@@ -194,7 +194,7 @@ const CommentsSection = ({
                     onChange={(e) => setEditText(e.target.value)}
                     rows={3}
                     maxLength={1000}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-blue-400 resize-none"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-white text-sm focus:outline-none focus:border-orange-400 resize-none"
                   />
                   <div className="flex items-center justify-end gap-2">
                     <button
@@ -210,7 +210,7 @@ const CommentsSection = ({
                     <button
                       onClick={() => handleUpdateComment(comment.id)}
                       disabled={!editText.trim() || submitting}
-                      className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded transition-colors"
+                      className="px-3 py-1 text-xs bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded transition-colors"
                     >
                       Save
                     </button>

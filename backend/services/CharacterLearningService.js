@@ -4,278 +4,185 @@
  */
 
 class CharacterLearningService {
-  constructor(supabase) {
-    this.supabase = supabase;
+  constructor(db) {
+    this.db = db;
   }
 
   /**
-   * Get learning data for a character
+   * Record an interaction and update learning patterns
+   */
+  async recordInteraction(userId, characterId, conversationContext = {}) {
+    try {
+      const { userMessage, characterResponse, userPersona } = conversationContext;
+      
+      if (!userMessage || !characterResponse) {
+        return { success: true };
+      }
+      
+      // COMMUNICATION STYLE LEARNING
+      await this.learnCommunicationStyle(characterId, userMessage, userPersona);
+      
+      // EMOTIONAL RESPONSE LEARNING
+      await this.learnEmotionalResponse(characterId, userMessage, characterResponse);
+      
+      // HUMOR STYLE LEARNING
+      await this.learnHumorStyle(characterId, userMessage);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error recording interaction:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Learn user's communication style
+   */
+  async learnCommunicationStyle(characterId, userMessage, userPersona) {
+    const existing = this.db.getCharacterLearning(characterId, 'communication_style');
+    
+    // Analyze message characteristics
+    const messageLength = userMessage.length;
+    const hasQuestions = /\?/.test(userMessage);
+    const hasEmojis = /[\u{1F600}-\u{1F64F}]/u.test(userMessage);
+    const isUppercase = userMessage === userMessage.toUpperCase() && messageLength > 5;
+    const punctuationDensity = (userMessage.match(/[!?.]/g) || []).length / messageLength;
+    
+    // Build pattern data
+    const newData = {
+      avg_message_length: messageLength,
+      asks_questions: hasQuestions,
+      uses_emojis: hasEmojis,
+      uses_caps: isUppercase,
+      punctuation_density: punctuationDensity,
+      formality_level: this.estimateFormality(userMessage)
+    };
+    
+    if (existing) {
+      // Merge with existing pattern (moving average)
+      const oldData = existing.pattern_data;
+      const merged = {
+        avg_message_length: (oldData.avg_message_length * 0.8 + messageLength * 0.2),
+        asks_questions: oldData.asks_questions || hasQuestions,
+        uses_emojis: oldData.uses_emojis || hasEmojis,
+        uses_caps: oldData.uses_caps || isUppercase,
+        punctuation_density: (oldData.punctuation_density * 0.8 + punctuationDensity * 0.2),
+        formality_level: (oldData.formality_level * 0.8 + newData.formality_level * 0.2)
+      };
+      
+      const confidence = Math.min(existing.confidence_score + 0.05, 1.0);
+      this.db.createOrUpdateLearning(characterId, 'communication_style', merged, confidence);
+    } else {
+      this.db.createOrUpdateLearning(characterId, 'communication_style', newData, 0.3);
+    }
+  }
+
+  /**
+   * Learn emotional response patterns
+   */
+  async learnEmotionalResponse(characterId, userMessage, characterResponse) {
+    const userEmotion = this.detectEmotion(userMessage);
+    const charEmotion = this.detectEmotion(characterResponse);
+    
+    if (!userEmotion || !charEmotion) return;
+    
+    const existing = this.db.getCharacterLearning(characterId, 'emotional_response');
+    
+    const newPattern = {
+      [`${userEmotion}_triggers_${charEmotion}`]: true,
+      last_user_emotion: userEmotion,
+      last_char_emotion: charEmotion
+    };
+    
+    if (existing) {
+      const oldData = existing.pattern_data;
+      const merged = { ...oldData, ...newPattern };
+      this.db.createOrUpdateLearning(characterId, 'emotional_response', merged, 
+        Math.min(existing.confidence_score + 0.05, 1.0));
+    } else {
+      this.db.createOrUpdateLearning(characterId, 'emotional_response', newPattern, 0.3);
+    }
+  }
+
+  /**
+   * Learn humor style preferences
+   */
+  async learnHumorStyle(characterId, userMessage) {
+    const hasJoke = /\b(lol|haha|lmao|😂|funny|hilarious)\b/i.test(userMessage);
+    const hasSarcasm = /(yeah right|sure|totally|definitely not)/i.test(userMessage);
+    const hasPun = /\b(pun intended|get it|see what i did)\b/i.test(userMessage);
+    
+    if (!hasJoke && !hasSarcasm && !hasPun) return;
+    
+    const existing = this.db.getCharacterLearning(characterId, 'humor_style');
+    
+    const newPattern = {
+      appreciates_jokes: hasJoke,
+      uses_sarcasm: hasSarcasm,
+      enjoys_puns: hasPun
+    };
+    
+    if (existing) {
+      const oldData = existing.pattern_data;
+      const merged = {
+        appreciates_jokes: oldData.appreciates_jokes || hasJoke,
+        uses_sarcasm: oldData.uses_sarcasm || hasSarcasm,
+        enjoys_puns: oldData.enjoys_puns || hasPun
+      };
+      this.db.createOrUpdateLearning(characterId, 'humor_style', merged, 
+        Math.min(existing.confidence_score + 0.1, 1.0));
+    } else {
+      this.db.createOrUpdateLearning(characterId, 'humor_style', newPattern, 0.4);
+    }
+  }
+
+  /**
+   * Get all learning data for a character
    */
   async getCharacterLearning(userId, characterId) {
     try {
-      const { data, error } = await this.supabase
-        .from('character_learning')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('character_id', characterId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-        throw error;
-      }
-
-      // Return existing data or default structure
-      return data || {
+      const patterns = this.db.getCharacterLearning(characterId);
+      
+      return {
         character_id: characterId,
         user_id: userId,
-        total_interactions: 0,
-        topics_discussed: [],
-        emotional_patterns: [],
-        avg_response_quality: 0.5,
-        learning_insights: [],
-        last_interaction: null
+        patterns: patterns || [],
+        total_interactions: patterns ? patterns.reduce((sum, p) => sum + (p.usage_count || 0), 0) : 0
       };
     } catch (error) {
       console.error('Error getting character learning:', error);
-      throw error;
+      return null;
     }
   }
 
   /**
-   * Update interaction count and last interaction time
+   * Helper: Estimate formality level
    */
-  async recordInteraction(userId, characterId) {
-    try {
-      // Get current data first
-      const learning = await this.getCharacterLearning(userId, characterId);
-      const totalInteractions = (learning.total_interactions || 0) + 1;
-
-      const { data, error } = await this.supabase
-        .from('character_learning')
-        .upsert({
-          user_id: userId,
-          character_id: characterId,
-          total_interactions: totalInteractions,
-          last_interaction: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,character_id'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error recording interaction:', error);
-      throw error;
-    }
+  estimateFormality(text) {
+    const formalWords = ['please', 'thank you', 'sir', 'madam', 'kindly', 'appreciate'];
+    const informalWords = ['yeah', 'nah', 'gonna', 'wanna', 'lol', 'hey'];
+    
+    const lower = text.toLowerCase();
+    const formalCount = formalWords.filter(w => lower.includes(w)).length;
+    const informalCount = informalWords.filter(w => lower.includes(w)).length;
+    
+    if (formalCount > informalCount) return 0.7;
+    if (informalCount > formalCount) return 0.3;
+    return 0.5;
   }
 
   /**
-   * Add a topic that was discussed
+   * Helper: Detect emotion in text
    */
-  async addTopicDiscussed(userId, characterId, topic, context = '') {
-    try {
-      // Get current topics
-      const learning = await this.getCharacterLearning(userId, characterId);
-      const topics = learning.topics_discussed || [];
-
-      // Check if topic already exists
-      const existingTopic = topics.find(t => t.topic === topic);
-
-      let updatedTopics;
-      if (existingTopic) {
-        // Increment count and update last discussed
-        updatedTopics = topics.map(t =>
-          t.topic === topic
-            ? { ...t, count: (t.count || 1) + 1, last_discussed: new Date().toISOString(), context }
-            : t
-        );
-      } else {
-        // Add new topic
-        updatedTopics = [...topics, {
-          topic,
-          count: 1,
-          first_discussed: new Date().toISOString(),
-          last_discussed: new Date().toISOString(),
-          context
-        }];
-      }
-
-      // Update database
-      const { data, error } = await this.supabase
-        .from('character_learning')
-        .upsert({
-          user_id: userId,
-          character_id: characterId,
-          topics_discussed: updatedTopics,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,character_id'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error adding topic:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Record an emotional pattern (e.g., user seems happy, frustrated, excited)
-   */
-  async recordEmotionalPattern(userId, characterId, emotion, intensity = 0.5) {
-    try {
-      const learning = await this.getCharacterLearning(userId, characterId);
-      const patterns = learning.emotional_patterns || [];
-
-      // Check if emotion already exists
-      const existingPattern = patterns.find(p => p.emotion === emotion);
-
-      let updatedPatterns;
-      if (existingPattern) {
-        // Update average intensity and count
-        const newCount = (existingPattern.count || 1) + 1;
-        const newAvgIntensity = ((existingPattern.avg_intensity || 0.5) * existingPattern.count + intensity) / newCount;
-
-        updatedPatterns = patterns.map(p =>
-          p.emotion === emotion
-            ? {
-                ...p,
-                count: newCount,
-                avg_intensity: newAvgIntensity,
-                last_observed: new Date().toISOString()
-              }
-            : p
-        );
-      } else {
-        // Add new emotional pattern
-        updatedPatterns = [...patterns, {
-          emotion,
-          count: 1,
-          avg_intensity: intensity,
-          first_observed: new Date().toISOString(),
-          last_observed: new Date().toISOString()
-        }];
-      }
-
-      // Update database
-      const { data, error } = await this.supabase
-        .from('character_learning')
-        .upsert({
-          user_id: userId,
-          character_id: characterId,
-          emotional_patterns: updatedPatterns,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,character_id'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error recording emotional pattern:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Add a learning insight about the user
-   */
-  async addLearningInsight(userId, characterId, insight, category = 'general') {
-    try {
-      const learning = await this.getCharacterLearning(userId, characterId);
-      const insights = learning.learning_insights || [];
-
-      // Add new insight
-      const newInsight = {
-        insight,
-        category,
-        confidence: 0.5,
-        discovered_at: new Date().toISOString()
-      };
-
-      const updatedInsights = [...insights, newInsight];
-
-      // Update database
-      const { data, error } = await this.supabase
-        .from('character_learning')
-        .upsert({
-          user_id: userId,
-          character_id: characterId,
-          learning_insights: updatedInsights,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,character_id'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error adding learning insight:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update response quality rating
-   */
-  async updateResponseQuality(userId, characterId, quality) {
-    try {
-      const learning = await this.getCharacterLearning(userId, characterId);
-      const currentQuality = learning.avg_response_quality || 0.5;
-      const totalInteractions = learning.total_interactions || 1;
-
-      // Calculate new average (weighted)
-      const newAvgQuality = (currentQuality * totalInteractions + quality) / (totalInteractions + 1);
-
-      // Update database
-      const { data, error } = await this.supabase
-        .from('character_learning')
-        .upsert({
-          user_id: userId,
-          character_id: characterId,
-          avg_response_quality: newAvgQuality,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,character_id'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error updating response quality:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get learning summary for all characters
-   */
-  async getUserLearningOverview(userId) {
-    try {
-      const { data, error } = await this.supabase
-        .from('character_learning')
-        .select('character_id, total_interactions, avg_response_quality, last_interaction')
-        .eq('user_id', userId)
-        .order('last_interaction', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error getting learning overview:', error);
-      throw error;
-    }
+  detectEmotion(text) {
+    const lower = text.toLowerCase();
+    
+    if (/\b(happy|excited|joy|great|wonderful|amazing)\b/.test(lower)) return 'positive';
+    if (/\b(sad|upset|disappointed|unhappy)\b/.test(lower)) return 'negative';
+    if (/\b(angry|mad|frustrated|furious)\b/.test(lower)) return 'angry';
+    if (/\b(worried|anxious|nervous|scared)\b/.test(lower)) return 'anxious';
+    
+    return null;
   }
 
   /**
@@ -283,19 +190,15 @@ class CharacterLearningService {
    */
   async deleteCharacterLearning(userId, characterId) {
     try {
-      const { error } = await this.supabase
-        .from('character_learning')
-        .delete()
-        .eq('user_id', userId)
-        .eq('character_id', characterId);
-
-      if (error) throw error;
+      this.db.deleteLearningPatterns(characterId);
       return { message: 'Learning data deleted' };
     } catch (error) {
       console.error('Error deleting learning data:', error);
-      throw error;
+      return { message: 'Error deleting learning data' };
     }
   }
 }
+
+module.exports = CharacterLearningService;
 
 module.exports = CharacterLearningService;

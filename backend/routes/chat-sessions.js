@@ -13,10 +13,17 @@ module.exports = (db) => {
         try {
             const { scenario, activeCharacters, title } = req.body;
 
+            // Get scenario name for better default title
+            let defaultTitle = 'New Chat';
+            if (scenario) {
+                const scenarioData = db.getScenario(scenario);
+                defaultTitle = scenarioData ? `${scenarioData.name} - ${new Date().toLocaleDateString()}` : 'New Chat';
+            }
+
             const session = await db.createChatSession(req.userId, {
                 scenario,
                 activeCharacters,
-                title: title || `Chat in ${scenario}`,
+                title: title || defaultTitle,
                 groupMode: 'natural'
             });
 
@@ -41,10 +48,10 @@ module.exports = (db) => {
 
             // Create the session
             const session = await db.createChatSession(req.userId, {
-                scenario: scenario_id,
-                activeCharacters: active_characters,
+                scenario_id: scenario_id,
+                active_characters: active_characters,
                 title: title || `Chat - ${new Date().toLocaleDateString()}`,
-                groupMode: 'natural'
+                group_mode: 'natural'
             });
 
             // Add the initial message if provided
@@ -55,7 +62,6 @@ module.exports = (db) => {
                 });
             }
 
-            console.log('✅ Created chat session with initial message:', session.id);
             res.status(201).json({
                 sessionId: session.id,
                 message: 'Chat session created successfully'
@@ -91,6 +97,11 @@ module.exports = (db) => {
             if (!session) {
                 return res.status(404).json({ error: 'Chat session not found' });
             }
+            
+            // Get messages for this session
+            const messages = await db.getChatMessages(req.params.sessionId, 100);
+            session.messages = messages;
+            
             res.json(session);
         } catch (error) {
             console.error('Error fetching chat session:', error);

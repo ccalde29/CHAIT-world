@@ -55,7 +55,7 @@ module.exports = (communityService, characterService, db) => {
     /**
      * Import a community character
      * POST /api/community/characters/:id/import
-     * Imports from Supabase community to local storage (if in local mode) or to user's characters (web mode)
+     * Imports from Supabase community to local SQLite database
      */
     router.post('/characters/:id/import', async (req, res) => {
         try {
@@ -64,29 +64,16 @@ module.exports = (communityService, characterService, db) => {
                 return res.status(401).json({ error: 'Authentication required' });
             }
 
-            // Use the database service to handle import (automatically routes to correct DB)
-            if (db && db.importCharacterFromCommunity) {
-                const character = await db.importCharacterFromCommunity(
-                    req.userId,
-                    req.params.id
-                );
-                
-                res.status(201).json({
-                    ...character,
-                    message: 'Character imported successfully'
-                });
-            } else {
-                // Fallback to communityService for backward compatibility
-                const character = await communityService.importCharacter(
-                    req.userId,
-                    req.params.id
-                );
-
-                res.status(201).json({
-                    ...character,
-                    message: 'Character imported successfully'
-                });
-            }
+            // Always use database service for import (handles local SQLite + Supabase community)
+            const character = await db.importCharacterFromCommunity(
+                req.userId,
+                req.params.id
+            );
+            
+            res.status(201).json({
+                ...character,
+                message: 'Character imported successfully'
+            });
         } catch (error) {
             console.error('Error importing character:', error);
             
@@ -116,16 +103,8 @@ module.exports = (communityService, characterService, db) => {
                 return res.status(401).json({ error: 'Authentication required' });
             }
             
-            // Get character from appropriate database
-            let character;
-            if (db && db.isLocalMode && db.isLocalMode()) {
-                // Local mode: get from SQLite
-                character = await db.getCharacter(req.params.id);
-            } else {
-                // Web mode: get from Supabase via characterService
-                const { characters } = await characterService.getCharacters(req.userId);
-                character = characters.find(c => c.id === req.params.id);
-            }
+            // Get character from local database
+            const character = await db.getCharacter(req.params.id);
 
             if (!character) {
                 return res.status(404).json({ error: 'Character not found' });
@@ -335,6 +314,20 @@ module.exports = (communityService, characterService, db) => {
     });
 
     /**
+     * Increment character view count
+     * POST /api/community/characters/:id/view
+     */
+    router.post('/characters/:id/view', async (req, res) => {
+        try {
+            await communityService.incrementViewCount(req.params.id);
+            res.json({ success: true });
+        } catch (error) {
+            console.error('Error incrementing view count:', error);
+            res.status(500).json({ error: 'Failed to update view count' });
+        }
+    });
+
+    /**
      * Report a character
      * POST /api/community/characters/:id/report
      */
@@ -403,13 +396,20 @@ module.exports = (communityService, characterService, db) => {
                 return res.status(401).json({ error: 'Authentication required' });
             }
 
+            // Get the scene from local database first
+            const localScene = await db.getScenario(req.userId, req.params.id);
+            if (!localScene) {
+                return res.status(404).json({ error: 'Scene not found' });
+            }
+
             // Get locking options from request body
             const { isLocked = false, hiddenFields = [] } = req.body;
 
             const published = await communityService.publishScene(
                 req.userId,
                 req.params.id,
-                { isLocked, hiddenFields }
+                { isLocked, hiddenFields },
+                localScene
             );
 
             res.json({
@@ -459,7 +459,8 @@ module.exports = (communityService, characterService, db) => {
                 return res.status(401).json({ error: 'Authentication required' });
             }
 
-            const scene = await communityService.importScene(
+            // Always import to local SQLite database via database service
+            const scene = await db.importSceneFromCommunity(
                 req.userId,
                 req.params.id
             );
@@ -486,6 +487,48 @@ module.exports = (communityService, characterService, db) => {
         } catch (error) {
             console.error('Error incrementing scene view count:', error);
             res.status(500).json({ error: 'Failed to update view count' });
+        }
+    });
+
+    /**
+     * Add scene to favorites
+     * POST /api/community/scenes/:id/favorite
+     */
+    router.post('/scenes/:id/favorite', async (req, res) => {
+        try {
+            await communityService.addToSceneFavorites(req.userId, req.params.id);
+            res.json({ message: 'Added to favorites' });
+        } catch (error) {
+            console.error('Error adding scene to favorites:', error);
+            res.status(500).json({ error: 'Failed to add to favorites' });
+        }
+    });
+
+    /**
+     * Remove scene from favorites
+     * DELETE /api/community/scenes/:id/favorite
+     */
+    router.delete('/scenes/:id/favorite', async (req, res) => {
+        try {
+            await communityService.removeFromSceneFavorites(req.userId, req.params.id);
+            res.json({ message: 'Removed from favorites' });
+        } catch (error) {
+            console.error('Error removing scene from favorites:', error);
+            res.status(500).json({ error: 'Failed to remove from favorites' });
+        }
+    });
+
+    /**
+     * Get user's scene favorites
+     * GET /api/community/scene-favorites
+     */
+    router.get('/scene-favorites', async (req, res) => {
+        try {
+            const favorites = await communityService.getUserSceneFavorites(req.userId);
+            res.json({ favorites });
+        } catch (error) {
+            console.error('Error fetching scene favorites:', error);
+            res.status(500).json({ error: 'Failed to fetch favorites' });
         }
     });
 

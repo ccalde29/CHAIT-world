@@ -76,9 +76,9 @@ const CharacterMemoryViewer = ({ character, onClose, apiRequest }) => {
   const getRelationshipColor = (type) => {
     switch (type) {
       case 'close_friend': return 'text-green-400 bg-green-400/20';
-      case 'friend': return 'text-blue-400 bg-blue-400/20';
+      case 'friend': return 'text-orange-400 bg-blue-400/20';
       case 'acquaintance': return 'text-yellow-400 bg-yellow-400/20';
-      case 'dislike': return 'text-red-400 bg-red-400/20';
+      case 'dislike': return 'text-orange-400 bg-red-400/20';
       default: return 'text-gray-400 bg-gray-400/20';
     }
   };
@@ -86,9 +86,9 @@ const CharacterMemoryViewer = ({ character, onClose, apiRequest }) => {
   const getMemoryTypeColor = (type) => {
     switch (type) {
       case 'relationship': return 'text-pink-400 bg-pink-400/20';
-      case 'event': return 'text-purple-400 bg-purple-400/20';
+      case 'event': return 'text-orange-400 bg-purple-400/20';
       case 'preference': return 'text-green-400 bg-green-400/20';
-      case 'fact': return 'text-blue-400 bg-blue-400/20';
+      case 'fact': return 'text-orange-400 bg-blue-400/20';
       default: return 'text-gray-400 bg-gray-400/20';
     }
   };
@@ -112,7 +112,7 @@ const CharacterMemoryViewer = ({ character, onClose, apiRequest }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${character.color} flex items-center justify-center text-sm`}>
+            <div className={`w-8 h-8 rounded-full ${character.color} flex items-center justify-center text-sm`}>
               {character.avatar}
             </div>
             <div>
@@ -132,11 +132,11 @@ const CharacterMemoryViewer = ({ character, onClose, apiRequest }) => {
         <div className="p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <RefreshCw className="animate-spin text-purple-400 mr-2" size={20} />
+              <RefreshCw className="animate-spin text-orange-400 mr-2" size={20} />
               <span className="text-white">Loading character data...</span>
             </div>
           ) : error ? (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-300">
+            <div className="bg-orange-600/10 border border-orange-500/20 rounded-lg p-4 text-orange-300">
               {error}
             </div>
           ) : (
@@ -203,7 +203,7 @@ const CharacterMemoryViewer = ({ character, onClose, apiRequest }) => {
               <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Brain className="text-purple-400" size={20} />
+                    <Brain className="text-orange-400" size={20} />
                     <h3 className="text-lg font-medium text-white">
                       Memories ({memories.length})
                     </h3>
@@ -228,7 +228,7 @@ const CharacterMemoryViewer = ({ character, onClose, apiRequest }) => {
                     
                     <button
                       onClick={clearMemories}
-                      className="p-1 text-gray-400 hover:text-red-400 transition-colors"
+                      className="p-1 text-gray-400 hover:text-orange-400 transition-colors"
                       title="Clear all memories"
                     >
                       <Trash2 size={16} />
@@ -260,7 +260,7 @@ const CharacterMemoryViewer = ({ character, onClose, apiRequest }) => {
                             </span>
                           </div>
                           
-                          <p className="text-sm text-white mb-2">{memory.memory_content}</p>
+                          <p className="text-sm text-white mb-2">{memory.content}</p>
                           
                           <div className="flex items-center justify-between text-xs text-gray-500">
                             <span>Accessed {memory.access_count || 1} times</span>
@@ -274,8 +274,8 @@ const CharacterMemoryViewer = ({ character, onClose, apiRequest }) => {
               </div>
 
               {/* Info Box */}
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-blue-300 mb-2">💡 How Character Memory Works</h4>
+              <div className="bg-orange-600/10 border border-blue-500/20 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-orange-300 mb-2">💡 How Character Memory Works</h4>
                 <ul className="text-xs text-blue-200 space-y-1">
                   <li>• <strong>Memories:</strong> Important facts and events from your conversations</li>
                   <li>• <strong>Relationships:</strong> How well the character knows and trusts you</li>

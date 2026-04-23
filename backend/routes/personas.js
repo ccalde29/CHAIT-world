@@ -4,13 +4,9 @@
 
 const express = require('express');
 const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
 const AIProviderService = require('../services/AIProviderService');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+module.exports = (db) => {
 
 /**
  * GET /api/personas
@@ -18,24 +14,24 @@ const supabase = createClient(
  */
 router.get('/', async (req, res) => {
   try {
-    const userId = req.headers['user-id'];
+    const userId = req.headers['user-id'] || req.userId;
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { data: personas, error } = await supabase
-      .from('user_personas')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const personas = db.localDb.all(
+      'SELECT * FROM user_personas WHERE user_id = ? ORDER BY created_at DESC',
+      [userId]
+    );
 
-    if (error) {
-      console.error('[Personas] Error fetching personas:', error);
-      return res.status(500).json({ error: 'Failed to fetch personas' });
-    }
+    // Parse JSON fields
+    const parsedPersonas = personas.map(p => ({
+      ...p,
+      interests: p.interests ? JSON.parse(p.interests) : []
+    }));
 
-    res.json({ personas });
+    res.json({ personas: parsedPersonas });
 
   } catch (error) {
     console.error('[Personas] Error:', error);
@@ -49,62 +45,51 @@ router.get('/', async (req, res) => {
  */
 router.get('/active', async (req, res) => {
   try {
-    const userId = req.headers['user-id'];
+    const userId = req.headers['user-id'] || req.userId;
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Get user settings to find active_persona_id
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('active_persona_id')
-      .eq('user_id', userId)
-      .single();
+    const settings = db.localDb.get(
+      'SELECT active_persona_id FROM user_settings_local WHERE user_id = ?',
+      [userId]
+    );
 
     let persona = null;
 
     // If active_persona_id is set, fetch that persona
     if (settings?.active_persona_id) {
-      const { data } = await supabase
-        .from('user_personas')
-        .select('*')
-        .eq('id', settings.active_persona_id)
-        .eq('user_id', userId)
-        .single();
-
-      persona = data;
+      persona = db.localDb.get(
+        'SELECT * FROM user_personas WHERE id = ? AND user_id = ?',
+        [settings.active_persona_id, userId]
+      );
     }
 
     // Fallback: Get first is_active persona if no active_persona_id
     if (!persona) {
-      const { data } = await supabase
-        .from('user_personas')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single();
-
-      persona = data;
+      persona = db.localDb.get(
+        'SELECT * FROM user_personas WHERE user_id = ? AND is_active = 1 ORDER BY created_at ASC LIMIT 1',
+        [userId]
+      );
     }
 
     // Fallback: Get any persona
     if (!persona) {
-      const { data } = await supabase
-        .from('user_personas')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single();
-
-      persona = data;
+      persona = db.localDb.get(
+        'SELECT * FROM user_personas WHERE user_id = ? ORDER BY created_at ASC LIMIT 1',
+        [userId]
+      );
     }
 
     if (!persona) {
       return res.status(404).json({ error: 'No persona found' });
+    }
+
+    // Parse JSON fields
+    if (persona.interests && typeof persona.interests === 'string') {
+      persona.interests = JSON.parse(persona.interests);
     }
 
     res.json({ persona });
@@ -121,7 +106,7 @@ router.get('/active', async (req, res) => {
  */
 router.post('/:personaId/activate', async (req, res) => {
   try {
-    const userId = req.headers['user-id'];
+    const userId = req.headers['user-id'] || req.userId;
     const { personaId } = req.params;
 
     if (!userId) {
@@ -129,33 +114,44 @@ router.post('/:personaId/activate', async (req, res) => {
     }
 
     // Verify persona belongs to user
-    const { data: persona, error: personaError } = await supabase
-      .from('user_personas')
-      .select('*')
-      .eq('id', personaId)
-      .eq('user_id', userId)
-      .single();
+    const persona = db.localDb.get(
+      'SELECT * FROM user_personas WHERE id = ? AND user_id = ?',
+      [personaId, userId]
+    );
 
-    if (personaError || !persona) {
+    if (!persona) {
       return res.status(404).json({ error: 'Persona not found' });
     }
 
+    // First, set all personas for this user to inactive
+    db.localDb.run(
+      'UPDATE user_personas SET is_active = 0 WHERE user_id = ?',
+      [userId]
+    );
+
+    // Then set the selected persona to active
+    db.localDb.run(
+      'UPDATE user_personas SET is_active = 1 WHERE id = ? AND user_id = ?',
+      [personaId, userId]
+    );
+
     // Update user_settings to set active_persona_id
-    const { error: updateError } = await supabase
-      .from('user_settings')
-      .upsert({
-        user_id: userId,
-        active_persona_id: parseInt(personaId)
-      }, {
-        onConflict: 'user_id'
-      });
+    const existing = db.localDb.get(
+      'SELECT id FROM user_settings_local WHERE user_id = ?',
+      [userId]
+    );
 
-    if (updateError) {
-      console.error('[Personas] Error setting active persona:', updateError);
-      return res.status(500).json({ error: 'Failed to set active persona' });
+    if (existing) {
+      db.localDb.run(
+        'UPDATE user_settings_local SET active_persona_id = ? WHERE user_id = ?',
+        [personaId, userId]
+      );
+    } else {
+      db.localDb.run(
+        'INSERT INTO user_settings_local (user_id, active_persona_id) VALUES (?, ?)',
+        [userId, personaId]
+      );
     }
-
-    console.log(`[Personas] User ${userId} activated persona ${personaId}: ${persona.name}`);
 
     res.json({
       success: true,
@@ -229,34 +225,48 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const { data: persona, error } = await supabase
-      .from('user_personas')
-      .insert({
-        user_id: userId,
-        name,
-        personality,
-        interests: interests || [],
-        communication_style: communication_style || '',
-        avatar: avatar || '👤',
-        color: color || 'from-blue-500 to-indigo-500',
-        avatar_image_url,
-        avatar_image_filename,
-        uses_custom_image: uses_custom_image || false,
-        is_active: true,
-        ai_provider: ai_provider || 'openai',
-        ai_model,
-        temperature: temperature !== undefined ? temperature : 0.8,
-        max_tokens: max_tokens !== undefined ? max_tokens : 150
-      })
-      .select()
-      .single();
+    // Check if user has any existing personas
+    const existingPersonas = db.localDb.all(
+      'SELECT id FROM user_personas WHERE user_id = ?',
+      [userId]
+    );
+    
+    // Only set as active if this is the user's first persona
+    const isActive = existingPersonas.length === 0 ? 1 : 0;
 
-    if (error) {
-      console.error('[Personas] Error creating persona:', error);
-      return res.status(500).json({ error: 'Failed to create persona' });
+    // Insert into local database
+    const stmt = db.localDb.db.prepare(`
+      INSERT INTO user_personas (
+        user_id, name, personality, interests, communication_style,
+        avatar, color, avatar_image_url, avatar_image_filename, uses_custom_image,
+        is_active, ai_provider, ai_model, temperature, max_tokens
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      userId,
+      name,
+      personality,
+      JSON.stringify(interests || []),
+      communication_style || '',
+      avatar || '👤',
+      color || 'from-blue-500 to-indigo-500',
+      avatar_image_url || null,
+      avatar_image_filename || null,
+      uses_custom_image ? 1 : 0,
+      isActive,
+      ai_provider || 'openai',
+      ai_model || null,
+      temperature !== undefined ? temperature : 0.8,
+      max_tokens !== undefined ? max_tokens : 150
+    );
+
+    const persona = db.localDb.get('SELECT * FROM user_personas WHERE rowid = ?', [result.lastInsertRowid]);
+    
+    // Parse JSON fields
+    if (persona.interests && typeof persona.interests === 'string') {
+      persona.interests = JSON.parse(persona.interests);
     }
-
-    console.log(`[Personas] Created new persona ${persona.id}: ${persona.name}`);
 
     res.json({ persona });
 
@@ -281,12 +291,10 @@ router.put('/:personaId', async (req, res) => {
     }
 
     // Verify persona belongs to user
-    const { data: existing } = await supabase
-      .from('user_personas')
-      .select('*')
-      .eq('id', personaId)
-      .eq('user_id', userId)
-      .single();
+    const existing = db.localDb.get(
+      'SELECT * FROM user_personas WHERE id = ? AND user_id = ?',
+      [personaId, userId]
+    );
 
     if (!existing) {
       return res.status(404).json({ error: 'Persona not found' });
@@ -321,20 +329,35 @@ router.put('/:personaId', async (req, res) => {
       });
     }
 
-    const { data: persona, error } = await supabase
-      .from('user_personas')
-      .update(updates)
-      .eq('id', personaId)
-      .eq('user_id', userId)
-      .select()
-      .single();
+    // Build update query
+    const fields = [];
+    const values = [];
+    
+    if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+    if (updates.personality !== undefined) { fields.push('personality = ?'); values.push(updates.personality); }
+    if (updates.interests !== undefined) { fields.push('interests = ?'); values.push(JSON.stringify(updates.interests)); }
+    if (updates.communication_style !== undefined) { fields.push('communication_style = ?'); values.push(updates.communication_style); }
+    if (updates.avatar !== undefined) { fields.push('avatar = ?'); values.push(updates.avatar); }
+    if (updates.color !== undefined) { fields.push('color = ?'); values.push(updates.color); }
+    if (updates.avatar_image_url !== undefined) { fields.push('avatar_image_url = ?'); values.push(updates.avatar_image_url); }
+    if (updates.avatar_image_filename !== undefined) { fields.push('avatar_image_filename = ?'); values.push(updates.avatar_image_filename); }
+    if (updates.uses_custom_image !== undefined) { fields.push('uses_custom_image = ?'); values.push(updates.uses_custom_image ? 1 : 0); }
+    if (updates.ai_provider !== undefined) { fields.push('ai_provider = ?'); values.push(updates.ai_provider); }
+    if (updates.ai_model !== undefined) { fields.push('ai_model = ?'); values.push(updates.ai_model); }
+    if (updates.temperature !== undefined) { fields.push('temperature = ?'); values.push(updates.temperature); }
+    if (updates.max_tokens !== undefined) { fields.push('max_tokens = ?'); values.push(updates.max_tokens); }
 
-    if (error) {
-      console.error('[Personas] Error updating persona:', error);
-      return res.status(500).json({ error: 'Failed to update persona' });
+    values.push(personaId, userId);
+
+    db.localDb.run(
+      `UPDATE user_personas SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
+      values
+    );
+
+    const persona = db.localDb.get('SELECT * FROM user_personas WHERE id = ?', [personaId]);
+    if (persona.interests && typeof persona.interests === 'string') {
+      persona.interests = JSON.parse(persona.interests);
     }
-
-    console.log(`[Personas] Updated persona ${personaId}: ${persona.name}`);
 
     res.json({ persona });
 
@@ -358,10 +381,10 @@ router.delete('/:personaId', async (req, res) => {
     }
 
     // Check if this is the only persona
-    const { data: allPersonas } = await supabase
-      .from('user_personas')
-      .select('id')
-      .eq('user_id', userId);
+    const allPersonas = db.localDb.all(
+      'SELECT id FROM user_personas WHERE user_id = ?',
+      [userId]
+    );
 
     if (allPersonas && allPersonas.length === 1) {
       return res.status(400).json({
@@ -370,39 +393,30 @@ router.delete('/:personaId', async (req, res) => {
     }
 
     // Check if this is the active persona
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('active_persona_id')
-      .eq('user_id', userId)
-      .single();
+    const settings = db.localDb.get(
+      'SELECT active_persona_id FROM user_settings_local WHERE user_id = ?',
+      [userId]
+    );
 
-    const isActive = settings?.active_persona_id === parseInt(personaId);
+    const isActive = settings?.active_persona_id === personaId;
 
     // Delete the persona
-    const { error } = await supabase
-      .from('user_personas')
-      .delete()
-      .eq('id', personaId)
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('[Personas] Error deleting persona:', error);
-      return res.status(500).json({ error: 'Failed to delete persona' });
-    }
+    db.localDb.run(
+      'DELETE FROM user_personas WHERE id = ? AND user_id = ?',
+      [personaId, userId]
+    );
 
     // If this was the active persona, set another one as active
     if (isActive && allPersonas && allPersonas.length > 1) {
-      const remainingPersona = allPersonas.find(p => p.id !== parseInt(personaId));
+      const remainingPersona = allPersonas.find(p => p.id !== personaId);
 
       if (remainingPersona) {
-        await supabase
-          .from('user_settings')
-          .update({ active_persona_id: remainingPersona.id })
-          .eq('user_id', userId);
+        db.localDb.run(
+          'UPDATE user_settings_local SET active_persona_id = ? WHERE user_id = ?',
+          [remainingPersona.id, userId]
+        );
       }
     }
-
-    console.log(`[Personas] Deleted persona ${personaId}`);
 
     res.json({ success: true, message: 'Persona deleted successfully' });
 
@@ -431,15 +445,18 @@ router.post('/:personaId/generate', async (req, res) => {
     }
 
     // Verify persona belongs to user
-    const { data: persona, error } = await supabase
-      .from('user_personas')
-      .select('*')
-      .eq('id', personaId)
-      .eq('user_id', userId)
-      .single();
+    const persona = db.localDb.get(
+      'SELECT * FROM user_personas WHERE id = ? AND user_id = ?',
+      [personaId, userId]
+    );
 
-    if (error || !persona) {
+    if (!persona) {
       return res.status(404).json({ error: 'Persona not found' });
+    }
+
+    // Parse JSON fields
+    if (persona.interests && typeof persona.interests === 'string') {
+      persona.interests = JSON.parse(persona.interests);
     }
 
     // Check if persona has AI model configured
@@ -450,11 +467,7 @@ router.post('/:personaId/generate', async (req, res) => {
     }
 
     // Get user settings for API keys
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('api_keys, ollama_settings')
-      .eq('user_id', userId)
-      .single();
+    const settings = await db.getUserSettings(userId);
 
     // Build persona prompt
     let personaPrompt = `You are ${persona.name}. Respond as this persona in the ongoing conversation.
@@ -477,7 +490,7 @@ ${persona.personality}`;
     personaPrompt += `\n\nRespond naturally in first person as ${persona.name}. Keep responses conversational and in-character.`;
 
     // Prepare character object for AIProviderService
-    const personaAsCharacter = {
+    let personaAsCharacter = {
       name: persona.name,
       ai_provider: persona.ai_provider,
       ai_model: persona.ai_model,
@@ -486,7 +499,16 @@ ${persona.personality}`;
     };
 
     // Generate response using AIProviderService
-    console.log(`[Personas] Generating auto-response for persona ${persona.name} (${persona.ai_provider}/${persona.ai_model})`);
+
+    // Prepare settings object with both ollama and lmstudio configurations
+    const localProviderSettings = {
+      ...settings?.ollamaSettings,
+      baseUrl: settings?.ollamaSettings?.baseUrl || 'http://localhost:11434',
+      lmStudioSettings: {
+        ...settings?.lmStudioSettings,
+        baseUrl: settings?.lmStudioSettings?.baseUrl || 'http://127.0.0.1:1234'
+      }
+    };
 
     const response = await AIProviderService.generateResponse(
       personaAsCharacter,
@@ -494,11 +516,9 @@ ${persona.personality}`;
         { role: 'system', content: personaPrompt },
         ...messages.slice(-10) // Last 10 messages for context
       ],
-      settings?.api_keys || {},
-      settings?.ollama_settings || {}
+      settings?.apiKeys || {},
+      localProviderSettings
     );
-
-    console.log(`[Personas] Generated response for persona ${persona.name}: ${response.substring(0, 50)}...`);
 
     res.json({
       success: true,
@@ -527,4 +547,5 @@ ${persona.personality}`;
   }
 });
 
-module.exports = router;
+return router;
+};

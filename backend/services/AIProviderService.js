@@ -17,14 +17,13 @@ class AIProviderService {
    * @param {Array} messages - Conversation messages in OpenAI format
    * @param {Object} apiKeys - User's API keys for various providers
    * @param {Object} ollamaSettings - Ollama configuration
+   * @param {Object} options - Additional options
    * @returns {Promise<string>} - AI response text
    */
-  static async generateResponse(character, messages, apiKeys = {}, ollamaSettings = {}) {
+  static async generateResponse(character, messages, apiKeys = {}, ollamaSettings = {}, options = {}) {
     const provider = character.ai_provider || 'openai';
     const model = character.ai_model || 'gpt-3.5-turbo';
-    
-    console.log(`[AI Service] Generating response for ${character.name} using ${provider}/${model}`);
-    
+
     try {
       // Route to appropriate provider
       switch (provider.toLowerCase()) {
@@ -50,7 +49,7 @@ class AIProviderService {
           return await this.callLMStudio(model, messages, lmStudioSettings, character);
 
         case 'custom':
-          return await this.callCustomModel(model, messages, apiKeys.openrouter, character);
+          return await this.callCustomModel(model, messages, apiKeys.openrouter, character, apiKeys);
 
         default:
           throw new Error(`Unsupported AI provider: ${provider}`);
@@ -61,8 +60,7 @@ class AIProviderService {
       
       // Try fallback if configured
       if (character.fallback_provider && character.fallback_model) {
-        console.log(`[AI Service] Attempting fallback: ${character.fallback_provider}/${character.fallback_model}`);
-        
+
         const fallbackChar = {
           ...character,
           ai_provider: character.fallback_provider,
@@ -94,10 +92,12 @@ class AIProviderService {
       body: JSON.stringify({
         model: model,
         messages: messages,
-        temperature: character.temperature || 0.8,
+        temperature: character.temperature ?? 0.8,
         max_tokens: character.max_tokens || 150,
-        presence_penalty: 0.6,
-        frequency_penalty: 0.3
+        ...(character.top_p != null && { top_p: character.top_p }),
+        ...(character.frequency_penalty != null ? { frequency_penalty: character.frequency_penalty } : { frequency_penalty: 0.3 }),
+        ...(character.presence_penalty != null ? { presence_penalty: character.presence_penalty } : { presence_penalty: 0.6 }),
+        ...(character.stop_sequences?.length && { stop: character.stop_sequences })
       })
     });
     
@@ -138,9 +138,11 @@ class AIProviderService {
       body: JSON.stringify({
         model: model,
         max_tokens: character.max_tokens || 150,
-        temperature: character.temperature || 0.8,
+        temperature: character.temperature ?? 0.8,
         system: systemMessage,
-        messages: conversationMessages
+        messages: conversationMessages,
+        ...(character.top_p != null && { top_p: character.top_p }),
+        ...(character.stop_sequences?.length && { stop_sequences: character.stop_sequences })
       })
     });
     
@@ -173,17 +175,33 @@ class AIProviderService {
       body: JSON.stringify({
         model: model, // e.g., 'anthropic/claude-3.5-sonnet'
         messages: messages,
-        temperature: character.temperature || 0.8,
-        max_tokens: character.max_tokens || 150
+        temperature: character.temperature ?? 0.8,
+        max_tokens: character.max_tokens || 150,
+        ...(character.top_p != null && { top_p: character.top_p }),
+        ...(character.frequency_penalty != null && { frequency_penalty: character.frequency_penalty }),
+        ...(character.presence_penalty != null && { presence_penalty: character.presence_penalty }),
+        ...(character.repetition_penalty != null && { repetition_penalty: character.repetition_penalty }),
+        ...(character.stop_sequences?.length && { stop: character.stop_sequences })
       })
     });
     
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error?.message || `OpenRouter API error: ${response.status}`);
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: { message: errorText } };
+      }
+      console.error('[OpenRouter] API Error:', response.status, errorData);
+      throw new Error(errorData.error?.message || `OpenRouter API error: ${response.status} - ${errorText.substring(0, 200)}`);
     }
     
     const data = await response.json();
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('[OpenRouter] Unexpected response format:', data);
+      throw new Error('Invalid response format from OpenRouter');
+    }
     return data.choices[0].message.content.trim();
   }
   
@@ -232,8 +250,10 @@ class AIProviderService {
         body: JSON.stringify({
           contents: contents,
           generationConfig: {
-            temperature: character.temperature || 0.8,
-            maxOutputTokens: character.max_tokens || 150
+            temperature: character.temperature ?? 0.8,
+            maxOutputTokens: character.max_tokens || 150,
+            ...(character.top_p != null && { topP: character.top_p }),
+            ...(character.stop_sequences?.length && { stopSequences: character.stop_sequences })
           }
         })
       }
@@ -304,8 +324,13 @@ class AIProviderService {
       body: JSON.stringify({
         model: model,
         prompt: prompt,
-        temperature: character.temperature || 0.8,
-        stream: false
+        temperature: character.temperature ?? 0.8,
+        stream: false,
+        options: {
+          ...(character.top_p != null && { top_p: character.top_p }),
+          ...(character.repetition_penalty != null && { repeat_penalty: character.repetition_penalty }),
+          ...(character.stop_sequences?.length && { stop: character.stop_sequences })
+        }
       })
     });
     
@@ -334,8 +359,12 @@ class AIProviderService {
         body: JSON.stringify({
           model: model,
           messages: messages,
-          temperature: character.temperature || 0.8,
-          max_tokens: character.max_tokens || 150
+          temperature: character.temperature ?? 0.8,
+          max_tokens: character.max_tokens || 150,
+          ...(character.top_p != null && { top_p: character.top_p }),
+          ...(character.frequency_penalty != null && { frequency_penalty: character.frequency_penalty }),
+          ...(character.presence_penalty != null && { presence_penalty: character.presence_penalty }),
+          ...(character.stop_sequences?.length && { stop: character.stop_sequences })
         })
       });
 
@@ -402,7 +431,7 @@ class AIProviderService {
   static getDefaultModel(provider) {
     const defaults = {
       'openai': 'gpt-4o-mini',
-      'anthropic': 'claude-3-5-haiku-20241022',
+      'anthropic': 'claude-haiku-4-5',
       'openrouter': 'openai/gpt-4o-mini',
       'google': 'gemini-2.5-flash',
       'ollama': 'llama2',
@@ -415,7 +444,7 @@ class AIProviderService {
   /**
    * Get available models for a provider
    */
-  static async getAvailableModels(provider, apiKey, ollamaSettings = {}, lmStudioSettings = {}) {
+  static async getAvailableModels(provider, apiKey, ollamaSettings = {}, lmStudioSettings = {}, userId = null) {
     try {
       switch (provider.toLowerCase()) {
         case 'openai':
@@ -437,7 +466,7 @@ class AIProviderService {
           return await this.getLMStudioModels(lmStudioSettings);
 
         case 'custom':
-          return await this.getCustomModels();
+          return await this.getCustomModels(userId);
 
         default:
           return [];
@@ -530,11 +559,9 @@ class AIProviderService {
   
   static getAnthropicModels() {
     return [
-      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Latest)' },
-      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' },
-      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-      { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' }
+      { id: 'claude-opus-4-6', name: 'Claude Opus 4.6 (Most Intelligent)' },
+      { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Balanced)' },
+      { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5 (Fastest)' }
     ];
   }
   
@@ -621,70 +648,67 @@ class AIProviderService {
   // CUSTOM MODELS
   // ==========================================================================
 
-  static async callCustomModel(customModelId, messages, openRouterApiKey, character) {
-    if (!openRouterApiKey) {
-      throw new Error('OpenRouter API key required for custom models');
+  static async callCustomModel(presetId, messages, openRouterApiKey, character, apiKeys = {}) {
+    // Look up the preset from local SQLite
+    const { getInstance } = require('./LocalDatabaseService');
+    const localDb = getInstance();
+    const preset = localDb.getCustomModel(presetId);
+
+    if (!preset || !preset.is_active) {
+      throw new Error('Custom model preset not found or inactive');
     }
 
-    const { createClient } = require('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-
-    const { data: customModel, error } = await supabase
-      .from('custom_models')
-      .select('*')
-      .eq('id', customModelId)
-      .eq('is_active', true)
-      .single();
-
-    if (error || !customModel) {
-      throw new Error('Custom model not found or inactive');
-    }
-
+    // Inject optional custom system prompt
     const enhancedMessages = [...messages];
-    if (customModel.custom_system_prompt) {
+    if (preset.custom_system_prompt) {
       const systemIndex = enhancedMessages.findIndex(m => m.role === 'system');
       if (systemIndex >= 0) {
-        // Inject custom system prompt AFTER the default system prompt
         enhancedMessages[systemIndex].content =
-          `${enhancedMessages[systemIndex].content}\n\n${customModel.custom_system_prompt}`;
+          `${enhancedMessages[systemIndex].content}\n\n${preset.custom_system_prompt}`;
       } else {
-        enhancedMessages.unshift({
-          role: 'system',
-          content: customModel.custom_system_prompt
-        });
+        enhancedMessages.unshift({ role: 'system', content: preset.custom_system_prompt });
       }
     }
 
-    return await this.callOpenRouter(
-      customModel.openrouter_model_id,
-      enhancedMessages,
-      openRouterApiKey,
-      {
-        ...character,
-        temperature: customModel.temperature,
-        max_tokens: customModel.max_tokens
-      }
-    );
+    // Build a merged character-like object with preset params overriding character params
+    const mergedCharacter = {
+      ...character,
+      temperature: preset.temperature ?? character.temperature,
+      max_tokens: preset.max_tokens ?? character.max_tokens,
+      top_p: preset.top_p ?? character.top_p ?? null,
+      frequency_penalty: preset.frequency_penalty ?? character.frequency_penalty ?? null,
+      presence_penalty: preset.presence_penalty ?? character.presence_penalty ?? null,
+      repetition_penalty: preset.repetition_penalty ?? character.repetition_penalty ?? null,
+      stop_sequences: preset.stop_sequences ?? character.stop_sequences ?? null,
+    };
+
+    // Route to the preset's configured provider using the user's API key for that provider
+    const mergedApiKeys = { ...apiKeys, openrouter: openRouterApiKey };
+    switch (preset.provider) {
+      case 'openai':
+        return await this.callOpenAI(preset.model_id, enhancedMessages, mergedApiKeys.openai, mergedCharacter);
+      case 'anthropic':
+        return await this.callAnthropic(preset.model_id, enhancedMessages, mergedApiKeys.anthropic, mergedCharacter);
+      case 'openrouter':
+        return await this.callOpenRouter(preset.model_id, enhancedMessages, mergedApiKeys.openrouter, mergedCharacter);
+      case 'google':
+      case 'gemini':
+        return await this.callGemini(preset.model_id, enhancedMessages, mergedApiKeys.google, mergedCharacter);
+      case 'ollama':
+        return await this.callOllama(preset.model_id, enhancedMessages, apiKeys.ollamaSettings || {}, mergedCharacter);
+      case 'lmstudio':
+        return await this.callLMStudio(preset.model_id, enhancedMessages, apiKeys.lmStudioSettings || {}, mergedCharacter);
+      default:
+        throw new Error(`Custom model preset has unsupported provider: ${preset.provider}`);
+    }
   }
 
-  static async getCustomModels() {
+  static async getCustomModels(userId) {
     try {
-      const { createClient } = require('@supabase/supabase-js');
-      const supabase = createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_SERVICE_ROLE_KEY
-      );
-
-      const { data: models } = await supabase
-        .from('custom_models')
-        .select('id, name, display_name, description, tags')
-        .eq('is_active', true)
-        .order('display_name');
-
-      return (models || []).map(m => ({
+      const { getInstance } = require('./LocalDatabaseService');
+      const localDb = getInstance();
+      const models = localDb.getCustomModels(userId);
+      return (models || []).filter(m => m.is_active).map(m => ({
         id: m.id,
         name: `${m.display_name}${m.tags?.length ? ' (' + m.tags.join(', ') + ')' : ''}`,
         description: m.description
@@ -694,6 +718,7 @@ class AIProviderService {
       return [];
     }
   }
+
 }
 
 module.exports = AIProviderService;

@@ -1,12 +1,11 @@
 /**
  * ImageUpload Component
  * 
- * Handles image uploads to Supabase storage with preview and management
+ * Handles image uploads with preview and management
  */
 
 import React, { useState, useRef } from 'react';
 import { Upload, X, Image as ImageIcon, Trash2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 const ImageUpload = ({
@@ -52,7 +51,7 @@ const ImageUpload = ({
     await uploadImage(file);
   };
 
-  // Upload image to Supabase Storage
+  // Upload image to backend
   const uploadImage = async (file) => {
     if (!user) {
       setError('You must be logged in to upload images');
@@ -61,59 +60,36 @@ const ImageUpload = ({
 
     setUploading(true);
     setError(null);
-    
-    let uploadedFileName = null;  // Track uploaded file
       
     try {
-      // Create a unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${type}/${Date.now()}.${fileExt}`;
-      uploadedFileName = fileName;
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('type', type);
 
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('user-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      // Upload to backend API
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/images/upload`, {
+        method: 'POST',
+        headers: {
+          'user-id': user.id
+        },
+        body: formData
+      });
 
-      if (uploadError) {
-        throw uploadError;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('user-images')
-        .getPublicUrl(fileName);
-
-      const imageUrl = urlData.publicUrl;
-
-      // Save image metadata to database
-      const { data: dbData, error: dbError } = await supabase
-        .from('user_images')
-        .insert({
-          user_id: user.id,
-          filename: fileName,
-          url: imageUrl,
-          type: type,
-          size_bytes: file.size
-        })
-        .select()
-        .single();
-
-      if (dbError) {
-          console.error('DB insert failed, rolling back storage upload');
-          await supabase.storage
-            .from('user-images')
-            .remove([fileName]);
-        throw dbError;
-      }
+      const data = await response.json();
+      
+      // Construct full URL for the uploaded image
+      const imageUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}${data.url}`;
 
       // Update parent component
       onImageChange({
         url: imageUrl,
-        filename: fileName,
+        filename: data.filename,
         useCustomImage: true
       });
 
@@ -132,33 +108,20 @@ const ImageUpload = ({
       if (!currentImage) return;
 
       try {
-        // Delete from storage if it's a custom uploaded image
-        if (currentImage.includes('user-images/')) {
+        // Delete from backend if it's a custom uploaded image
+        if (currentImage.includes('/uploads/')) {
           // Extract the filename from the URL
-          const urlParts = currentImage.split('/user-images/');
+          const urlParts = currentImage.split('/uploads/');
           if (urlParts.length > 1) {
             const fileName = urlParts[1];
             
-            const { error: storageError } = await supabase.storage
-              .from('user-images')
-              .remove([fileName]);
-
-            if (storageError) {
-              console.error('Storage deletion error:', storageError);
-              // Continue anyway - the database cleanup is more important
-            }
-
-            // Delete from database
-            const { error: dbError } = await supabase
-              .from('user_images')
-              .delete()
-              .eq('url', currentImage)
-              .eq('user_id', user.id);
-
-            if (dbError) {
-              console.error('Database deletion error:', dbError);
-              // Continue anyway - the main goal is to update the UI
-            }
+            // Call backend delete endpoint
+            await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/images/${type}/${fileName}`, {
+              method: 'DELETE',
+              headers: {
+                'user-id': user.id
+              }
+            });
           }
         }
 
@@ -206,7 +169,7 @@ const ImageUpload = ({
               name={`${type}-image-mode`}
               checked={!useCustomImage}
               onChange={handleSwitchToEmoji}
-              className="text-purple-500 focus:ring-purple-500"
+              className="text-orange-500 focus:ring-purple-500"
             />
             <span className="text-sm text-gray-300">
               {type === 'scene' ? 'No Background' : 'Use Emoji'}
@@ -219,7 +182,7 @@ const ImageUpload = ({
               name={`${type}-image-mode`}
               checked={useCustomImage}
               onChange={handleSwitchToCustomImage}
-              className="text-purple-500 focus:ring-purple-500"
+              className="text-orange-500 focus:ring-purple-500"
             />
             <span className="text-sm text-gray-300">Custom Image</span>
           </label>
@@ -243,7 +206,7 @@ const ImageUpload = ({
                 <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                   <button
                     onClick={handleRemoveImage}
-                    className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                    className="p-2 bg-orange-600 hover:bg-orange-700 text-white rounded-full transition-colors"
                     title="Remove image"
                   >
                     <Trash2 size={16} />
@@ -255,7 +218,7 @@ const ImageUpload = ({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="mt-2 text-sm text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                className="mt-2 text-sm text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50"
               >
                 Replace Image
               </button>
@@ -264,13 +227,13 @@ const ImageUpload = ({
             /* Upload Area */
             <div
               onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed border-white/20 rounded-lg p-6 text-center cursor-pointer hover:border-purple-400 hover:bg-white/5 transition-colors ${
+              className={`border-2 border-dashed border-white/20 rounded-lg p-6 text-center cursor-pointer hover:border-orange-400 hover:bg-white/5 transition-colors ${
                 aspectRatio === 'wide' ? 'aspect-video max-w-md' : 'aspect-square w-32'
               }`}
             >
               {uploading ? (
                 <div className="flex flex-col items-center justify-center h-full">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mb-2"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-400 mb-2"></div>
                   <p className="text-sm text-gray-400">Uploading...</p>
                 </div>
               ) : (
@@ -296,7 +259,7 @@ const ImageUpload = ({
 
       {/* Error Display */}
       {error && (
-        <div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded p-2">
+        <div className="text-orange-400 text-xs bg-orange-600/10 border border-orange-500/20 rounded p-2">
           {error}
         </div>
       )}

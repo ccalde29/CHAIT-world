@@ -15,6 +15,7 @@ const NewChatModal = ({
   const [step, setStep] = useState(1); // 1 = scene, 2 = characters
   const [selectedScene, setSelectedScene] = useState(null);
   const [selectedCharacters, setSelectedCharacters] = useState([]);
+  const [customTitle, setCustomTitle] = useState('');
 
   const handleSceneSelect = (scene) => {
     setSelectedScene(scene);
@@ -34,7 +35,7 @@ const NewChatModal = ({
 
   const handleStart = () => {
     if (selectedScene && selectedCharacters.length > 0) {
-      onStart(selectedScene, selectedCharacters);
+      onStart(selectedScene, selectedCharacters, customTitle);
       onClose();
     }
   };
@@ -45,7 +46,7 @@ const NewChatModal = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <Sparkles className="text-purple-400" size={24} />
+            <Sparkles className="text-orange-400" size={24} />
             <div>
               <h2 className="text-xl font-bold text-white">Start New Chat</h2>
               <p className="text-sm text-gray-400">
@@ -63,15 +64,15 @@ const NewChatModal = ({
 
         {/* Progress Steps */}
         <div className="flex items-center justify-center gap-4 px-6 py-4 bg-white/5">
-          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-purple-400' : 'text-gray-500'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 1 ? 'bg-purple-500' : 'bg-gray-700'}`}>
+          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-orange-400' : 'text-gray-500'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 1 ? 'bg-orange-600' : 'bg-gray-700'}`}>
               {step > 1 ? <Check size={16} /> : '1'}
             </div>
             <span className="text-sm font-medium">Scene</span>
           </div>
           <ArrowRight size={16} className="text-gray-500" />
-          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-purple-400' : 'text-gray-500'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 2 ? 'bg-purple-500' : 'bg-gray-700'}`}>
+          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-orange-400' : 'text-gray-500'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 2 ? 'bg-orange-600' : 'bg-gray-700'}`}>
               2
             </div>
             <span className="text-sm font-medium">Characters</span>
@@ -87,18 +88,18 @@ const NewChatModal = ({
                 <button
                   key={scene.id}
                   onClick={() => handleSceneSelect(scene)}
-                  className="bg-white/5 border border-white/10 rounded-lg p-4 hover:bg-white/10 hover:border-purple-400 transition-all text-left group"
+                  className="bg-white/5 border border-white/10 rounded-lg p-4 hover:bg-white/10 hover:border-orange-400 transition-all text-left group"
                 >
                   <div className="flex items-start gap-3 mb-3">
-                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center text-2xl">
+                    <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center text-2xl">
                       {scene.background_image_url ? (
                         <img src={scene.background_image_url} alt={scene.name} className="w-full h-full object-cover rounded-lg" />
                       ) : (
-                        <MapPin className="text-purple-400" size={24} />
+                        <MapPin className="text-orange-400" size={24} />
                       )}
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-medium text-white group-hover:text-purple-400 transition-colors">
+                      <h3 className="text-lg font-medium text-white group-hover:text-orange-400 transition-colors">
                         {scene.name}
                       </h3>
                       <p className="text-sm text-gray-400 mt-1">{scene.description}</p>
@@ -110,7 +111,7 @@ const NewChatModal = ({
                     </div>
                   )}
                   {scene.atmosphere && (
-                    <div className="text-xs text-purple-300 mt-2">
+                    <div className="text-xs text-orange-300 mt-2">
                       <span className="font-medium">Atmosphere:</span> {scene.atmosphere}
                     </div>
                   )}
@@ -122,13 +123,30 @@ const NewChatModal = ({
           {step === 2 && (
             /* Character Selection */
             <div>
-              <div className="mb-4 p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+              <div className="mb-4 p-4 bg-orange-600/10 border border-orange-500/30 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <MapPin size={16} className="text-purple-400" />
-                  <span className="text-sm font-medium text-purple-300">Selected Scene:</span>
+                  <MapPin size={16} className="text-orange-400" />
+                  <span className="text-sm font-medium text-orange-300">Selected Scene:</span>
                 </div>
                 <p className="text-white font-medium">{selectedScene?.name}</p>
                 <p className="text-sm text-gray-400 mt-1">{selectedScene?.description}</p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Chat Title (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder={`${selectedScene?.name} - ${new Date().toLocaleDateString()}`}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  maxLength={100}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty to use default format
+                </p>
               </div>
 
               <div className="mb-4">
@@ -139,7 +157,7 @@ const NewChatModal = ({
                   {selectedCharacters.length > 0 && (
                     <button
                       onClick={() => setSelectedCharacters([])}
-                      className="text-xs text-purple-400 hover:text-purple-300"
+                      className="text-xs text-orange-400 hover:text-orange-300"
                     >
                       Clear All
                     </button>
@@ -155,17 +173,17 @@ const NewChatModal = ({
                       key={character.id}
                       onClick={() => toggleCharacter(character)}
                       className={`bg-white/5 border rounded-lg p-3 hover:bg-white/10 transition-all text-left ${
-                        isSelected ? 'border-purple-400 bg-purple-500/10' : 'border-white/10'
+                        isSelected ? 'border-orange-400 bg-orange-600/10' : 'border-white/10'
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${character.color || 'from-gray-500 to-slate-500'} flex items-center justify-center text-lg`}>
+                        <div className={`w-10 h-10 rounded-full ${character.color || 'bg-gray-700'} flex items-center justify-center text-lg`}>
                           {character.avatar || '🤖'}
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-white">{character.name}</p>
-                            {isSelected && <Check size={14} className="text-purple-400" />}
+                            {isSelected && <Check size={14} className="text-orange-400" />}
                           </div>
                           {character.age && (
                             <p className="text-xs text-gray-500">{character.age} years old</p>
@@ -198,7 +216,7 @@ const NewChatModal = ({
             <button
               onClick={handleStart}
               disabled={selectedCharacters.length === 0}
-              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all font-medium flex items-center gap-2"
+              className="px-6 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all font-medium flex items-center gap-2"
             >
               <Users size={16} />
               Start Chat with {selectedCharacters.length} Character{selectedCharacters.length !== 1 ? 's' : ''}

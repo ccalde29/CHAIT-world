@@ -55,7 +55,10 @@ class PromptBuilder {
       character,
       userPersona,
       memories,
-      learningData
+      learningData,
+      config.characterMemories,
+      otherCharacters,
+      config.topicEngagement
     );
     if (memoryLayer) layers.push(memoryLayer);
 
@@ -94,6 +97,11 @@ class PromptBuilder {
     // Personality description
     if (character.personality) {
       layer += `${character.personality}\n\n`;
+    }
+
+    // Evolved personality growth (AI-compiled from past experiences)
+    if (character.personality_growth) {
+      layer += `[Through experience: ${character.personality_growth}]\n\n`;
     }
 
     // Appearance (if relevant for self-awareness)
@@ -278,7 +286,7 @@ class PromptBuilder {
   /**
    * Layer 4: Memories and learning insights
    */
-  buildMemoryLayer(character, userPersona, memories, learningData) {
+  buildMemoryLayer(character, userPersona, memories, learningData, characterMemories, otherCharacters, topicEngagement) {
     if (!memories || memories.length === 0) {
       return null;
     }
@@ -286,21 +294,73 @@ class PromptBuilder {
     const userName = userPersona?.name || 'the user';
     let layer = `WHAT YOU REMEMBER ABOUT ${userName.toUpperCase()}:\n`;
 
-    // Add top memories
+    // Add top memories about user
     for (const memory of memories.slice(0, 8)) {
-      layer += `- ${memory.memory_content}\n`;
+      layer += `- ${memory.content || memory.memory_content}\n`;
     }
 
-    // Add learning insights (topics discussed)
-    if (learningData && learningData.topics_discussed && learningData.topics_discussed.length > 0) {
-      layer += `\nTOPICS YOU'VE DISCUSSED:\n`;
+    // Add memories about other characters
+    if (characterMemories && Object.keys(characterMemories).length > 0 && otherCharacters) {
+      layer += `\nWHAT YOU REMEMBER ABOUT OTHER CHARACTERS:\n`;
       
-      const topTopics = [...learningData.topics_discussed]
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5)
-        .map(t => t.topic);
+      for (const otherChar of otherCharacters) {
+        const charMems = characterMemories[otherChar.id];
+        if (charMems && charMems.length > 0) {
+          layer += `\nAbout ${otherChar.name}:\n`;
+          for (const mem of charMems.slice(0, 3)) {
+            layer += `- ${mem.content || mem.memory_content}\n`;
+          }
+        }
+      }
+    }
+
+    // Add learning insights (communication style, patterns)
+    if (learningData && learningData.patterns && learningData.patterns.length > 0) {
+      layer += `\nLEARNED PATTERNS ABOUT USER:\n`;
       
-      layer += `${topTopics.join(', ')}\n`;
+      learningData.patterns.forEach(pattern => {
+        const data = pattern.pattern_data;
+        
+        if (pattern.learning_type === 'communication_style') {
+          if (data.formality_level > 0.6) {
+            layer += `- User prefers formal communication\n`;
+          } else if (data.formality_level < 0.4) {
+            layer += `- User prefers casual communication\n`;
+          }
+          
+          if (data.asks_questions) {
+            layer += `- User tends to ask questions frequently\n`;
+          }
+          
+          if (data.uses_emojis) {
+            layer += `- User uses emojis in messages\n`;
+          }
+        }
+        
+        if (pattern.learning_type === 'humor_style') {
+          if (data.appreciates_jokes) {
+            layer += `- User appreciates humor and jokes\n`;
+          }
+          if (data.uses_sarcasm) {
+            layer += `- User uses sarcasm\n`;
+          }
+        }
+      });
+    }
+
+    // Add topic interests
+    if (topicEngagement && topicEngagement.length > 0) {
+      layer += `\nTOPIC INTERESTS:\n`;
+      
+      for (const topic of topicEngagement.slice(0, 5)) {
+        const interestDesc = topic.interest_level > 0.7 ? 'very interested' :
+                             topic.interest_level > 0.5 ? 'interested' : 'somewhat interested';
+        
+        const emotionalDesc = topic.emotional_association > 0.3 ? ' (positive feelings)' :
+                              topic.emotional_association < -0.3 ? ' (negative feelings)' : '';
+        
+        layer += `- ${topic.topic}: ${interestDesc}${emotionalDesc} (discussed ${topic.times_discussed}x)\n`;
+      }
     }
 
     return layer;

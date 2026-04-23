@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, Save, User, MessageCircle, Sparkles, Sliders,
-  Brain, Zap, Tag, Globe, RefreshCw, AlertCircle, Users, Heart
+  Brain, Zap, Tag, Globe, RefreshCw, AlertCircle, Users, Heart, ChevronDown, ChevronUp
 } from 'lucide-react';
 import ImageUpload from './ImageUpload';
 
@@ -37,6 +37,11 @@ const CharacterEditorV15 = ({
     max_tokens: 150,
     context_window: 8000,
     memory_enabled: true,
+    top_p: null,
+    frequency_penalty: null,
+    presence_penalty: null,
+    repetition_penalty: null,
+    stop_sequences: null,
     chat_examples: [],
     relationships: [],
 
@@ -46,8 +51,14 @@ const CharacterEditorV15 = ({
     uses_custom_image: false,
 
     // AI Provider settings
-    ai_provider: 'openai',
-    ai_model: 'gpt-3.5-turbo'
+    ai_provider: null,
+    ai_model: '',
+    localType: 'ollama', // For local provider sub-type
+
+    // Personality evolution
+    personality_size: 'small',
+    memory_compile_interval: 20,
+    personality_growth: ''
   });
   
   const [tagInput, setTagInput] = useState('');
@@ -55,6 +66,9 @@ const CharacterEditorV15 = ({
   const [loadingModels, setLoadingModels] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [showAdvancedParams, setShowAdvancedParams] = useState(false);
+  const [compiling, setCompiling] = useState(false);
+  const [compileMessage, setCompileMessage] = useState(null);
 
   // Relationships state
   const [availableCharacters, setAvailableCharacters] = useState([]);
@@ -82,27 +96,41 @@ const CharacterEditorV15 = ({
         max_tokens: character.max_tokens || 150,
         context_window: character.context_window || 8000,
         memory_enabled: character.memory_enabled !== false,
+        top_p: character.top_p ?? null,
+        frequency_penalty: character.frequency_penalty ?? null,
+        presence_penalty: character.presence_penalty ?? null,
+        repetition_penalty: character.repetition_penalty ?? null,
+        stop_sequences: character.stop_sequences ?? null,
         chat_examples: character.chat_examples || [],
         relationships: character.relationships || [],
         avatar_image_url: character.avatar_image_url || null,
         avatar_image_filename: character.avatar_image_filename || null,
         uses_custom_image: character.uses_custom_image || false,
         ai_provider: character.ai_provider || 'openai',
-        ai_model: character.ai_model || ''  // Will be set by loadAvailableModels
+        ai_model: character.ai_model || '',  // Will be set by loadAvailableModels
+        localType: character.ai_provider === 'local' ? (character.ai_model?.includes('lmstudio') ? 'lmstudio' : 'ollama') : 'ollama',
+        personality_size: character.personality_size || 'small',
+        memory_compile_interval: character.memory_compile_interval || 20,
+        personality_growth: character.personality_growth || ''
       });
+      // Models will be loaded by the useEffect that watches formData.ai_provider
     } else {
-      // Create mode - use defaults
+      // Create mode - use user's default settings
+      const defaultProvider = userSettings?.defaultProvider || 'openai';
       setFormData(prev => ({
         ...prev,
-        ai_provider: 'openai',
-        ai_model: ''  // Will be set by loadAvailableModels
+        ai_provider: defaultProvider,
+        ai_model: userSettings?.defaultModel || ''  // Will be validated by loadAvailableModels
       }));
+      // Models will be loaded by the useEffect that watches formData.ai_provider
     }
-  }, [character]);
+  }, [character, userSettings]);
   
   // Load available models when provider changes or on initial mount
   useEffect(() => {
     if (formData.ai_provider) {
+      // Clear models first to show loading state
+      setAvailableModels([]);
       loadAvailableModels(formData.ai_provider);
     }
   }, [formData.ai_provider]);
@@ -116,6 +144,34 @@ const CharacterEditorV15 = ({
     setError(null);
 
     try {
+      // Handle custom model presets - fetch from custom-models endpoint
+      if (provider === 'custom') {
+        const response = await fetch(`${API_BASE_URL}/api/custom-models`, {
+          headers: { 'user-id': user.id }
+        });
+        const data = await response.json();
+        const presets = data.models || [];
+        if (presets.length > 0) {
+          const formattedModels = presets.map(m => ({
+            id: m.id,
+            name: m.display_name || m.name,
+            tier: 'custom'
+          }));
+          setAvailableModels(formattedModels);
+
+          const currentModelExists = formattedModels.find(m => m.id === formData.ai_model);
+          const shouldSetDefaultModel = !character || !formData.ai_model || !currentModelExists;
+          if (shouldSetDefaultModel) {
+            setFormData(prev => ({ ...prev, ai_model: formattedModels[0].id }));
+          }
+        } else {
+          setAvailableModels([]);
+          setError('No custom model presets found. Create one in Settings → Model Manager.');
+        }
+        setLoadingModels(false);
+        return;
+      }
+
       // Get the appropriate API key from user settings
       let apiKey = null;
 
@@ -136,6 +192,9 @@ const CharacterEditorV15 = ({
         }
       }
 
+      // Determine actual provider for local
+      const actualProvider = provider === 'local' ? (formData.localType || 'ollama') : provider;
+
       const response = await fetch(`${API_BASE_URL}/api/providers/models`, {
         method: 'POST',
         headers: {
@@ -143,7 +202,7 @@ const CharacterEditorV15 = ({
           'user-id': user.id
         },
         body: JSON.stringify({
-          provider,
+          provider: actualProvider,
           apiKey,
           ollamaSettings: userSettings?.ollamaSettings,
           lmStudioSettings: userSettings?.lmStudioSettings || { baseUrl: 'http://localhost:1234' }
@@ -155,10 +214,18 @@ const CharacterEditorV15 = ({
       if (data.models && data.models.length > 0) {
         setAvailableModels(data.models);
 
-        // Auto-select first model if current model not in list or is empty
+        // Only auto-select first model if:
+        // 1. We're creating a new character (not editing), OR
+        // 2. The current model is empty/not set, OR
+        // 3. The current model doesn't exist in the available models list
         const currentModelExists = data.models.find(m => m.id === formData.ai_model);
-        if (!currentModelExists || !formData.ai_model) {
-          setFormData(prev => ({ ...prev, ai_model: data.models[0].id }));
+        const shouldSetDefaultModel = !character || !formData.ai_model || !currentModelExists;
+        
+        if (shouldSetDefaultModel) {
+          // Use user's default model preference if available, otherwise first model
+          const defaultModel = userSettings?.defaultModel || data.models[0].id;
+          const useDefaultModel = data.models.find(m => m.id === defaultModel) ? defaultModel : data.models[0].id;
+          setFormData(prev => ({ ...prev, ai_model: useDefaultModel }));
         }
         // Clear any previous errors since models loaded successfully
         setError(null);
@@ -209,18 +276,21 @@ const CharacterEditorV15 = ({
     // Set default models for each provider
     const defaultModels = {
       'openai': 'gpt-4o-mini',
-      'anthropic': 'claude-3-5-haiku-20241022',
+      'anthropic': 'claude-haiku-4-5',
       'openrouter': 'openai/gpt-4o-mini',
       'google': 'gemini-1.5-flash-latest',
-      'ollama': 'llama2',
-      'lmstudio': 'local-model'
+      'local': 'llama2',
+      'custom': '' // Will be set from custom model preset selection
     };
 
     setFormData(prev => ({
       ...prev,
       ai_provider: provider,
-      ai_model: defaultModels[provider] || 'gpt-4o-mini' // Set default, will be updated when models load
+      ai_model: '' // Clear model first, will be set when models load
     }));
+    
+    // Load models for the new provider
+    loadAvailableModels(provider);
   };
   
   // ============================================================================
@@ -305,7 +375,6 @@ const CharacterEditorV15 = ({
 
       if (response.ok) {
         const data = await response.json();
-        console.log('[CharacterEditor] Loaded relationships:', data.relationships);
         setCharacterRelationships(data.relationships || []);
       }
     } catch (error) {
@@ -376,11 +445,55 @@ const CharacterEditorV15 = ({
   // Load relationships when editing an existing character
   useEffect(() => {
     if (character?.id) {
-      console.log('[CharacterEditor] Loading relationships for character:', character.id);
       loadCharacterRelationships();
       loadAvailableCharactersForRelationships();
     }
   }, [character?.id, loadCharacterRelationships, loadAvailableCharactersForRelationships]);
+
+  // ============================================================================
+  // PERSONALITY EVOLUTION HANDLERS
+  // ============================================================================
+
+  const handleCompileNow = async () => {
+    if (!character?.id) return;
+    setCompiling(true);
+    setCompileMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/characters/${character.id}/compile`, {
+        method: 'POST',
+        headers: { 'user-id': user.id, 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setCompileMessage({ type: 'success', text: data.message });
+        if (data.growth) {
+          setFormData(prev => ({ ...prev, personality_growth: data.growth }));
+        }
+      } else {
+        setCompileMessage({ type: 'error', text: data.error || 'Compile failed' });
+      }
+    } catch (err) {
+      setCompileMessage({ type: 'error', text: 'Network error during compile' });
+    } finally {
+      setCompiling(false);
+    }
+  };
+
+  const handleClearGrowth = async () => {
+    if (!character?.id) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/characters/${character.id}/clear-growth`, {
+        method: 'POST',
+        headers: { 'user-id': user.id, 'Content-Type': 'application/json' }
+      });
+      if (response.ok) {
+        setFormData(prev => ({ ...prev, personality_growth: '' }));
+        setCompileMessage({ type: 'success', text: 'Growth cleared' });
+      }
+    } catch (err) {
+      setCompileMessage({ type: 'error', text: 'Failed to clear growth' });
+    }
+  };
 
   const handleSave = async () => {
     if (!validateForm()) return;
@@ -389,8 +502,14 @@ const CharacterEditorV15 = ({
     setError(null);
     
     try {
+      // Convert 'local' provider to actual provider (ollama or lmstudio)
+      const actualProvider = formData.ai_provider === 'local' 
+        ? (formData.localType || 'ollama') 
+        : formData.ai_provider;
+
       const characterData = {
         ...formData,
+        ai_provider: actualProvider,
         tags: formData.tags.length > 0 ? formData.tags : ['custom']
       };
       
@@ -419,13 +538,13 @@ const CharacterEditorV15 = ({
       anthropic: {
         name: 'Anthropic',
         icon: '🧠',
-        color: 'text-purple-400',
+        color: 'text-orange-400',
         description: 'Claude models - thoughtful and nuanced'
       },
       openrouter: {
         name: 'OpenRouter',
         icon: '🌐',
-        color: 'text-blue-400',
+        color: 'text-orange-400',
         description: 'Access to 100+ models'
       },
       google: {
@@ -434,23 +553,17 @@ const CharacterEditorV15 = ({
         color: 'text-yellow-400',
         description: 'Gemini models - fast and efficient'
       },
-      ollama: {
-        name: 'Ollama',
+      local: {
+        name: 'Local',
         icon: '💻',
         color: 'text-cyan-400',
-        description: 'Local models - free and private'
-      },
-      lmstudio: {
-        name: 'LM Studio',
-        icon: '🖥️',
-        color: 'text-indigo-400',
-        description: 'Local GGUF models - high performance'
+        description: 'Local models (Ollama/LM Studio) - free and private'
       },
       custom: {
-        name: 'Custom Model',
+        name: 'Custom Preset',
         icon: '⚙️',
-        color: 'text-yellow-400',
-        description: 'Admin-created custom model presets'
+        color: 'text-purple-400',
+        description: 'Your saved model presets from Model Manager'
       }
     };
 
@@ -470,7 +583,7 @@ const CharacterEditorV15 = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10 sticky top-0 bg-gray-900 z-10">
           <div className="flex items-center gap-3">
-            <User className="text-red-500" size={24} />
+            <User className="text-orange-500" size={24} />
             <h2 className="text-xl font-bold text-white">
               {character ? 'Edit Character' : 'Create Character'}
             </h2>
@@ -485,7 +598,7 @@ const CharacterEditorV15 = ({
         
         {/* Error Message - Only show if there's an error and no models loaded */}
         {error && availableModels.length === 0 && (
-          <div className="mx-6 mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-400">
+          <div className="mx-6 mt-4 p-3 bg-orange-600/20 border border-red-500/30 rounded-lg flex items-center gap-2 text-orange-400">
             <AlertCircle size={16} />
             <span className="text-sm">{error}</span>
           </div>
@@ -497,7 +610,7 @@ const CharacterEditorV15 = ({
           {/* Basic Info */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Sparkles size={18} className="text-red-500" />
+              <Sparkles size={18} className="text-orange-500" />
               Basic Information
             </h3>
             
@@ -506,7 +619,7 @@ const CharacterEditorV15 = ({
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Character Name *
                 <span className={`ml-2 text-xs ${
-                  formData.name.length > 50 ? 'text-red-400' : 'text-gray-500'
+                  formData.name.length > 50 ? 'text-orange-400' : 'text-gray-500'
                 }`}>
                   ({formData.name.length} / 50 characters)
                 </span>
@@ -584,7 +697,7 @@ const CharacterEditorV15 = ({
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Appearance
                 <span className={`ml-2 text-xs ${
-                  formData.appearance.length > 1000 ? 'text-red-400' : 'text-gray-500'
+                  formData.appearance.length > 1000 ? 'text-orange-400' : 'text-gray-500'
                 }`}>
                   ({formData.appearance.length} / 1000 characters)
                 </span>
@@ -604,25 +717,61 @@ const CharacterEditorV15 = ({
 
             {/* Personality */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Personality & Background *
-                <span className={`ml-2 text-xs ${
-                  formData.personality.length > 500 ? 'text-red-400' : 'text-gray-500'
-                }`}>
-                  ({formData.personality.length} / 500 characters)
-                </span>
-              </label>
-              <p className="text-xs text-gray-400 mb-2">
-                This is the core of your character. Describe their personality traits, background story, speaking style, interests, and how they interact with others. Be specific and detailed - this directly shapes how the AI will roleplay this character.
-              </p>
-              <textarea
-                value={formData.personality}
-                onChange={(e) => handleInputChange('personality', e.target.value)}
-                placeholder="Describe who this character is, their personality traits, background, speaking style, interests, etc."
-                rows={6}
-                maxLength={500}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[140px]"
-              />
+              {(() => {
+                const sizeLimits = { small: 500, medium: 1000, large: 2000 };
+                const maxPersonality = sizeLimits[formData.personality_size] || 500;
+                return (
+                  <>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Personality & Background *
+                      <span className={`ml-2 text-xs ${
+                        formData.personality.length > maxPersonality ? 'text-orange-400' : 'text-gray-500'
+                      }`}>
+                        ({formData.personality.length} / {maxPersonality} characters)
+                      </span>
+                    </label>
+                    <p className="text-xs text-gray-400 mb-2">
+                      This is the core of your character. Describe their personality traits, background story, speaking style, interests, and how they interact with others. Be specific and detailed - this directly shapes how the AI will roleplay this character.
+                    </p>
+                    <textarea
+                      value={formData.personality}
+                      onChange={(e) => handleInputChange('personality', e.target.value)}
+                      placeholder="Describe who this character is, their personality traits, background, speaking style, interests, etc."
+                      rows={6}
+                      maxLength={maxPersonality}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-red-400 resize-y min-h-[140px]"
+                    />
+
+                    {/* Personality Size selector */}
+                    <div className="mt-3">
+                      <p className="text-xs text-gray-400 mb-2">
+                        <span className="font-medium text-gray-300">Personality size</span> — sets the character limit for this field and the growth buffer (+50%).
+                      </p>
+                      <div className="flex gap-2">
+                        {[
+                          { value: 'small',  label: 'Small',  cap: 500  },
+                          { value: 'medium', label: 'Medium', cap: 1000 },
+                          { value: 'large',  label: 'Large',  cap: 2000 }
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => handleInputChange('personality_size', opt.value)}
+                            className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                              formData.personality_size === opt.value
+                                ? 'bg-orange-600/30 border-orange-500 text-orange-300'
+                                : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                            }`}
+                          >
+                            {opt.label}
+                            <span className="block text-gray-500 font-normal">{opt.cap} chars</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
             
             {/* Tags */}
@@ -656,7 +805,7 @@ const CharacterEditorV15 = ({
                   {formData.tags.map(tag => (
                     <span
                       key={tag}
-                      className="px-3 py-1 bg-red-500/20 text-red-300 rounded-full text-xs flex items-center gap-2"
+                      className="px-3 py-1 bg-orange-600/20 text-orange-300 rounded-full text-xs flex items-center gap-2"
                     >
                       {tag}
                       <button
@@ -683,9 +832,6 @@ const CharacterEditorV15 = ({
                   Define how this character knows other characters in your world. This helps create more natural conversations.
                 </p>
 
-                {/* Debug info */}
-                {console.log('[CharacterEditor] Relationships state:', characterRelationships)}
-
                 {/* Existing Relationships */}
                 {characterRelationships.length > 0 ? (
                   <div className="space-y-2 mb-3">
@@ -700,7 +846,7 @@ const CharacterEditorV15 = ({
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex items-start gap-3 flex-1">
-                              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${target.color} flex items-center justify-center flex-shrink-0`}>
+                              <div className={`w-10 h-10 rounded-full ${target.color} flex items-center justify-center flex-shrink-0`}>
                                 {target.uses_custom_image && target.avatar_image_url ? (
                                   <img
                                     src={target.avatar_image_url}
@@ -714,11 +860,11 @@ const CharacterEditorV15 = ({
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <p className="text-sm font-medium text-white">{target.name}</p>
-                                  <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">
+                                  <span className="text-xs bg-orange-600/20 text-orange-300 px-2 py-0.5 rounded-full">
                                     {rel.relationship_type}
                                   </span>
                                   {rel.target_persona && (
-                                    <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
+                                    <span className="text-xs bg-orange-600/20 text-orange-300 px-2 py-0.5 rounded-full">
                                       User Persona
                                     </span>
                                   )}
@@ -737,7 +883,7 @@ const CharacterEditorV15 = ({
                                   </div>
                                   <div>
                                     <span className="text-gray-500">Bond:</span>
-                                    <span className={`ml-1 ${rel.emotional_bond > 0 ? 'text-green-400' : rel.emotional_bond < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                                    <span className={`ml-1 ${rel.emotional_bond > 0 ? 'text-green-400' : rel.emotional_bond < 0 ? 'text-orange-400' : 'text-gray-400'}`}>
                                       {rel.emotional_bond > 0 ? '+' : ''}{Math.round(rel.emotional_bond * 100)}%
                                     </span>
                                   </div>
@@ -747,7 +893,7 @@ const CharacterEditorV15 = ({
                             <button
                               type="button"
                               onClick={() => handleDeleteRelationship(rel.target_id)}
-                              className="text-red-400 hover:text-red-300 p-1"
+                              className="text-orange-400 hover:text-orange-300 p-1"
                               title="Remove Relationship"
                             >
                               <X size={16} />
@@ -795,7 +941,7 @@ const CharacterEditorV15 = ({
           {/* AI Model Selection */}
           <div className="pt-6 border-t border-white/10 space-y-4">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Brain size={18} className="text-red-500" />
+              <Brain size={18} className="text-orange-500" />
               AI Model Configuration
             </h3>
 
@@ -808,7 +954,7 @@ const CharacterEditorV15 = ({
                 Choose between cloud API providers or local models running on your machine.
               </p>
 
-              <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className="grid grid-cols-3 gap-2 mb-4">
                 <button
                   type="button"
                   onClick={() => {
@@ -819,7 +965,7 @@ const CharacterEditorV15 = ({
                   }}
                   className={`p-3 rounded-lg border transition-all ${
                     ['openai', 'anthropic', 'openrouter', 'google'].includes(formData.ai_provider)
-                      ? 'bg-purple-500/20 border-purple-500 text-white'
+                      ? 'bg-orange-600/20 border-purple-500 text-white'
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
                 >
@@ -830,35 +976,18 @@ const CharacterEditorV15 = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (formData.ai_provider !== 'ollama') {
-                      handleProviderChange('ollama');
+                    if (formData.ai_provider !== 'local') {
+                      handleProviderChange('local');
                     }
                   }}
                   className={`p-3 rounded-lg border transition-all ${
-                    formData.ai_provider === 'ollama'
+                    formData.ai_provider === 'local'
                       ? 'bg-cyan-500/20 border-cyan-500 text-white'
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
                 >
                   <div className="text-2xl mb-1">💻</div>
-                  <div className="text-xs font-medium">Ollama</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (formData.ai_provider !== 'lmstudio') {
-                      handleProviderChange('lmstudio');
-                    }
-                  }}
-                  className={`p-3 rounded-lg border transition-all ${
-                    formData.ai_provider === 'lmstudio'
-                      ? 'bg-indigo-500/20 border-indigo-500 text-white'
-                      : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">🖥️</div>
-                  <div className="text-xs font-medium">LM Studio</div>
+                  <div className="text-xs font-medium">Local</div>
                 </button>
 
                 <button
@@ -870,12 +999,12 @@ const CharacterEditorV15 = ({
                   }}
                   className={`p-3 rounded-lg border transition-all ${
                     formData.ai_provider === 'custom'
-                      ? 'bg-yellow-500/20 border-yellow-500 text-white'
+                      ? 'bg-purple-500/20 border-purple-500 text-white'
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
                 >
                   <div className="text-2xl mb-1">⚙️</div>
-                  <div className="text-xs font-medium">Custom</div>
+                  <div className="text-xs font-medium">Custom Presets</div>
                 </button>
               </div>
 
@@ -888,13 +1017,32 @@ const CharacterEditorV15 = ({
                   <select
                     value={formData.ai_provider}
                     onChange={(e) => handleProviderChange(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-purple-400"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-orange-400"
                   >
                     <option value="openai" className="bg-gray-800">🤖 OpenAI - GPT Models</option>
                     <option value="anthropic" className="bg-gray-800">🧠 Anthropic - Claude Models</option>
                     <option value="openrouter" className="bg-gray-800">🌐 OpenRouter - 100+ Models</option>
                     <option value="google" className="bg-gray-800">✨ Google - Gemini Models</option>
-                    <option value="custom" className="bg-gray-800">⚙️ Custom Model</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Local Provider Sub-Type Selection */}
+              {formData.ai_provider === 'local' && (
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-400 mb-2">
+                    Select Local Provider
+                  </label>
+                  <select
+                    value={formData.localType || 'ollama'}
+                    onChange={(e) => {
+                      setFormData(prev => ({ ...prev, localType: e.target.value }));
+                      loadAvailableModels('local');
+                    }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="ollama" className="bg-gray-800">💻 Ollama</option>
+                    <option value="lmstudio" className="bg-gray-800">🖥️ LM Studio</option>
                   </select>
                 </div>
               )}
@@ -975,7 +1123,7 @@ const CharacterEditorV15 = ({
           {/* Advanced Settings */}
           <div className="pt-6 border-t border-white/10 space-y-4">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Sliders size={18} className="text-red-500" />
+              <Sliders size={18} className="text-orange-500" />
               Advanced Settings
             </h3>
 
@@ -1036,7 +1184,7 @@ const CharacterEditorV15 = ({
                   type="button"
                   onClick={() => handleInputChange('memory_enabled', !formData.memory_enabled)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    formData.memory_enabled ? 'bg-red-500' : 'bg-gray-600'
+                    formData.memory_enabled ? 'bg-orange-600' : 'bg-gray-600'
                   }`}
                 >
                   <span
@@ -1055,6 +1203,246 @@ const CharacterEditorV15 = ({
                 </span>
               </p>
             </div>
+
+            {/* Personality Growth Compile Interval */}
+            {formData.memory_enabled && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <Brain size={14} className="inline mr-1 text-orange-400" />
+                  Personality Growth Interval
+                </label>
+                <p className="text-xs text-gray-400 mb-2">
+                  After this many messages, memories are compiled into the character's personality growth. The character grows and changes over time based on your conversations.
+                </p>
+                <select
+                  value={formData.memory_compile_interval}
+                  onChange={(e) => handleInputChange('memory_compile_interval', parseInt(e.target.value))}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-2.5 text-white text-sm focus:outline-none focus:border-orange-400"
+                >
+                  <option value={10} className="bg-gray-800">Every 10 messages (fast evolution)</option>
+                  <option value={20} className="bg-gray-800">Every 20 messages (balanced)</option>
+                  <option value={30} className="bg-gray-800">Every 30 messages (slow, deep evolution)</option>
+                </select>
+              </div>
+            )}
+
+            {/* Personality Growth — read-only display + controls (edit mode only) */}
+            {character?.id && (
+              <div className="rounded-lg border border-white/10 bg-white/3 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-300 flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-orange-400" />
+                    Personality Growth
+                  </label>
+                  <div className="flex gap-2">
+                    {formData.personality_growth && (
+                      <button
+                        type="button"
+                        onClick={handleClearGrowth}
+                        className="text-xs px-2.5 py-1 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-500/20 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCompileNow}
+                      disabled={compiling}
+                      className="text-xs px-2.5 py-1 rounded bg-orange-600/20 text-orange-300 hover:bg-orange-600/30 border border-orange-500/20 transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {compiling ? <RefreshCw size={11} className="animate-spin" /> : <Brain size={11} />}
+                      {compiling ? 'Compiling…' : 'Compile Now'}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  AI-generated growth built from memories. Compiled automatically every {formData.memory_compile_interval} messages.
+                </p>
+                {formData.personality_growth ? (
+                  <p className="text-sm text-gray-300 bg-white/5 rounded p-3 italic leading-relaxed">
+                    {formData.personality_growth}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500 italic">
+                    No growth compiled yet. Chat with this character to build memories, then compile.
+                  </p>
+                )}
+                {compileMessage && (
+                  <p className={`text-xs ${compileMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                    {compileMessage.text}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Advanced Model Parameters — collapsible */}
+            <div className="pt-4 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedParams(v => !v)}
+                className="flex items-center justify-between w-full text-sm font-medium text-gray-300 hover:text-white transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Sliders size={15} className="text-orange-400" />
+                  Advanced Model Parameters
+                  <span className="text-xs text-gray-500 font-normal">(optional overrides)</span>
+                </span>
+                {showAdvancedParams ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {showAdvancedParams && (
+                <div className="mt-4 space-y-5">
+                  <p className="text-xs text-gray-500">
+                    Leave a field blank to use the provider's default. Changes here override global defaults for this character only.
+                  </p>
+
+                  {/* Top P */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Top P{formData.top_p != null ? `: ${formData.top_p.toFixed(2)}` : ' — provider default'}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Nucleus sampling. Limits token selection to the top probability mass. Lower = more focused. Supported by all providers.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0.0"
+                        max="1.0"
+                        step="0.05"
+                        value={formData.top_p ?? 1.0}
+                        onChange={(e) => handleInputChange('top_p', parseFloat(e.target.value))}
+                        className="flex-1 accent-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('top_p', null)}
+                        className="text-xs text-gray-500 hover:text-orange-400 transition-colors whitespace-nowrap"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-1">
+                      <span>Narrow (0.0)</span><span>Full (1.0)</span>
+                    </div>
+                  </div>
+
+                  {/* Frequency Penalty */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Frequency Penalty{formData.frequency_penalty != null ? `: ${formData.frequency_penalty.toFixed(2)}` : ' — provider default'}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Reduces repetition of tokens proportional to how often they've appeared. Supported by OpenAI, OpenRouter, LM Studio.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="-2.0"
+                        max="2.0"
+                        step="0.05"
+                        value={formData.frequency_penalty ?? 0}
+                        onChange={(e) => handleInputChange('frequency_penalty', parseFloat(e.target.value))}
+                        className="flex-1 accent-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('frequency_penalty', null)}
+                        className="text-xs text-gray-500 hover:text-orange-400 transition-colors whitespace-nowrap"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-1">
+                      <span>More repetition (-2)</span><span>Less repetition (+2)</span>
+                    </div>
+                  </div>
+
+                  {/* Presence Penalty */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Presence Penalty{formData.presence_penalty != null ? `: ${formData.presence_penalty.toFixed(2)}` : ' — provider default'}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Encourages the model to introduce new topics by penalising tokens that have appeared at all. Supported by OpenAI, OpenRouter, LM Studio.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="-2.0"
+                        max="2.0"
+                        step="0.05"
+                        value={formData.presence_penalty ?? 0}
+                        onChange={(e) => handleInputChange('presence_penalty', parseFloat(e.target.value))}
+                        className="flex-1 accent-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('presence_penalty', null)}
+                        className="text-xs text-gray-500 hover:text-orange-400 transition-colors whitespace-nowrap"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-1">
+                      <span>Stay on topic (-2)</span><span>Explore more (+2)</span>
+                    </div>
+                  </div>
+
+                  {/* Repetition Penalty */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Repetition Penalty{formData.repetition_penalty != null ? `: ${formData.repetition_penalty.toFixed(2)}` : ' — provider default'}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Penalises recently used tokens. Values {'>'} 1 reduce repetition. Supported by Ollama and OpenRouter.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="2.0"
+                        step="0.05"
+                        value={formData.repetition_penalty ?? 1.0}
+                        onChange={(e) => handleInputChange('repetition_penalty', parseFloat(e.target.value))}
+                        className="flex-1 accent-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleInputChange('repetition_penalty', null)}
+                        className="text-xs text-gray-500 hover:text-orange-400 transition-colors whitespace-nowrap"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600 mt-1">
+                      <span>Allow repeats (0.5)</span><span>Strongly avoid (2.0)</span>
+                    </div>
+                  </div>
+
+                  {/* Stop Sequences */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
+                      Stop Sequences
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Comma-separated strings that will stop generation when encountered. Supported by all providers.
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="e.g.  [END], ###, User:"
+                      value={Array.isArray(formData.stop_sequences) ? formData.stop_sequences.join(', ') : (formData.stop_sequences || '')}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const parsed = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : null;
+                        handleInputChange('stop_sequences', parsed?.length ? parsed : null);
+                      }}
+                      className="w-full bg-gray-700 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
@@ -1070,7 +1458,7 @@ const CharacterEditorV15 = ({
           <button
             onClick={handleSave}
             disabled={saving || loadingModels || !formData.ai_model}
-            className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Save size={16} />
             {saving ? 'Saving...' : character ? 'Update Character' : 'Create Character'}
@@ -1238,7 +1626,7 @@ const AddRelationshipForm = ({ availableCharacters, onAdd, onCancel }) => {
         <button
           type="button"
           onClick={handleSubmit}
-          className="flex-1 px-3 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white text-sm transition-colors"
+          className="flex-1 px-3 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg text-white text-sm transition-colors"
         >
           Add Relationship
         </button>

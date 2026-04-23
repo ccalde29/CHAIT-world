@@ -64,15 +64,15 @@ export const useCharacters = (apiRequest) => {
     if (characterSearch.trim()) {
       const searchLower = characterSearch.toLowerCase();
       filtered = filtered.filter(char =>
-        char.name.toLowerCase().includes(searchLower) ||
-        char.personality?.toLowerCase().includes(searchLower)
+        char?.name?.toLowerCase().includes(searchLower) ||
+        char?.personality?.toLowerCase().includes(searchLower)
       );
     }
 
     // Apply tag filter
     if (selectedTagFilter) {
       filtered = filtered.filter(char =>
-        char.tags?.includes(selectedTagFilter)
+        char?.tags?.includes(selectedTagFilter)
       );
     }
 

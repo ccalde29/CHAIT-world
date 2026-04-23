@@ -4,16 +4,9 @@
 // ============================================================================
 
 const express = require('express');
-const router = express.Router();
-const { createClient } = require('@supabase/supabase-js');
 const AIProviderService = require('../services/AIProviderService');
 const { aiCallLimiter } = require('../middleware/rateLimiter');
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
+const PersonalityEvolutionService = require('../services/PersonalityEvolutionService');
 // Core services
 const MemoryService = require('../services/MemoryService');
 const CharacterLearningService = require('../services/CharacterLearningService');
@@ -26,11 +19,68 @@ const ResponsePlanner = require('../services/ResponsePlanner');
 const MemoryRelevanceService = require('../services/MemoryRelevanceService');
 const SessionContinuityService = require('../services/SessionContinuityService');
 
-const memoryService = new MemoryService(supabase);
-const learningService = new CharacterLearningService(supabase);
-const promptBuilder = new PromptBuilder();
-const conversationTracker = new ConversationStateTracker();
-const sessionContinuity = new SessionContinuityService(supabase);
+// Export function that accepts db parameter
+module.exports = (db) => {
+  const router = express.Router();
+  
+  const memoryService = new MemoryService(db);
+  const learningService = new CharacterLearningService(db);
+  const promptBuilder = new PromptBuilder();
+  const conversationTracker = new ConversationStateTracker();
+  const sessionContinuity = new SessionContinuityService(db);
+
+  /**
+   * Extract topics from text using keyword and phrase detection
+   */
+  function extractTopicsFromText(text, limit = 3) {
+    const lower = text.toLowerCase();
+    
+    // Topic categories with keywords
+    const topicMap = {
+      'technology': ['computer', 'software', 'app', 'tech', 'code', 'program', 'ai', 'robot', 'internet', 'website'],
+      'sports': ['football', 'soccer', 'basketball', 'game', 'sport', 'team', 'player', 'match', 'compete'],
+      'music': ['song', 'music', 'band', 'concert', 'album', 'artist', 'sing', 'guitar', 'piano', 'listen'],
+      'food': ['food', 'eat', 'cook', 'restaurant', 'meal', 'dish', 'recipe', 'hungry', 'taste', 'delicious'],
+      'movies': ['movie', 'film', 'watch', 'cinema', 'actor', 'director', 'netflix', 'show', 'series'],
+      'books': ['book', 'read', 'novel', 'author', 'story', 'chapter', 'library', 'write', 'reading'],
+      'travel': ['travel', 'trip', 'vacation', 'visit', 'country', 'city', 'tourist', 'journey', 'explore'],
+      'work': ['work', 'job', 'career', 'office', 'boss', 'project', 'meeting', 'business', 'professional'],
+      'school': ['school', 'class', 'study', 'student', 'teacher', 'exam', 'homework', 'learn', 'education'],
+      'family': ['family', 'parent', 'mom', 'dad', 'sibling', 'child', 'relative', 'brother', 'sister'],
+      'relationships': ['love', 'relationship', 'boyfriend', 'girlfriend', 'date', 'partner', 'romance', 'friend'],
+      'health': ['health', 'doctor', 'sick', 'medicine', 'hospital', 'exercise', 'fitness', 'wellness'],
+      'politics': ['politics', 'government', 'election', 'president', 'vote', 'policy', 'law'],
+      'science': ['science', 'research', 'experiment', 'theory', 'discovery', 'study', 'lab'],
+      'art': ['art', 'paint', 'draw', 'artist', 'gallery', 'creative', 'design', 'sketch'],
+      'gaming': ['game', 'play', 'gamer', 'console', 'video game', 'esports', 'gaming'],
+      'fashion': ['fashion', 'clothes', 'style', 'outfit', 'wear', 'dress', 'shop', 'clothing'],
+      'nature': ['nature', 'animal', 'plant', 'tree', 'forest', 'outdoor', 'wildlife', 'environment']
+    };
+    
+    const detectedTopics = [];
+    
+    for (const [topic, keywords] of Object.entries(topicMap)) {
+      const matchCount = keywords.filter(kw => lower.includes(kw)).length;
+      if (matchCount > 0) {
+        detectedTopics.push({ topic, score: matchCount });
+      }
+    }
+    
+    // Sort by score and return top topics
+    return detectedTopics
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(t => t.topic);
+  }
+
+  /**
+   * Detect emotion in text for topic association
+   */
+  function detectEmotionInText(text) {
+    if (/\b(love|wonderful|amazing|great|excellent)\b/i.test(text)) return 0.5;
+    if (/\b(hate|terrible|awful|horrible)\b/i.test(text)) return -0.5;
+    return 0.0;
+  }
 
 /**
  * POST /api/chat/group-response
@@ -53,8 +103,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    console.log(`[Group Chat v2.0] Processing for ${activeCharacters.length} characters`);
-
     // ========================================================================
     // STEP 0: CREATE OR USE EXISTING SESSION
     // ========================================================================
@@ -63,105 +111,71 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
     // If no session provided, create a new one
     if (!activeSessionId) {
-      const { data: newSession, error: sessionError } = await supabase
-        .from('chat_sessions')
-        .insert({
-          user_id: userId,
-          scenario_id: currentScene || 'default',
-          active_characters: activeCharacters,
-          title: currentScene ? `Chat in ${currentScene}` : 'New Chat',
-          group_mode: 'natural'
-        })
-        .select()
-        .single();
-
-      if (sessionError) {
-        console.error('[Session] Error creating session:', sessionError);
-        return res.status(500).json({ error: 'Failed to create chat session' });
+      // Get scenario name for better title
+      let scenarioName = 'New Chat';
+      if (currentScene) {
+        const scenario = db.getScenario(currentScene);
+        scenarioName = scenario ? `${scenario.name} - ${new Date().toLocaleDateString()}` : 'New Chat';
       }
 
+      const newSession = await db.createChatSession(userId, {
+        scenario_id: currentScene || 'default',
+        active_characters: activeCharacters,
+        title: scenarioName,
+        group_mode: 'natural'
+      });
+
       activeSessionId = newSession.id;
-      console.log(`[Session] Created new session: ${activeSessionId}`);
     } else {
-      console.log(`[Session] Using existing session: ${activeSessionId}`);
     }
 
     // Save user message to database
-    await supabase
-      .from('messages')
-      .insert({
-        session_id: activeSessionId,
-        type: 'user',
-        content: userMessage
-      });
-
-    // Update message count
-    const { data: session } = await supabase
-      .from('chat_sessions')
-      .select('message_count')
-      .eq('id', activeSessionId)
-      .single();
-
-    await supabase
-      .from('chat_sessions')
-      .update({
-        message_count: (session?.message_count || 0) + 1,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', activeSessionId);
-
-    console.log(`[Session] Saved user message to session ${activeSessionId}`);
+    await db.saveChatMessage(activeSessionId, {
+      type: 'user',
+      content: userMessage
+    });
 
     // ========================================================================
     // STEP 1: LOAD CHARACTER DATA
     // ========================================================================
     
-    const { data: characters, error: charError } = await supabase
-      .from('characters')
-      .select('*')
-      .in('id', activeCharacters);
+    const characterPromises = activeCharacters.map(charId => db.getCharacter(charId));
+    const characters = (await Promise.all(characterPromises)).filter(char => char != null); // Filters both null and undefined
     
-    if (charError || !characters || characters.length === 0) {
-      return res.status(500).json({ error: 'Failed to load character data' });
+    if (!characters || characters.length === 0) {
+      console.error('[GroupChat] Failed to load characters. Active IDs:', activeCharacters);
+      console.error('[GroupChat] Loaded characters:', characters);
+      return res.status(500).json({ error: 'Failed to load character data. Characters may have been deleted.' });
     }
     
     // ========================================================================
     // STEP 2: LOAD USER SETTINGS & SCENE DATA
     // ========================================================================
 
-    const { data: userSettings, error: settingsError } = await supabase
-      .from('user_settings')
-      .select('api_keys, ollama_settings, admin_system_prompt')
-      .eq('user_id', userId)
-      .single();
+    const userSettings = await db.getUserSettings(userId);
 
-    const apiKeys = userSettings?.api_keys || {
+    const apiKeys = userSettings?.apiKeys || {
       openai: null,
       anthropic: null,
       openrouter: null,
       google: null
     };
 
-    const ollamaSettings = userSettings?.ollama_settings || {
+    const ollamaSettings = userSettings?.ollamaSettings || {
       baseUrl: 'http://localhost:11434'
     };
     
     // Add LM Studio settings
-    ollamaSettings.lmStudioSettings = userSettings?.lmstudio_settings || {
+    ollamaSettings.lmStudioSettings = userSettings?.lmStudioSettings || {
       baseUrl: 'http://127.0.0.1:1234'
     };
 
-    const adminSystemPrompt = userSettings?.admin_system_prompt || null;
+    const adminSystemPrompt = userSettings?.adminSystemPrompt || null;
 
     // Load scene data with context rules
     let sceneData = null;
     if (currentScene) {
-      const { data: scene } = await supabase
-        .from('scenarios')
-        .select('*')
-        .eq('id', currentScene)
-        .single();
-      sceneData = scene;
+      sceneData = await db.getScenario(userId, currentScene);
     }
 
     // ========================================================================
@@ -190,8 +204,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       conversationTracker
     );
 
-    console.log(`[Planning] ${responsePlan.responders.length} character(s) will respond`);
-
     // Limit to max 3 responding characters to prevent conversation breakdown
     const respondingCharacters = responsePlan.responders.slice(0, 3);
 
@@ -206,11 +218,10 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         const charData = {};
 
         // Load relationships
-        const { data: allRelationships } = await supabase
-          .from('character_relationships')
-          .select('*')
-          .eq('character_id', char.id)
-          .eq('user_id', userId);
+        const allRelationships = db.localDb.all(
+          'SELECT * FROM character_relationships WHERE character_id = ? AND user_id = ?',
+          [char.id, userId]
+        );
 
         charData.characterRelationships = allRelationships?.filter(r => r.target_type === 'character') || [];
         charData.userRelationship = allRelationships?.find(r => r.target_type === 'user' && r.target_id === userId) || {
@@ -244,6 +255,24 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           userId,
           activeSessionId
         );
+        
+        // Load memories about other characters in this session
+        if (char.memory_enabled !== false) {
+          const charToCharMemories = {};
+          for (const otherChar of respondingCharacters) {
+            if (otherChar.id === char.id) continue;
+            const filtered = await memoryService.db.getMemoriesByCharacter(
+              char.id, userId, 3, { target_type: 'character', target_entity: otherChar.id }
+            );
+            if (filtered.length > 0) charToCharMemories[otherChar.id] = filtered;
+          }
+          charData.characterMemories = charToCharMemories;
+        } else {
+          charData.characterMemories = {};
+        }
+        
+        // Load topic engagement
+        charData.topicEngagement = db.getTopInterests(char.id, 5);
 
         characterDataMap.set(char.id, charData);
 
@@ -320,7 +349,9 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
           memories: charData.memories,
           learningData: charData.learningData,
           adminSystemPrompt,
-          sessionContinuity: charData.continuity
+          sessionContinuity: charData.continuity,
+          characterMemories: charData.characterMemories,
+          topicEngagement: charData.topicEngagement
         });
 
         // Adapt prompt for provider
@@ -341,17 +372,10 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         const dynamicTemp = ProviderAdapter.calculateDynamicTemperature(char, charContext);
         const tokenBudget = ProviderAdapter.calculateResponseBudget(char, charContext);
 
-        console.log(`[Response] ${char.name} - Temp: ${dynamicTemp.toFixed(2)}, Tokens: ${tokenBudget}`);
-
-        // Generate response with adjusted character settings
-        const adjustedChar = {
-          ...char,
-          temperature: dynamicTemp,
-          max_tokens: tokenBudget
-        };
+        const resolvedChar = { ...char, temperature: dynamicTemp, max_tokens: tokenBudget };
 
         const rawResponse = await AIProviderService.generateResponse(
-          adjustedChar,
+          resolvedChar,
           messages,
           apiKeys,
           ollamaSettings
@@ -365,21 +389,18 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
         );
 
         // Save to database with metadata
-        await supabase
-          .from('messages')
-          .insert({
-            session_id: activeSessionId,
-            type: 'character',
-            character_id: char.id,
-            content: response,
-            is_primary_response: isPrimary,
-            response_metadata: {
-              temperature_used: dynamicTemp,
-              tokens_used: tokenBudget,
-              provider: char.ai_provider || 'openai',
-              model: char.ai_model || 'gpt-3.5-turbo'
-            }
-          });
+        await db.saveChatMessage(activeSessionId, {
+          type: 'character',
+          character_id: char.id,
+          content: response,
+          is_primary_response: isPrimary,
+          response_metadata: {
+            temperature_used: dynamicTemp,
+            tokens_used: tokenBudget,
+            provider: char.ai_provider || 'openai',
+            model: char.ai_model || 'gpt-3.5-turbo'
+          }
+        });
 
         // Update conversation state
         conversationTracker.updateState(
@@ -399,45 +420,101 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
         // Process memories and relationships
         try {
-          const newMemories = memoryService.analyzeConversationForMemories(
-            userMessage,
-            response,
-            userPersona,
-            userId
-          );
+          if (char.memory_enabled !== false) {
+            // Check if AI memory extraction is enabled
+            const useAIMemories = userSettings?.use_ai_memory_extraction || false;
+            
+            let newMemories;
+            if (useAIMemories) {
+              newMemories = await memoryService.extractMemoriesWithAI(
+                userMessage,
+                response,
+                char,
+                userPersona,
+                userId,
+                apiKeys
+              );
+            } else {
+              newMemories = memoryService.analyzeConversationForMemories(
+                userMessage,
+                response,
+                userPersona,
+                userId
+              );
+            }
 
-          for (const mem of newMemories) {
-            await memoryService.addCharacterMemory(char.id, userId, mem);
+            for (const mem of newMemories) {
+              await memoryService.addCharacterMemory(char.id, userId, mem);
+            }
+
+            const currentRelationship = await memoryService.getCharacterRelationship(char.id, userId);
+            const relationshipUpdate = memoryService.calculateRelationshipUpdate(
+              currentRelationship,
+              userMessage,
+              response
+            );
+            await memoryService.updateCharacterRelationship(char.id, userId, relationshipUpdate);
+
+            // Store character-to-character memories
+            const otherCharacterResponses = responses
+              .filter(r => r.character !== char.id)
+              .map(r => ({ character: r.character, content: r.response }));
+
+            if (otherCharacterResponses.length > 0) {
+              const charactersMap = {};
+              characters.forEach(c => { charactersMap[c.id] = c; });
+              const charToCharMemories = memoryService.analyzeCharacterInteractions(
+                char.id,
+                otherCharacterResponses,
+                charactersMap
+              );
+              for (const mem of charToCharMemories) {
+                await memoryService.addCharacterMemory(char.id, userId, mem);
+              }
+            }
           }
-
-          const currentRelationship = await memoryService.getCharacterRelationship(char.id, userId);
-          const relationshipUpdate = memoryService.calculateRelationshipUpdate(
-            currentRelationship,
-            userMessage,
-            response
-          );
-
-          await memoryService.updateCharacterRelationship(char.id, userId, relationshipUpdate);
         } catch (memErr) {
           console.error(`[Memory] Error for ${char.name}:`, memErr);
         }
 
+        // Personality evolution: increment counter, fire non-blocking compile when threshold hit
+        try {
+          if (char.memory_enabled !== false) {
+            const freshChar = db.localDb.incrementCompileCounter(char.id);
+            const interval = freshChar?.memory_compile_interval || char.memory_compile_interval || 20;
+            const count = freshChar?.messages_since_compile || 0;
+            if (count >= interval) {
+              PersonalityEvolutionService.compileGrowth(char, userId, db, apiKeys, ollamaSettings)
+                .catch(e => console.error(`[Evolution] Compile failed for ${char.name}:`, e));
+            }
+          }
+        } catch (evoErr) {
+          console.error(`[Evolution] Counter error for ${char.name}:`, evoErr);
+        }
+
         // Track learning
         try {
-          await learningService.recordInteraction(userId, char.id);
-          
-          const topicKeywords = extractTopicsFromText(userMessage + ' ' + response);
-          for (const topic of topicKeywords) {
-            await learningService.addTopicDiscussed(userId, char.id, topic);
+          if (char.memory_enabled !== false) {
+            await learningService.recordInteraction(userId, char.id, {
+              userMessage,
+              characterResponse: response,
+              userPersona
+            });
+            
+            const topicKeywords = extractTopicsFromText(userMessage + ' ' + response);
+            for (const topic of topicKeywords) {
+              const interestDelta = response.length > 100 ? 0.15 : 0.05;
+              const emotionalAssociation = detectEmotionInText(response);
+              await db.createOrUpdateTopicEngagement(char.id, topic, interestDelta, emotionalAssociation);
+            }
           }
         } catch (learnErr) {
           console.error(`[Learning] Error for ${char.name}:`, learnErr);
         }
 
-        console.log(`[Response] ${char.name}: "${response.substring(0, 80)}..."`);
-
       } catch (error) {
         console.error(`[Response] Error for ${char.name}:`, error);
+
         if (isPrimary) {
           responses.push({
             character: char.id,
@@ -457,9 +534,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
 
     // Validate group coherence
     const isCoherent = ResponsePlanner.validateGroupCoherence(responses);
-    if (!isCoherent) {
-      console.log('[Coherence] Warning: Potential contradictions detected in responses');
-    }
 
     // Store session metadata for continuity
     const conversationSummary = conversationTracker.getSummary();
@@ -468,8 +542,6 @@ router.post('/group-response', aiCallLimiter, async (req, res) => {
       key_topics: conversationSummary.active_topics,
       message_count: conversationHistory.length + responses.length
     });
-
-    console.log(`[Group Chat v3.0] Generated ${responses.length} responses`);
 
     res.json({
       sessionId: activeSessionId,
@@ -523,4 +595,5 @@ function extractTopicsFromText(text) {
   return topics;
 }
 
-module.exports = router;
+  return router;
+};

@@ -5,6 +5,7 @@ const express = require('express');
 const router = express.Router();
 
 module.exports = (db) => {
+    
     /**
      * Get all scenarios
      * GET /api/scenarios
@@ -207,6 +208,14 @@ module.exports = (db) => {
             const AIProviderService = require('../services/AIProviderService');
             const userSettings = await db.getUserSettings(req.userId);
 
+            const narratorAsCharacter = {
+                name: 'Narrator',
+                ai_provider: scene.narrator_ai_provider,
+                ai_model: scene.narrator_ai_model,
+                temperature: scene.narrator_temperature || 0.7,
+                max_tokens: scene.narrator_max_tokens || 100
+            };
+
             let narratorPrompt = `You are the narrator for this scene: ${scene.name}
 
 SCENE DESCRIPTION:
@@ -228,19 +237,11 @@ ${scene.atmosphere || 'neutral'}`;
 
 Keep responses brief (1-2 sentences). Focus on what's happening in the scene, not character dialogue.`;
 
-            const narratorAsCharacter = {
-                name: 'Narrator',
-                ai_provider: scene.narrator_ai_provider,
-                ai_model: scene.narrator_ai_model,
-                temperature: scene.narrator_temperature || 0.7,
-                max_tokens: scene.narrator_max_tokens || 100
-            };
-
             const response = await AIProviderService.generateResponse(
                 narratorAsCharacter,
                 [{ role: 'system', content: narratorPrompt }, ...(messages || []).slice(-10)],
-                userSettings.api_keys || {},
-                userSettings.ollama_settings || {}
+                userSettings?.apiKeys || {},
+                userSettings?.ollamaSettings || {}
             );
 
             res.json({ triggered: true, response, scene: scene.name });

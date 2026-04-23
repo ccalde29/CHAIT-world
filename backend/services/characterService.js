@@ -256,7 +256,7 @@ class CharacterService {
             console.error('Error deleting character image:', storageError);
             // Don't fail the deletion if image removal fails
           } else {
-            console.log(`[Deletion] Deleted image: ${character.avatar_image_filename}`);
+
           }
         } catch (err) {
           console.error('Error removing character image:', err);
@@ -274,7 +274,7 @@ class CharacterService {
         if (memoryError) {
           console.error('Error deleting character memories:', memoryError);
         } else {
-          console.log(`[Deletion] Deleted memories for character ${characterId}`);
+
         }
       } catch (err) {
         console.error('Error removing memories:', err);
@@ -304,7 +304,7 @@ class CharacterService {
         if (relError2) {
           console.error('Error deleting character relationships (target):', relError2);
         } else {
-          console.log(`[Deletion] Deleted relationships for character ${characterId}`);
+
         }
       } catch (err) {
         console.error('Error removing relationships:', err);
@@ -321,7 +321,7 @@ class CharacterService {
         if (learningError) {
           console.error('Error deleting character learning data:', learningError);
         } else {
-          console.log(`[Deletion] Deleted learning data for character ${characterId}`);
+
         }
       } catch (err) {
         console.error('Error removing learning data:', err);
@@ -336,7 +336,6 @@ class CharacterService {
 
       if (error) throw error;
 
-      console.log(`[Deletion] Successfully deleted character ${characterId} and all related data`);
       return {
         message: 'Character and all related data deleted successfully',
         characterId,

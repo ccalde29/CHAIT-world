@@ -5,8 +5,7 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, TrendingUp, Sparkles, DollarSign } from 'lucide-react';
-import CustomModelsPanel from './CustomModelsPanel';
+import { Shield, CheckCircle, XCircle, Eye, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
 
 const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   const [activeTab, setActiveTab] = useState('pending');
@@ -20,8 +19,6 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
   });
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(null);
-  const [pricing, setPricing] = useState({});
-  const [loadingPricing, setLoadingPricing] = useState(false);
 
   // Fetch moderation queue
   const fetchQueue = async () => {
@@ -52,26 +49,6 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
       console.error('Failed to fetch stats:', error);
     }
   };
-
-  // Fetch pricing
-  const fetchPricing = async () => {
-    setLoadingPricing(true);
-    try {
-      const response = await apiRequest('/api/pricing');
-      setPricing(response.pricing || {});
-    } catch (error) {
-      console.error('Failed to fetch pricing:', error);
-    } finally {
-      setLoadingPricing(false);
-    }
-  };
-
-  // Load pricing when pricing tab is selected
-  useEffect(() => {
-    if (activeTab === 'pricing' && Object.keys(pricing).length === 0) {
-      fetchPricing();
-    }
-  }, [activeTab]);
 
   // Load initial data
   useEffect(() => {
@@ -178,7 +155,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
       {/* Header */}
       <div className="bg-gray-800 border-b border-white/10 p-4">
         <div className="flex items-center gap-3">
-          <Shield className="text-purple-400" size={24} />
+          <Shield className="text-orange-400" size={24} />
           <div>
             <h2 className="text-xl font-bold text-white">Admin Panel</h2>
             <p className="text-sm text-gray-400">Review and moderate community content</p>
@@ -187,13 +164,12 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
       </div>
 
       {/* Tabs */}
-      <div className="bg-gray-800 border-b border-white/10 px-4">
-        <div className="flex gap-2">
-          <button
+      <div className="bg-gray-800 border-b border-white/10 px-4 overflow-x-auto">
+        <div className="flex gap-2 scrollbar-hide min-w-max">          <button
             onClick={() => setActiveTab('pending')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'pending'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -204,7 +180,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('reports')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'reports'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -215,34 +191,12 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
             onClick={() => setActiveTab('stats')}
             className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
               activeTab === 'stats'
-                ? 'text-purple-400 border-b-2 border-purple-400'
+                ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
             <TrendingUp size={18} />
             Stats
-          </button>
-          <button
-            onClick={() => setActiveTab('custom-models')}
-            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
-              activeTab === 'custom-models'
-                ? 'text-purple-400 border-b-2 border-purple-400'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <Sparkles size={18} />
-            Custom Models
-          </button>
-          <button
-            onClick={() => setActiveTab('pricing')}
-            className={`px-4 py-3 font-medium transition-all flex items-center gap-2 ${
-              activeTab === 'pricing'
-                ? 'text-purple-400 border-b-2 border-purple-400'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <DollarSign size={18} />
-            Pricing
           </button>
         </div>
       </div>
@@ -276,12 +230,12 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
                               item.moderation_status === 'pending'
                                 ? 'bg-yellow-500/20 text-yellow-400'
-                                : 'bg-red-500/20 text-red-400'
+                                : 'bg-orange-600/20 text-orange-400'
                             }`}>
                               {item.moderation_status}
                             </span>
                             {item.report_count > 0 && (
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400 flex items-center gap-1">
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-orange-600/20 text-orange-400 flex items-center gap-1">
                                 <AlertTriangle size={12} />
                                 {item.report_count} report{item.report_count > 1 ? 's' : ''}
                               </span>
@@ -307,7 +261,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                           <button
                             onClick={() => handleReject(item.id)}
                             disabled={processing === item.id}
-                            className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+                            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
                             title="Reject"
                           >
                             <XCircle size={18} />
@@ -344,13 +298,13 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-purple-500/20 text-purple-400">
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-orange-600/20 text-orange-400">
                                 {itemType}
                               </span>
                               <h3 className="text-lg font-bold text-white">
                                 {itemName}
                               </h3>
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400">
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-orange-600/20 text-orange-400">
                                 {report.reason}
                               </span>
                             </div>
@@ -376,7 +330,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                             <button
                               onClick={() => handleResolveReport(report.id, 'unpublish')}
                               disabled={processing === report.id}
-                              className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
                               title={isCharacter ? "Unpublish character" : "Delete scene"}
                             >
                               {isCharacter ? 'Unpublish' : 'Delete'}
@@ -415,7 +369,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
 
                     <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
                       <div className="flex items-center gap-3 mb-2">
-                        <XCircle className="text-red-400" size={24} />
+                        <XCircle className="text-orange-400" size={24} />
                         <h3 className="text-sm font-medium text-gray-400">Rejected</h3>
                       </div>
                       <p className="text-3xl font-bold text-white">{stats.rejected || 0}</p>
@@ -437,7 +391,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
                       <div className="flex items-center gap-3 mb-2">
-                        <Eye className="text-blue-400" size={24} />
+                        <Eye className="text-orange-400" size={24} />
                         <h3 className="text-sm font-medium text-gray-400">Total Characters</h3>
                       </div>
                       <p className="text-3xl font-bold text-white">{stats.totalCharacters || 0}</p>
@@ -445,7 +399,7 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
 
                     <div className="bg-gray-800 border border-white/10 rounded-lg p-6">
                       <div className="flex items-center gap-3 mb-2">
-                        <Eye className="text-purple-400" size={24} />
+                        <Eye className="text-orange-400" size={24} />
                         <h3 className="text-sm font-medium text-gray-400">Total Scenes</h3>
                       </div>
                       <p className="text-3xl font-bold text-white">{stats.totalScenes || 0}</p>
@@ -509,71 +463,12 @@ const ModerationPanel = ({ apiRequest, fullScreen = true }) => {
                 </div>
               </div>
             )}
-
-            {/* Custom Models Tab */}
-            {activeTab === 'custom-models' && (
-              <CustomModelsPanel apiRequest={apiRequest} />
-            )}
-
-            {/* Pricing Tab */}
-            {activeTab === 'pricing' && (
-              loadingPricing ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-gray-400">Loading pricing data...</div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-2">AI Model Pricing</h3>
-                    <p className="text-sm text-gray-400">
-                      Cost per 1M tokens for all supported AI providers. Updated regularly from provider APIs.
-                    </p>
-                  </div>
-
-                  {Object.entries(pricing).map(([provider, models]) => (
-                    <div key={provider} className="bg-gray-800 border border-white/10 rounded-lg p-4">
-                      <h4 className="text-lg font-semibold text-white mb-3 capitalize">
-                        {provider === 'openrouter' ? 'OpenRouter' : provider === 'ollama' ? 'Ollama (Local)' : provider === 'lmstudio' ? 'LM Studio (Local)' : provider}
-                      </h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b border-white/10">
-                              <th className="text-left py-2 px-3 text-sm font-medium text-gray-400">Model</th>
-                              <th className="text-right py-2 px-3 text-sm font-medium text-gray-400">Input</th>
-                              <th className="text-right py-2 px-3 text-sm font-medium text-gray-400">Output</th>
-                              <th className="text-right py-2 px-3 text-sm font-medium text-gray-400">Per</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {Array.isArray(models) && models.map((model, idx) => (
-                              <tr key={idx} className="border-b border-white/5 hover:bg-white/5">
-                                <td className="py-2 px-3 text-sm text-white">{model.name}</td>
-                                <td className="text-right py-2 px-3 text-sm text-gray-300">
-                                  {model.input === 0 ? 'FREE' : `$${model.input < 0.01 ? model.input.toFixed(4) : model.input.toFixed(2)}`}
-                                </td>
-                                <td className="text-right py-2 px-3 text-sm text-gray-300">
-                                  {model.output === 0 ? 'FREE' : `$${model.output < 0.01 ? model.output.toFixed(4) : model.output.toFixed(2)}`}
-                                </td>
-                                <td className="text-right py-2 px-3 text-sm text-gray-400">{model.per}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      {provider === 'ollama' || provider === 'lmstudio' ? (
-                        <p className="text-xs text-gray-500 mt-2">Runs locally on your machine - no API costs</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              )
-            )}
           </>
         )}
       </div>
     </div>
   );
 };
+
 
 export default ModerationPanel;

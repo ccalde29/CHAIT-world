@@ -47,7 +47,7 @@ export const useSettings = (apiRequest) => {
           interests: [],
           communication_style: 'casual and friendly',
           avatar: '=d',
-          color: 'from-blue-500 to-indigo-500'
+          color: 'bg-orange-600'
         }
       });
     }

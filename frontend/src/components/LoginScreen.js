@@ -23,15 +23,15 @@ const LoginScreen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-grey-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-2xl p-8 w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Users className="text-red-400" size={32} />
+            <Users className="text-orange-400" size={32} />
             <h1 className="text-2xl font-bold text-white">
               CH
-              <span className="text-red-400">AI</span>
+              <span className="text-orange-400">AI</span>
               T World
             </h1>
           </div>
@@ -74,7 +74,7 @@ const LoginScreen = () => {
           </button>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-red-300 text-sm">
+            <div className="bg-orange-600/10 border border-orange-500/20 rounded-lg p-3 text-orange-300 text-sm">
               {error}
             </div>
           )}

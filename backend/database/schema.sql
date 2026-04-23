@@ -37,7 +37,12 @@ CREATE TABLE IF NOT EXISTS characters (
     fallback_provider TEXT,
     fallback_model TEXT,
     voice_traits TEXT DEFAULT '{"humor": 0.5, "optimism": 0.5, "formality": 0.5, "verbosity": 0.5, "directness": 0.5, "emotiveness": 0.5, "intellectualism": 0.5}', -- JSON string
-    speech_patterns TEXT DEFAULT '{"uses_slang": false, "avoided_words": [], "favored_phrases": [], "punctuation_style": "casual", "uses_contractions": true, "typical_sentence_length": "medium"}' -- JSON string
+    speech_patterns TEXT DEFAULT '{"uses_slang": false, "avoided_words": [], "favored_phrases": [], "punctuation_style": "casual", "uses_contractions": true, "typical_sentence_length": "medium"}', -- JSON string
+    personality_size TEXT DEFAULT 'small' CHECK(personality_size IN ('small', 'medium', 'large')),
+    personality_growth TEXT DEFAULT NULL,        -- AI-compiled growth text (max 250/500/1000 chars)
+    memory_compile_interval INTEGER DEFAULT 20 CHECK(memory_compile_interval IN (10, 20, 30)),
+    messages_since_compile INTEGER DEFAULT 0,
+    personality_compiled_at DATETIME DEFAULT NULL
 );
 
 CREATE INDEX idx_characters_user ON characters(user_id);
@@ -146,6 +151,7 @@ CREATE TABLE IF NOT EXISTS character_memories (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     embedding_hash TEXT,
     tags TEXT, -- JSON array
+    compiled INTEGER DEFAULT 0, -- 1 = included in a personality_growth compile, pruned from active retrieval
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
     FOREIGN KEY (related_session_id) REFERENCES chat_sessions(id) ON DELETE SET NULL
 );
@@ -250,9 +256,19 @@ CREATE TABLE IF NOT EXISTS user_personas (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     user_id TEXT,
     name TEXT NOT NULL,
-    description TEXT,
-    avatar TEXT,
+    personality TEXT,
+    interests TEXT,
+    communication_style TEXT,
+    avatar TEXT DEFAULT '👤',
+    color TEXT DEFAULT 'from-blue-500 to-indigo-500',
+    avatar_image_url TEXT,
+    avatar_image_filename TEXT,
+    uses_custom_image INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 0,
+    ai_provider TEXT DEFAULT 'openai',
+    ai_model TEXT,
+    temperature REAL DEFAULT 0.8,
+    max_tokens INTEGER DEFAULT 150,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -347,6 +363,8 @@ CREATE TABLE IF NOT EXISTS user_settings_local (
     default_provider TEXT DEFAULT 'openai',
     default_model TEXT,
     active_persona_id TEXT,
+    group_dynamics_mode TEXT DEFAULT 'natural',
+    message_delay INTEGER DEFAULT 1200,
     preferences TEXT DEFAULT '{"responseDelay": true, "showTypingIndicator": true, "maxCharactersInGroup": 5, "theme": "dark", "fontSize": "medium"}', -- JSON
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -356,38 +374,40 @@ CREATE TABLE IF NOT EXISTS user_settings_local (
 CREATE INDEX idx_settings_user ON user_settings_local(user_id);
 
 -- =============================================================================
--- CHARACTER COMMENTS TABLE (LOCAL) - Comments on local characters (not community)
+-- CHARACTER NOTES TABLE (LOCAL) - Private notes/ratings on local characters
+-- Distinct from community character_comments in Supabase
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS character_comments (
+CREATE TABLE IF NOT EXISTS character_notes (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     character_id TEXT NOT NULL,
     user_id TEXT,
-    content TEXT NOT NULL,
+    note TEXT NOT NULL,
     rating INTEGER CHECK(rating >= 1 AND rating <= 5),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_character_comments_character ON character_comments(character_id);
-CREATE INDEX idx_character_comments_user ON character_comments(user_id);
+CREATE INDEX idx_character_notes_character ON character_notes(character_id);
+CREATE INDEX idx_character_notes_user ON character_notes(user_id);
 
 -- =============================================================================
--- SCENE COMMENTS TABLE (LOCAL) - Comments on local scenarios
+-- SCENE NOTES TABLE (LOCAL) - Private notes/ratings on local scenarios
+-- Distinct from community scene_comments in Supabase
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS scene_comments (
+CREATE TABLE IF NOT EXISTS scene_notes (
     id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     scenario_id TEXT NOT NULL,
     user_id TEXT,
-    content TEXT NOT NULL,
+    note TEXT NOT NULL,
     rating INTEGER CHECK(rating >= 1 AND rating <= 5),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (scenario_id) REFERENCES scenarios(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_scene_comments_scenario ON scene_comments(scenario_id);
-CREATE INDEX idx_scene_comments_user ON scene_comments(user_id);
+CREATE INDEX idx_scene_notes_scenario ON scene_notes(scenario_id);
+CREATE INDEX idx_scene_notes_user ON scene_notes(user_id);
 
 -- =============================================================================
 -- TRIGGERS FOR UPDATED_AT COLUMNS
@@ -447,17 +467,23 @@ BEGIN
     UPDATE user_settings_local SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
-CREATE TRIGGER update_character_comments_timestamp 
-AFTER UPDATE ON character_comments 
+CREATE TRIGGER update_character_notes_timestamp 
+AFTER UPDATE ON character_notes 
 BEGIN
-    UPDATE character_comments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    UPDATE character_notes SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
-CREATE TRIGGER update_scene_comments_timestamp 
-AFTER UPDATE ON scene_comments 
+CREATE TRIGGER update_scene_notes_timestamp 
+AFTER UPDATE ON scene_notes 
 BEGIN
-    UPDATE scene_comments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    UPDATE scene_notes SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
+
+-- =============================================================================
+-- TOKEN SYSTEM TABLES - MOVED TO SUPABASE
+-- =============================================================================
+-- Admin/token tables have been moved to Supabase for security
+-- See: supabase/migrations/20251225_admin_token_security.sql
 
 -- =============================================================================
 -- DATABASE VERSION TABLE

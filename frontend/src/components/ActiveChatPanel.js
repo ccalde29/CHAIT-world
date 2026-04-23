@@ -36,15 +36,15 @@ const ActiveChatPanel = ({
       {/* Header */}
       <div className="p-4 border-b border-white/10 flex items-center justify-between">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <MapPin size={20} className="text-purple-400" />
+          <MapPin size={20} className="text-orange-400" />
           Active Chat
         </h2>
         <button
           onClick={onToggleCollapse}
-          className="p-1 hover:bg-white/10 rounded transition-colors text-gray-400 hover:text-white"
+          className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
           title="Collapse panel"
         >
-          <ChevronRight size={18} />
+          <ChevronRight size={20} />
         </button>
       </div>
 
@@ -67,7 +67,7 @@ const ActiveChatPanel = ({
               {onChangeScene && (
                 <button
                   onClick={onChangeScene}
-                  className="text-xs text-purple-400 hover:text-purple-300"
+                  className="text-xs text-orange-400 hover:text-orange-300"
                 >
                   Change
                 </button>
@@ -86,7 +86,7 @@ const ActiveChatPanel = ({
               <p className="font-medium text-white">{currentScene.name}</p>
               <p className="text-xs text-gray-400 mt-1">{currentScene.description}</p>
               {currentScene.atmosphere && (
-                <p className="text-xs text-purple-300 mt-2">
+                <p className="text-xs text-orange-300 mt-2">
                   <span className="font-medium">Mood:</span> {currentScene.atmosphere}
                 </p>
               )}
@@ -119,8 +119,8 @@ const ActiveChatPanel = ({
                   <div className="flex items-start gap-3">
                     {/* Avatar */}
                     <div
-                      className={`flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br ${
-                        character.color || 'from-gray-500 to-slate-500'
+                      className={`flex-shrink-0 w-10 h-10 rounded-full ${
+                        character.color || 'bg-gray-700'
                       } flex items-center justify-center text-lg`}
                     >
                       {character.uses_custom_image && character.avatar_image_url ? (
@@ -141,7 +141,7 @@ const ActiveChatPanel = ({
                         {onRemoveCharacter && (
                           <button
                             onClick={() => onRemoveCharacter(character)}
-                            className="text-gray-400 hover:text-red-400 transition-colors"
+                            className="text-gray-400 hover:text-orange-400 transition-colors"
                             title="Remove from chat"
                           >
                             <X size={14} />
